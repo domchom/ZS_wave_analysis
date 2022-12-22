@@ -18,15 +18,15 @@ class BaseGUI(tk.Tk):
 
         # define variable types for the different widget field
         self.box_size = tk.IntVar()
-        self.box_size.set(20)
+        self.box_size.set(8)
         self.box_shift = tk.IntVar()
-        self.box_shift.set(20)
+        self.box_shift.set(8)
         self.plot_summary_ACFs = tk.BooleanVar()
-        self.plot_summary_ACFs.set(True)
+        self.plot_summary_ACFs.set(False)
         self.plot_summary_CCFs = tk.BooleanVar()
-        self.plot_summary_CCFs.set(True)
+        self.plot_summary_CCFs.set(False)
         self.plot_summary_peaks = tk.BooleanVar()
-        self.plot_summary_peaks.set(True)
+        self.plot_summary_peaks.set(False)
         self.plot_ind_ACFs = tk.BooleanVar()
         self.plot_ind_CCFs = tk.BooleanVar()
         self.plot_ind_peaks = tk.BooleanVar()
@@ -34,6 +34,7 @@ class BaseGUI(tk.Tk):
         self.acf_peak_thresh.set(0.1)
         self.group_names = tk.StringVar()
         self.folder_path = tk.StringVar()
+        self.folder_path.set('/Users/domchom/Desktop/112DCE_Ect2-titrate/crop_no-good')
         # set default value for 'roll' to False
         self.roll = False
 
