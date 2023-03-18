@@ -34,7 +34,6 @@ class BaseGUI(tk.Tk):
         self.acf_peak_thresh.set(0.1)
         self.group_names = tk.StringVar()
         self.folder_path = tk.StringVar()
-        self.folder_path.set('/Users/domchom/Desktop/112DCE_Ect2-titrate/crop_no-good')
         # set default value for 'roll' to False
         self.roll = False
 
@@ -42,8 +41,9 @@ class BaseGUI(tk.Tk):
         self.file_path_entry = ttk.Entry(self, textvariable = self.folder_path)
         self.file_path_entry.grid(row = 0, column = 0, padx = 10, sticky = 'E')
         self.file_path_button = ttk.Button(self, text = 'Select folder')
+
         # make a default path
-        #self.folder_path.set('/Users/bementmbp/Desktop/Scripts/waveAnalysis/small_test')
+        self.folder_path.set('/Users/domchom/Desktop/112DCE_Ect2-titrate/crop_no-good')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 

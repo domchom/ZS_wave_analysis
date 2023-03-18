@@ -189,7 +189,6 @@ class TotalSignalProcessor:
                     self.peak_mins[channel, box_num] = np.nan
 
                     # store the smoothed signal, peak locations, maxs, mins, and widths for each box in each channel
-                    # DC: might not acutally need this, as the code works fine without it (221222). Just putting for safety.
                     self.ind_peak_props[f'Ch {channel} Box {box_num}'] = {'smoothed': np.nan, 
                                                             'peaks': np.nan,
                                                             'proms': np.nan, 

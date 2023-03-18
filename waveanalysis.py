@@ -76,9 +76,9 @@ def main():
                     "Plot Summary ACFs" : plot_summary_ACFs,
                     "Plot Summary CCFs" : plot_summary_CCFs,
                     "Plot Summary Peaks" : plot_summary_peaks,
-                    "Plot Indivdual ACFs" : plot_ind_ACFs,
-                    "Plot Indivdual CCFs" : plot_ind_CCFs,
-                    "Plot Indivdual Peaks" : plot_ind_peaks,
+                    "Plot Individual ACFs" : plot_ind_ACFs,
+                    "Plot Individual CCFs" : plot_ind_CCFs,
+                    "Plot Individual Peaks" : plot_ind_peaks,
                     "Group Matching Errors" : [],
                     "Files Processed" : [],
                     "Files Not Processed" : [],
@@ -233,14 +233,14 @@ def main():
 
                 if plot_ind_peaks:        
                     ind_peak_plots = processor.plot_ind_peak_props()
-                    ind_peak_path = os.path.join(im_save_path, 'Indidvidual_peak_plots')
+                    ind_peak_path = os.path.join(im_save_path, 'Individual_peak_plots')
                     if not os.path.exists(ind_peak_path):
                         os.makedirs(ind_peak_path)
                     for plot_name, plot in ind_peak_plots.items():
                         plot.savefig(f'{ind_peak_path}/{plot_name}.png')
                 if plot_ind_ACFs:
                     ind_acf_plots = processor.plot_ind_acfs()
-                    ind_acf_path = os.path.join(im_save_path, 'Indidvidual_ACF_plots')
+                    ind_acf_path = os.path.join(im_save_path, 'Individual_ACF_plots')
                     if not os.path.exists(ind_acf_path):
                         os.makedirs(ind_acf_path)
                     for plot_name, plot in ind_acf_plots.items():
@@ -249,7 +249,7 @@ def main():
                     if processor.num_channels == 1:
                         log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
                     ind_ccf_plots = processor.plot_ind_ccfs()
-                    ind_ccf_path = os.path.join(im_save_path, 'Indidvidual_CCF_plots')
+                    ind_ccf_path = os.path.join(im_save_path, 'Individual_CCF_plots')
                     if not os.path.exists(ind_ccf_path):
                         os.makedirs(ind_ccf_path)
                     for plot_name, plot in ind_ccf_plots.items():
@@ -295,12 +295,12 @@ def main():
                 # make a list of parameters to compare
                 stats_to_compare = ['Mean']
                 channels_to_compare = [f'Ch {i+1}' for i in range(processor.num_channels)]
-                measurments_to_compare = ['Period', 'Shift', 'Peak Width', 'Peak Max', 'Peak Min', 'Peak Amp', 'Peak Rel Amp']
+                measurements_to_compare = ['Period', 'Shift', 'Peak Width', 'Peak Max', 'Peak Min', 'Peak Amp', 'Peak Rel Amp']
                 params_to_compare = []
                 for channel in channels_to_compare:
                     for stat in stats_to_compare:
-                        for measurment in measurments_to_compare:
-                            params_to_compare.append(f'{channel} {stat} {measurment}')
+                        for measurement in measurements_to_compare:
+                            params_to_compare.append(f'{channel} {stat} {measurement}')
 
                 shifts_to_compare = [f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift' for combo in processor.channel_combos]
                 params_to_compare.extend(shifts_to_compare)
