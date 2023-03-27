@@ -282,6 +282,13 @@ def main():
 
             # create dataframe from summary list    
             summary_df = pd.DataFrame(summary_list, columns = col_headers)
+
+            # normalize relative amplitude to the lowest relative amplitude measurement
+            mean_rel_amp = summary_df['Ch 1 Mean Peak Rel Amp']
+            norm_mean_rel_amp = mean_rel_amp / mean_rel_amp.min() # calc
+            summary_df['Ch1 Norm Mean Rel Amp (x / min)'] = norm_mean_rel_amp # new column to the df
+
+            # save the summary csv file
             summary_df.to_csv(f'{main_save_path}/summary.csv', index = False)
 
             # if group names were entered into the gui, generate comparisons between each group

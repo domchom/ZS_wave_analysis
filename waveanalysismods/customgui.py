@@ -18,9 +18,9 @@ class BaseGUI(tk.Tk):
 
         # define variable types for the different widget field
         self.box_size = tk.IntVar()
-        self.box_size.set(8)
+        self.box_size.set(20)
         self.box_shift = tk.IntVar()
-        self.box_shift.set(8)
+        self.box_shift.set(20)
         self.plot_summary_ACFs = tk.BooleanVar()
         self.plot_summary_ACFs.set(False)
         self.plot_summary_CCFs = tk.BooleanVar()
@@ -43,7 +43,7 @@ class BaseGUI(tk.Tk):
         self.file_path_button = ttk.Button(self, text = 'Select folder')
 
         # make a default path
-        self.folder_path.set('/Users/domchom/Desktop/112DCE_Ect2-titrate/crop_no-good')
+        self.folder_path.set('/Volumes/DOM_LS/129DCE_230316_Rho-IT-waves-SFC/processed/t-series/raw_crop_diff')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 
