@@ -18,9 +18,9 @@ class BaseGUI(tk.Tk):
 
         # define variable types for the different widget field
         self.box_size = tk.IntVar()
-        self.box_size.set(20)
+        self.box_size.set(8)
         self.box_shift = tk.IntVar()
-        self.box_shift.set(20)
+        self.box_shift.set(8)
         self.plot_summary_ACFs = tk.BooleanVar()
         self.plot_summary_ACFs.set(False)
         self.plot_summary_CCFs = tk.BooleanVar()

@@ -201,9 +201,6 @@ def main():
                     except IndexError:
                         pass
 
-                # calculate the number of boxes used for analysis
-                num_meas = processor.xpix * processor.ypix
-
                 # calculate the population signal properties
                 processor.calc_ACF(peak_thresh = acf_peak_thresh)
                 processor.calc_peak_props()
@@ -277,16 +274,22 @@ def main():
                     for i in range(10):
                         dummy_pbar.update(1)
 
-
                 pbar.update(1)
 
             # create dataframe from summary list    
             summary_df = pd.DataFrame(summary_list, columns = col_headers)
 
-            # normalize relative amplitude to the lowest relative amplitude measurement
-            mean_rel_amp = summary_df['Ch 1 Mean Peak Rel Amp']
-            norm_mean_rel_amp = mean_rel_amp / mean_rel_amp.min() # calc
-            summary_df['Ch1 Norm Mean Rel Amp (x / min)'] = norm_mean_rel_amp # new column to the df
+            # Get column names for all channels
+            channel_cols = [col for col in summary_df.columns if 'Ch' in col and 'Mean Peak Rel Amp' in col]
+
+            # Normalize mean peak relative amplitude for each channel
+            for col in channel_cols:
+                channel_mean_rel_amp = summary_df[col]
+                norm_mean_rel_amp = channel_mean_rel_amp / channel_mean_rel_amp.min()
+                norm_col_name = col.replace('Mean Peak Rel Amp', 'Norm Mean Rel Amp (x/min)')
+                summary_df[norm_col_name] = norm_mean_rel_amp
+
+            summary_df = summary_df.sort_values('File Name', ascending=True)
 
             # save the summary csv file
             summary_df.to_csv(f'{main_save_path}/summary.csv', index = False)
@@ -348,11 +351,8 @@ def main():
 
                 # name without the extension
                 name_wo_ext = file_name.rsplit(".",1)[0]
-            
-                # calculate the number of boxes used for analysis
-                num_meas = processor.xpix * processor.ypix
 
-                # calculate the numbe of subframes used
+                # calculate the number of subframes used
                 num_submovies = processor.num_submovies
                 log_params['Submovies Used'].append(num_submovies)
 
