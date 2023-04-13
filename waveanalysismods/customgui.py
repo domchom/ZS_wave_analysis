@@ -18,15 +18,15 @@ class BaseGUI(tk.Tk):
 
         # define variable types for the different widget field
         self.box_size = tk.IntVar()
-        self.box_size.set(20)
+        self.box_size.set(8)
         self.box_shift = tk.IntVar()
-        self.box_shift.set(20)
+        self.box_shift.set(8)
         self.plot_summary_ACFs = tk.BooleanVar()
-        self.plot_summary_ACFs.set(True)
+        self.plot_summary_ACFs.set(False)
         self.plot_summary_CCFs = tk.BooleanVar()
-        self.plot_summary_CCFs.set(True)
+        self.plot_summary_CCFs.set(False)
         self.plot_summary_peaks = tk.BooleanVar()
-        self.plot_summary_peaks.set(True)
+        self.plot_summary_peaks.set(False)
         self.plot_ind_ACFs = tk.BooleanVar()
         self.plot_ind_CCFs = tk.BooleanVar()
         self.plot_ind_peaks = tk.BooleanVar()
@@ -41,8 +41,9 @@ class BaseGUI(tk.Tk):
         self.file_path_entry = ttk.Entry(self, textvariable = self.folder_path)
         self.file_path_entry.grid(row = 0, column = 0, padx = 10, sticky = 'E')
         self.file_path_button = ttk.Button(self, text = 'Select folder')
+
         # make a default path
-        #self.folder_path.set('/Users/bementmbp/Desktop/Scripts/waveAnalysis/small_test')
+        self.folder_path.set('/Volumes/DOM_LS/129DCE_230316_Rho-IT-waves-SFC/processed/t-series/raw_crop_diff')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 
