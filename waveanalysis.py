@@ -10,9 +10,6 @@ import matplotlib.pyplot as plt
 from waveanalysismods.customgui import BaseGUI, RollingGUI
 from waveanalysismods.processor import TotalSignalProcessor, RollingSignalProcessor
 
-
-#hello
-
 np.seterr(divide='ignore', invalid='ignore')
 
 def main():
