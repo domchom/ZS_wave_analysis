@@ -121,10 +121,10 @@ def main():
         ax.set_xticklabels(ax.get_xticklabels(),rotation=45)
         fig = ax.get_figure()
         return fig
-
+    
     ''' ** error catching for group names ** '''
     # list of file names in specified directory
-    file_names = filelist = [fname for fname in os.listdir(folder_path) if fname.endswith('.tif') and not fname.startswith('.')]
+    file_names = [fname for fname in os.listdir(folder_path) if fname.endswith('.tif') and not fname.startswith('.')]
 
     # list of groups that matched to file names
     groups_found = np.unique([group for group in group_names for file in file_names if group in file]).tolist()
@@ -286,12 +286,11 @@ def main():
             for col in channel_cols:
                 channel_mean_rel_amp = summary_df[col]
                 norm_mean_rel_amp = channel_mean_rel_amp / channel_mean_rel_amp.min()
-                norm_col_name = col.replace('Mean Peak Rel Amp', 'Norm Mean Rel Amp (x/min)')
+                norm_col_name = col.replace('Mean Peak Rel Amp', 'Norm Mean Rel Amp')
                 summary_df[norm_col_name] = norm_mean_rel_amp
 
-            summary_df = summary_df.sort_values('File Name', ascending=True)
-
             # save the summary csv file
+            summary_df = summary_df.sort_values('File Name', ascending=True)
             summary_df.to_csv(f'{main_save_path}/summary.csv', index = False)
 
             # if group names were entered into the gui, generate comparisons between each group
@@ -312,8 +311,10 @@ def main():
                         for measurement in measurements_to_compare:
                             params_to_compare.append(f'{channel} {stat} {measurement}')
 
-                shifts_to_compare = [f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift' for combo in processor.channel_combos]
-                params_to_compare.extend(shifts_to_compare)
+                # will compare the shifts if multichannel movie
+                if hasattr(processor, 'channel_combos'):
+                    shifts_to_compare = [f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift' for combo in processor.channel_combos]
+                    params_to_compare.extend(shifts_to_compare)
 
                 # generate and save figures for each parameter
                 for param in params_to_compare:
@@ -324,12 +325,14 @@ def main():
                     except ValueError:
                         log_params['Plotting errors'].append(f'No data to compare for {param}')
 
+                # save the means for the attributes to make them easier to work with in prism
+                processor.save_means_to_csv(main_save_path, group_names, summary_df)
+
             end = timeit.default_timer()
             log_params["Time Elapsed"] = f"{end - start:.2f} seconds"
             # log parameters and errors
             make_log(main_save_path, log_params)
             print('Done!')
-
 
     if rolling:
         with tqdm(total = len(file_names)) as pbar:

@@ -661,6 +661,45 @@ class TotalSignalProcessor:
                     self.file_data_summary[f'Ch {channel + 1} {stat} Peak Rel Amp'] = self.peak_relamp_with_stats[channel][ind + 1]
             
         return self.file_data_summary
+    
+    def save_means_to_csv(self, main_save_path, group_names,summary_df):
+        """
+        Save the mean values of certain metrics to separate CSV files for each group.
+
+        Parameters:
+            main_save_path (str): The path where the CSV files will be saved.
+            group_names (list): A list of strings representing the names of the groups to be analyzed.
+            summary_df (pandas DataFrame): The summary DataFrame containing the data to be analyzed.
+
+        Returns:
+            None
+        """
+        for channel in range(self.num_channels):
+            data_to_extract = [f"Ch {channel + 1} {data}" for data in ['Mean Period', 'Mean Peak Width', 'Mean Peak Max', 'Mean Peak Min', 'Mean Peak Amp', 'Mean Peak Rel Amp', 'Norm Mean Rel Amp']]
+
+            # Set up the output file paths
+            output_file_paths = {}
+            for data_name in data_to_extract:
+                output_file_paths[f"{data_name}"] = f"{main_save_path}/table_{data_name.lower().replace(' ', '_')}_means.csv"
+            
+            # extract all the data (data_to_extract) from the summary df and store in a data frame
+            result_df = pd.DataFrame(columns=['Data Type', 'Group Name', 'Value'])
+            for data in data_to_extract:
+                for group_name in group_names:
+                    subset_df = summary_df.loc[summary_df['File Name'].str.contains(group_name)]
+                    values = subset_df[data].tolist()
+                    new_df = pd.DataFrame({'Data Type': data, 'Group Name': group_name, 'Value': values})
+                    result_df = pd.concat([result_df, new_df], ignore_index=True)
+
+            # extract, sort, and save individual tables for each data type in data_to_extract
+            for data_type, output_path in output_file_paths.items():
+                table = result_df[result_df['Data Type'] == data_type][['Group Name', 'Value']]
+                table = pd.pivot_table(table, index=table.index, columns='Group Name', values='Value')
+                for col in table.columns:
+                    table[col] = sorted(table[col], key=lambda x: 1 if pd.isna(x) or x == '' else 0)
+                table.to_csv(output_path, index=False)
+
+        
 
 
 ##############################################################################################################################################################################
