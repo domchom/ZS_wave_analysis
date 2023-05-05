@@ -3,7 +3,7 @@ import pandas as pd
 import scipy.signal as sig
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from tifffile import imread, imwrite, TiffFile
+from tifffile import imread, TiffFile
 import scipy.ndimage as nd
 np.seterr(divide='ignore', invalid='ignore')
 
@@ -666,13 +666,10 @@ class TotalSignalProcessor:
         """
         Save the mean values of certain metrics to separate CSV files for each group.
 
-        Parameters:
+        Args:
             main_save_path (str): The path where the CSV files will be saved.
             group_names (list): A list of strings representing the names of the groups to be analyzed.
             summary_df (pandas DataFrame): The summary DataFrame containing the data to be analyzed.
-
-        Returns:
-            None
         """
         for channel in range(self.num_channels):
             data_to_extract = [f"Ch {channel + 1} {data}" for data in ['Mean Period', 'Mean Peak Width', 'Mean Peak Max', 'Mean Peak Min', 'Mean Peak Amp', 'Mean Peak Rel Amp', 'Norm Mean Rel Amp']]
@@ -680,7 +677,7 @@ class TotalSignalProcessor:
             # Set up the output file paths
             output_file_paths = {}
             for data_name in data_to_extract:
-                output_file_paths[f"{data_name}"] = f"{main_save_path}/table_{data_name.lower().replace(' ', '_')}_means.csv"
+                output_file_paths[f"{data_name}"] = f"{main_save_path}/{data_name.lower().replace(' ', '_')}_means.csv"
             
             # extract all the data (data_to_extract) from the summary df and store in a data frame
             result_df = pd.DataFrame(columns=['Data Type', 'Group Name', 'Value'])
@@ -992,7 +989,7 @@ class RollingSignalProcessor:
         Summarizes the results of period, shift (if applicable) and peak analyses. Returns a
         SINGLE dataframe summarizing each of the relevant measurements for each submovie.
 
-        returns:
+        Returns:
         self.full_movie_summary is a dataframe summarizing the results of period, shift, and peak analyses for each submovie
         '''
         all_submovie_summary = []
