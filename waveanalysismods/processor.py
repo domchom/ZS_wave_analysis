@@ -129,6 +129,15 @@ class TotalSignalProcessor:
                 else:
                     delay_frames = np.nan
                     cc_curve = np.full((self.num_frames*2-1), np.nan)
+
+                # The script has issues when the shift is very small or none, so minus the average period from the two channels
+                period = (self.periods[combo[0],box] + self.periods[combo[1],box]) / 2
+                if abs(delay_frames) > abs(period * .5):
+                    if delay_frames < 0:
+                        delay_frames = delay_frames + period
+                    elif delay_frames > 0:
+                        delay_frames = delay_frames - period
+
                 self.shifts[combo_number, box] = delay_frames
                 self.ccfs[combo_number, box] = cc_curve
 
