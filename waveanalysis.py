@@ -52,7 +52,6 @@ def save_plots(plots, plot_dir):
     pool.close()
 
 def main():
-    '''** GUI Window and sanity checks'''
     # make GUI object and display the window
     gui = BaseGUI()
     gui.mainloop()
@@ -136,7 +135,6 @@ def main():
                         'Submovies Used' : []
                 } 
 
-    ''' ** housekeeping functions ** '''
     def make_log(directory, logParams):
         '''
         Convert dictionary of parameters to a log file and save it in the directory
@@ -161,7 +159,6 @@ def main():
         fig = ax.get_figure()
         return fig
     
-    ''' ** error catching for group names ** '''
     # list of file names in specified directory
     file_names = [fname for fname in os.listdir(folder_path) if fname.endswith('.tif') and not fname.startswith('.')]
 
@@ -193,7 +190,6 @@ def main():
             "\n****** ERROR ******")
         sys.exit()
 
-    ''' ** Main Workflow ** '''
     # performance tracker
     start = timeit.default_timer()
     # create main save path
