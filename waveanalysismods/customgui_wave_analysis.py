@@ -9,7 +9,7 @@ class BaseGUI(tk.Tk):
 
         # configure root window
         self.title("Define your analysis parameters")
-        self.geometry("600x235")
+        self.geometry("600x245")
         
         #sets number of columns in the main window
         self.columnconfigure(0, weight = 1)
@@ -27,6 +27,8 @@ class BaseGUI(tk.Tk):
         self.plot_summary_CCFs.set(False)
         self.plot_summary_peaks = tk.BooleanVar()
         self.plot_summary_peaks.set(False)
+        self.fast_process = tk.BooleanVar()
+        self.fast_process.set(False)
         self.plot_ind_ACFs = tk.BooleanVar()
         self.plot_ind_CCFs = tk.BooleanVar()
         self.plot_ind_peaks = tk.BooleanVar()
@@ -125,6 +127,12 @@ class BaseGUI(tk.Tk):
         self.rolling_button['command'] = self.launch_rolling_analysis
         self.rolling_button.grid(row = 9, column = 3, padx = 10, sticky = 'E')
 
+        self.fast_process_checkbox = ttk.Checkbutton(self, variable = self.fast_process)
+        self.fast_process_checkbox.grid(row = 8, column = 2, padx = 10, sticky = 'E')
+        self.fast_process_label = ttk.Label(self, text = 'Quicker Processing')
+        self.fast_process_label.grid(row = 8, column = 3, padx = 10, sticky = 'W')
+
+
     def get_folder_path(self):
         self.folder_path.set(askdirectory())
 
@@ -148,6 +156,7 @@ class BaseGUI(tk.Tk):
         self.plot_ind_CCFs = self.plot_ind_CCFs.get()
         self.plot_ind_peaks = self.plot_ind_peaks.get()
         self.folder_path = self.folder_path.get()
+        self.fast_process = self.fast_process.get()
         
         # convert group names to list of strings
         self.group_names = [group_name.strip() for group_name in self.group_names.split(',')]
