@@ -129,7 +129,7 @@ class BaseGUI(tk.Tk):
 
         self.fast_process_checkbox = ttk.Checkbutton(self, variable = self.fast_process)
         self.fast_process_checkbox.grid(row = 8, column = 2, padx = 10, sticky = 'E')
-        self.fast_process_label = ttk.Label(self, text = 'Quicker Processing')
+        self.fast_process_label = ttk.Label(self, text = 'Faster save time')
         self.fast_process_label.grid(row = 8, column = 3, padx = 10, sticky = 'W')
 
 
