@@ -22,11 +22,11 @@ class BaseGUI(tk.Tk):
         self.box_shift = tk.IntVar()
         self.box_shift.set(20)
         self.plot_summary_ACFs = tk.BooleanVar()
-        self.plot_summary_ACFs.set(False)
+        self.plot_summary_ACFs.set(True)
         self.plot_summary_CCFs = tk.BooleanVar()
-        self.plot_summary_CCFs.set(False)
+        self.plot_summary_CCFs.set(True)
         self.plot_summary_peaks = tk.BooleanVar()
-        self.plot_summary_peaks.set(False)
+        self.plot_summary_peaks.set(True)
         self.fast_process = tk.BooleanVar()
         self.fast_process.set(False)
         self.plot_ind_ACFs = tk.BooleanVar()
@@ -129,7 +129,7 @@ class BaseGUI(tk.Tk):
 
         self.fast_process_checkbox = ttk.Checkbutton(self, variable = self.fast_process)
         self.fast_process_checkbox.grid(row = 8, column = 2, padx = 10, sticky = 'E')
-        self.fast_process_label = ttk.Label(self, text = 'Faster save time')
+        self.fast_process_label = ttk.Label(self, text = 'Faster save for indv plots')
         self.fast_process_label.grid(row = 8, column = 3, padx = 10, sticky = 'W')
 
 
