@@ -7,6 +7,8 @@ import pandas as pd
 import seaborn as sns
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
 from waveanalysismods.customgui_wave_analysis import BaseGUI, RollingGUI
 from waveanalysismods.processor_wave_analysis import TotalSignalProcessor, RollingSignalProcessor
 
@@ -124,6 +126,27 @@ def main():
         ax.set_xticklabels(ax.get_xticklabels(),rotation=45)
         fig = ax.get_figure()
         return fig
+    
+    def calc_anova(dataFrame: pd.DataFrame, dependent: str, independent = 'Group Name'):
+        """
+        Calculate ANOVA and pairwise comparisons.
+
+        Parameters:
+            dataFrame: Input DataFrame containing the data.
+            dependent: Column name representing the dependent variable.
+            independent: Column name representing the independent variable (default: 'Group Name').
+
+        Returns:
+            Tuple containing the ANOVA table and pairwise comparisons.
+        """
+        new_df = dataFrame[[independent, dependent]].copy()
+        new_df = new_df.rename(columns={dependent: 'parameter', independent: 'group'})
+        
+        model = ols(formula='parameter ~ group', data=new_df).fit()
+        anova_table = sm.stats.anova_lm(model)
+        pairwise_comparisons = sm.stats.multicomp.pairwise_tukeyhsd(new_df['parameter'], new_df['group'])
+        
+        return anova_table, pairwise_comparisons
     
     # list of file names in specified directory
     file_names = [fname for fname in os.listdir(folder_path) if fname.endswith('.tif') and not fname.startswith('.')]
@@ -333,14 +356,19 @@ def main():
                     params_to_compare.extend(shifts_to_compare)
 
                 # generate and save figures for each parameter
-                for param in params_to_compare:
-                    try:
-                        fig = plotComparisons(summary_df, param)
-                        fig.savefig(f'{group_save_path}/{param}.png')
-                        plt.close(fig)
-                    except ValueError:
-                        log_params['Plotting errors'].append(f'No data to compare for {param}')
-
+                anova_path = os.path.join(main_save_path, 'pairwise_comparisons.txt')
+                with open(anova_path, 'w') as file:
+                    for param in params_to_compare:
+                        try:
+                            if not param == 'Ch 1 Mean Shift' or param == 'Ch 2 Mean Shift' or param == 'Ch 3 Mean Shift' or param == 'Ch 4 Mean Shift':
+                                anova_table, pairwise_comparisons = calc_anova(summary_df, param)
+                                file.write(f'{param}:\n{str(pairwise_comparisons)}\n{str(anova_table)}\n\n')
+                            fig = plotComparisons(summary_df, param)
+                            fig.savefig(f'{group_save_path}/{param}.png')
+                            plt.close(fig)
+                        except ValueError:
+                            log_params['Plotting errors'].append(f'No data to compare for {param}')
+                
                 # save the means for the attributes to make them easier to work with in prism
                 processor.save_means_to_csv(main_save_path, group_names, summary_df)
 

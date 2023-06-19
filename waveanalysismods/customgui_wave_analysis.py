@@ -45,7 +45,7 @@ class BaseGUI(tk.Tk):
         self.file_path_button = ttk.Button(self, text = 'Select folder')
 
         # make a default path
-        self.folder_path.set('/Users/domchom/Desktop/Isaac_data/003IHE_230414_FV_MgcdeltaGAP-waves/processed/not-for-analysis')
+        self.folder_path.set('/Users/domchom/Desktop')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 
@@ -70,8 +70,10 @@ class BaseGUI(tk.Tk):
         self.acf_peak_thresh_label.grid(row = 3, column = 1, padx = 10, sticky = 'W')
 
         # create group names entry widget
+        self.group_names.set('WT,82,IH1')
         self.group_names_entry = ttk.Entry(self, textvariable = self.group_names)
         self.group_names_entry.grid(row = 4, column = 0, padx = 10, sticky = 'E')
+
         # create group names label text
         self.group_names_label = ttk.Label(self, text = 'Group names')
         self.group_names_label.grid(row = 4, column = 1, padx = 10, sticky = 'W')
