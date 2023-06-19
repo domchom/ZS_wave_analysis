@@ -360,7 +360,7 @@ def main():
                 with open(anova_path, 'w') as file:
                     for param in params_to_compare:
                         try:
-                            if not param == 'Ch 1 Mean Shift' or param == 'Ch 2 Mean Shift' or param == 'Ch 3 Mean Shift' or param == 'Ch 4 Mean Shift':
+                            if param != 'Ch 1 Mean Shift' and param != 'Ch 2 Mean Shift' and param != 'Ch 3 Mean Shift' and param != 'Ch 4 Mean Shift':
                                 anova_table, pairwise_comparisons = calc_anova(summary_df, param)
                                 file.write(f'{param}:\n{str(pairwise_comparisons)}\n{str(anova_table)}\n\n')
                             fig = plotComparisons(summary_df, param)

@@ -45,7 +45,7 @@ class BaseGUI(tk.Tk):
         self.file_path_button = ttk.Button(self, text = 'Select folder')
 
         # make a default path
-        self.folder_path.set('/Users/domchom/Desktop')
+        self.folder_path.set('/Volumes/DOM_FIVE/143DCE_230524_Ect2_1000ng_utr_SFC/processed/raw_crop_diff')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 
@@ -70,7 +70,7 @@ class BaseGUI(tk.Tk):
         self.acf_peak_thresh_label.grid(row = 3, column = 1, padx = 10, sticky = 'W')
 
         # create group names entry widget
-        self.group_names.set('WT,82,IH1')
+        self.group_names.set('200ng,1000ng,DC154')
         self.group_names_entry = ttk.Entry(self, textvariable = self.group_names)
         self.group_names_entry.grid(row = 4, column = 0, padx = 10, sticky = 'E')
 
