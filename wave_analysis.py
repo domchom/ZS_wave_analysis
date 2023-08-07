@@ -32,10 +32,12 @@ def main():
     plot_summary_ACFs = gui.plot_summary_ACFs
     plot_summary_CCFs = gui.plot_summary_CCFs
     plot_summary_peaks = gui.plot_summary_peaks
+    plot_summary_latent_periods = gui.plot_summary_latent_periods
     plot_ind_ACFs = gui.plot_ind_ACFs
     plot_ind_CCFs = gui.plot_ind_CCFs
     plot_ind_peaks = gui.plot_ind_peaks
     fast_process = gui.fast_process
+    
 
     # if rolling GUI specified, make rolling GUI object and display the window
     if gui.roll:
@@ -82,6 +84,7 @@ def main():
                     "Plot Summary ACFs" : plot_summary_ACFs,
                     "Plot Summary CCFs" : plot_summary_CCFs,
                     "Plot Summary Peaks" : plot_summary_peaks,
+                    "Plot Summary Latent Periods": plot_summary_latent_periods,
                     "Plot Individual ACFs" : plot_ind_ACFs,
                     "Plot Individual CCFs" : plot_ind_CCFs,
                     "Plot Individual Peaks" : plot_ind_peaks,
@@ -228,6 +231,7 @@ def main():
                 # calculate the population signal properties
                 processor.calc_ACF(peak_thresh = acf_peak_thresh)
                 processor.calc_peak_props()
+                processor.calc_latent_period()
                 if processor.num_channels > 1:
                     processor.calc_CCF()
                 
@@ -247,6 +251,10 @@ def main():
                         plot.savefig(f'{im_save_path}/{plot_name}.png')
                 if plot_summary_peaks:
                     summ_peak_plots = processor.plot_mean_peak_props()
+                    for plot_name, plot in summ_peak_plots.items():
+                        plot.savefig(f'{im_save_path}/{plot_name}.png')
+                if plot_summary_latent_periods:
+                    summ_peak_plots = processor.plot_mean_latent_periods()
                     for plot_name, plot in summ_peak_plots.items():
                         plot.savefig(f'{im_save_path}/{plot_name}.png')
                 
@@ -343,7 +351,7 @@ def main():
                 # make a list of parameters to compare
                 stats_to_compare = ['Mean']
                 channels_to_compare = [f'Ch {i+1}' for i in range(processor.num_channels)]
-                measurements_to_compare = ['Period', 'Shift', 'Peak Width', 'Peak Max', 'Peak Min', 'Peak Amp', 'Peak Rel Amp']
+                measurements_to_compare = ['Period', 'Shift', 'Peak Width', 'Peak Max', 'Peak Min', 'Peak Amp', 'Peak Rel Amp', 'Latent Period']
                 params_to_compare = []
                 for channel in channels_to_compare:
                     for stat in stats_to_compare:

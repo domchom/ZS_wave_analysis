@@ -9,7 +9,7 @@ class BaseGUI(tk.Tk):
 
         # configure root window
         self.title("Define your analysis parameters")
-        self.geometry("600x245")
+        self.geometry("600x265")
         
         #sets number of columns in the main window
         self.columnconfigure(0, weight = 1)
@@ -27,6 +27,8 @@ class BaseGUI(tk.Tk):
         self.plot_summary_CCFs.set(True)
         self.plot_summary_peaks = tk.BooleanVar()
         self.plot_summary_peaks.set(True)
+        self.plot_summary_latent_periods = tk.BooleanVar()
+        self.plot_summary_latent_periods.set(True)
         self.fast_process = tk.BooleanVar()
         self.fast_process.set(False)
         self.plot_ind_ACFs = tk.BooleanVar()
@@ -45,32 +47,29 @@ class BaseGUI(tk.Tk):
         self.file_path_button = ttk.Button(self, text = 'Select folder')
 
         # make a default path
-        self.folder_path.set('/Volumes/DOM_FIVE/143DCE_230524_Ect2_1000ng_utr_SFC/processed/raw_crop_diff')
+        self.folder_path.set('/Users/domchom/Desktop/random_movies/latent_per_analysis_testing/crop')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 
         # box size selection widget
         self.box_size_entry = ttk.Entry(self, width = 3, textvariable = self.box_size)
         self.box_size_entry.grid(row = 1, column = 0, padx = 10, sticky = 'E')
-        # create box size label text
         self.box_size_label = ttk.Label(self, text = 'Box size (pixels)')
         self.box_size_label.grid(row = 1, column = 1, padx = 10, sticky = 'W')
 
         self.box_shift_entry = ttk.Entry(self, width = 3, textvariable = self.box_shift)
         self.box_shift_entry.grid(row = 2, column = 0, padx = 10, sticky = 'E')
-        # create box size label text
         self.box_shift_label = ttk.Label(self, text = 'Box shift (pixels)')
         self.box_shift_label.grid(row = 2, column = 1, padx = 10, sticky = 'W')
 
         # create ACF peak threshold entry widget
         self.acf_peak_thresh_entry = ttk.Entry(self, width = 3, textvariable = self.acf_peak_thresh)
         self.acf_peak_thresh_entry.grid(row = 3, column = 0, padx = 10, sticky = 'E')
-        # create ACF peak threshold label text
         self.acf_peak_thresh_label = ttk.Label(self, text = 'ACF peak threshold')
         self.acf_peak_thresh_label.grid(row = 3, column = 1, padx = 10, sticky = 'W')
 
         # create group names entry widget
-        self.group_names.set('200ng,1000ng,DC154')
+        self.group_names.set('200ng,T835')
         self.group_names_entry = ttk.Entry(self, textvariable = self.group_names)
         self.group_names_entry.grid(row = 4, column = 0, padx = 10, sticky = 'E')
 
@@ -96,6 +95,12 @@ class BaseGUI(tk.Tk):
         self.plot_summary_peaks_label = ttk.Label(self, text = 'Plot summary peaks')
         self.plot_summary_peaks_label.grid(row = 7, column = 1, padx = 10, sticky = 'W')
 
+        # create checkbox for plotting summary latent period
+        self.plot_summary_latent_periods_checkbox = ttk.Checkbutton(self, variable = self.plot_summary_peaks)
+        self.plot_summary_latent_periods_checkbox.grid(row = 8, column = 0, padx = 10, sticky = 'E')
+        self.plot_summary_latent_periods_label = ttk.Label(self, text = 'Plot summ latent per')
+        self.plot_summary_latent_periods_label.grid(row = 8, column = 1, padx = 10, sticky = 'W')
+
         # create checkbox for plotting individual ACFs
         self.plot_ind_ACFs_checkbox = ttk.Checkbutton(self, variable = self.plot_ind_ACFs)
         self.plot_ind_ACFs_checkbox.grid(row = 5, column = 2, padx = 10, sticky = 'E')
@@ -117,23 +122,23 @@ class BaseGUI(tk.Tk):
         # create start button
         self.start_button = ttk.Button(self, text = 'Start analysis')
         self.start_button['command'] = self.start_analysis
-        self.start_button.grid(row = 9, column = 0, padx = 10, sticky = 'E')
+        self.start_button.grid(row = 10, column = 0, padx = 10, sticky = 'E')
 
         # create cancel button
         self.cancel_button = ttk.Button(self, text = 'Cancel')
         self.cancel_button['command'] = self.cancel_analysis
-        self.cancel_button.grid(row = 9, column = 1, padx = 10, sticky = 'W')
+        self.cancel_button.grid(row = 10, column = 1, padx = 10, sticky = 'W')
 
-        # create button to launch rolling analysis gui
-        self.rolling_button = ttk.Button(self, text = 'Launch rolling analysis')
-        self.rolling_button['command'] = self.launch_rolling_analysis
-        self.rolling_button.grid(row = 9, column = 3, padx = 10, sticky = 'E')
-
+        # create button to multiprocessing
         self.fast_process_checkbox = ttk.Checkbutton(self, variable = self.fast_process)
         self.fast_process_checkbox.grid(row = 8, column = 2, padx = 10, sticky = 'E')
         self.fast_process_label = ttk.Label(self, text = 'Faster save for indv plots')
         self.fast_process_label.grid(row = 8, column = 3, padx = 10, sticky = 'W')
 
+        # create button to launch rolling analysis gui
+        self.rolling_button = ttk.Button(self, text = 'Launch rolling analysis')
+        self.rolling_button['command'] = self.launch_rolling_analysis
+        self.rolling_button.grid(row = 10, column = 3, padx = 10, sticky = 'E')
 
     def get_folder_path(self):
         self.folder_path.set(askdirectory())
@@ -154,6 +159,7 @@ class BaseGUI(tk.Tk):
         self.plot_summary_ACFs = self.plot_summary_ACFs.get()
         self.plot_summary_CCFs = self.plot_summary_CCFs.get()
         self.plot_summary_peaks = self.plot_summary_peaks.get()
+        self.plot_summary_latent_periods = self.plot_summary_latent_periods.get()
         self.plot_ind_ACFs = self.plot_ind_ACFs.get()
         self.plot_ind_CCFs = self.plot_ind_CCFs.get()
         self.plot_ind_peaks = self.plot_ind_peaks.get()
