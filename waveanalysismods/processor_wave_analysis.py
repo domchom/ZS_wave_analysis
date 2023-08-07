@@ -284,11 +284,11 @@ class TotalSignalProcessor:
             arr_mean = np.nanmean(arr, axis = 0)
             arr_std = np.nanstd(arr, axis = 0)
             x_axis = np.arange(-self.num_frames + 1, self.num_frames)
-            ax['A'].plot(x_axis, arr_mean, color='blue')
+            ax['A'].plot(x_axis, arr_mean, color='orange')
             ax['A'].fill_between(x_axis, 
                                  arr_mean - arr_std, 
                                  arr_mean + arr_std, 
-                                 color='blue', 
+                                 color='orange', 
                                  alpha=0.2)
             ax['A'].set_title(f'{channel_combo} Mean Crosscorrelation Curve ± Standard Deviation') 
             ax['B'].hist(shifts_or_periods)
