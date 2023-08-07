@@ -222,21 +222,15 @@ class TotalSignalProcessor:
                 peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*0.1)
 
                 if len(peaks) > 1:
-                    proms, _, _ = sig.peak_prominences(signal, peaks)
-                    mean_max = np.mean(signal[peaks], axis = 0)
-                    mean_min = np.mean(signal[peaks]-proms, axis = 0)
-                    threshold = ((mean_max - mean_min) / 2) + mean_min
-
                     indv_latent_periods = []
-                    indv_threshold_indices = []
                     
                     for i in range(len(peaks) - 1):
                         start_index, end_index = peaks[i], peaks[i + 1]
                         interval_signal = signal[start_index:end_index]
-                        below_threshold_indices = np.where(interval_signal < threshold)[0]
-                        time_under_threshold = len(below_threshold_indices)
+                        threshold = ((np.max(interval_signal) - np.min(interval_signal)) / 2 ) + np.min(interval_signal)
+                        below_threshold_frames = np.where(interval_signal < threshold)[0]
+                        time_under_threshold = len(below_threshold_frames)
                         indv_latent_periods.append(time_under_threshold)
-                        #indv_threshold_indices.append((start_index + below_threshold_indices[0], start_index + below_threshold_indices[-1]))
 
                     mean_time_below_threshold = np.mean(indv_latent_periods)
                     self.latent_periods[channel, box_num] = mean_time_below_threshold
