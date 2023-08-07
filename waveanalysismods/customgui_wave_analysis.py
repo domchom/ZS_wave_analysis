@@ -27,13 +27,12 @@ class BaseGUI(tk.Tk):
         self.plot_summary_CCFs.set(True)
         self.plot_summary_peaks = tk.BooleanVar()
         self.plot_summary_peaks.set(True)
-        self.plot_summary_latent_periods = tk.BooleanVar()
-        self.plot_summary_latent_periods.set(True)
         self.fast_process = tk.BooleanVar()
         self.fast_process.set(False)
         self.plot_ind_ACFs = tk.BooleanVar()
         self.plot_ind_CCFs = tk.BooleanVar()
         self.plot_ind_peaks = tk.BooleanVar()
+        self.plot_ind_peaks.set(True)
         self.acf_peak_thresh = tk.DoubleVar()
         self.acf_peak_thresh.set(0.1)
         self.group_names = tk.StringVar()
@@ -95,12 +94,6 @@ class BaseGUI(tk.Tk):
         self.plot_summary_peaks_label = ttk.Label(self, text = 'Plot summary peaks')
         self.plot_summary_peaks_label.grid(row = 7, column = 1, padx = 10, sticky = 'W')
 
-        # create checkbox for plotting summary latent period
-        self.plot_summary_latent_periods_checkbox = ttk.Checkbutton(self, variable = self.plot_summary_peaks)
-        self.plot_summary_latent_periods_checkbox.grid(row = 8, column = 0, padx = 10, sticky = 'E')
-        self.plot_summary_latent_periods_label = ttk.Label(self, text = 'Plot summ latent per')
-        self.plot_summary_latent_periods_label.grid(row = 8, column = 1, padx = 10, sticky = 'W')
-
         # create checkbox for plotting individual ACFs
         self.plot_ind_ACFs_checkbox = ttk.Checkbutton(self, variable = self.plot_ind_ACFs)
         self.plot_ind_ACFs_checkbox.grid(row = 5, column = 2, padx = 10, sticky = 'E')
@@ -159,7 +152,6 @@ class BaseGUI(tk.Tk):
         self.plot_summary_ACFs = self.plot_summary_ACFs.get()
         self.plot_summary_CCFs = self.plot_summary_CCFs.get()
         self.plot_summary_peaks = self.plot_summary_peaks.get()
-        self.plot_summary_latent_periods = self.plot_summary_latent_periods.get()
         self.plot_ind_ACFs = self.plot_ind_ACFs.get()
         self.plot_ind_CCFs = self.plot_ind_CCFs.get()
         self.plot_ind_peaks = self.plot_ind_peaks.get()
