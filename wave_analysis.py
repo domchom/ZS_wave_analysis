@@ -122,6 +122,8 @@ def main():
         independent variable (by default, set to Group Name). It returns a figure object showing
         a box and scatter plot of the dependent variable grouped by the independent variable.
         '''
+        plt.style.use('dark_background')
+
         ax = sns.boxplot(x=independent, y=dependent, data=dataFrame, palette = "Set2", showfliers = False)
         ax = sns.swarmplot(x=independent, y=dependent, data=dataFrame, color=".25")	
         ax.set_xticklabels(ax.get_xticklabels(),rotation=45)
@@ -281,7 +283,7 @@ def main():
                         ind_ccf_path = os.path.join(im_save_path, 'Individual_CCF_plots')
                         if not os.path.exists(ind_ccf_path):
                             os.makedirs(ind_ccf_path)
-                        for plot_name, plot in ind_peak_plots.items():
+                        for plot_name, plot in ind_ccf_plots.items():
                             plot.savefig(f'{ind_ccf_path}/{plot_name}.png')
 
                     if plot_ind_ACFs:

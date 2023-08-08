@@ -182,12 +182,10 @@ class TotalSignalProcessor:
                 if len(peaks) > 0:
                     proms, _, _ = sig.peak_prominences(signal, peaks)
                     widths, heights, leftIndex, rightIndex = sig.peak_widths(signal, peaks, rel_height=0.5)
-                    mean_width = np.mean(widths, axis=0)
-                    mean_max = np.mean(signal[peaks], axis = 0)
-                    mean_min = np.mean(signal[peaks]-proms, axis = 0)
-                    self.peak_widths[channel, box_num] = mean_width
-                    self.peak_maxs[channel, box_num] = mean_max
-                    self.peak_mins[channel, box_num] = mean_min
+
+                    self.peak_widths[channel, box_num] = np.mean(widths, axis=0)
+                    self.peak_maxs[channel, box_num] = np.mean(signal[peaks], axis = 0)
+                    self.peak_mins[channel, box_num] = np.mean(signal[peaks]-proms, axis = 0)
 
                     # store the smoothed signal, peak locations, maxs, mins, and widths for each box in each channel
                     self.ind_peak_props[f'Ch {channel} Box {box_num}'] = {'smoothed': signal, 
@@ -208,13 +206,15 @@ class TotalSignalProcessor:
                             start_index, end_index = peaks[i], peaks[i + 1]
                             interval_signal = signal[start_index:end_index]
                             threshold = ((np.max(interval_signal) - np.min(interval_signal)) / 2 ) + np.min(interval_signal)
+
                             below_threshold_frames = np.where(interval_signal < threshold)[0]
                             time_under_threshold = len(below_threshold_frames)
-                            
+
+                            thresholds.append(threshold)
                             indv_latent_periods.append(time_under_threshold)
                             indv_left_indexes.append(below_threshold_frames[0] + start_index)
                             indv_right_indexes.append(below_threshold_frames[-1] + start_index)
-                            thresholds.append(threshold)
+                            
 
                         mean_time_below_threshold = np.mean(indv_latent_periods)
 
@@ -270,6 +270,8 @@ class TotalSignalProcessor:
             '''
             Space saving function for plotting the mean autocorrelation or crosscorrelation curve. Returns a figure object.
             '''
+            plt.style.use('dark_background')
+
             fig, ax = plt.subplot_mosaic(mosaic = '''
                                                   AA
                                                   BC
@@ -277,11 +279,11 @@ class TotalSignalProcessor:
             arr_mean = np.nanmean(arr, axis = 0)
             arr_std = np.nanstd(arr, axis = 0)
             x_axis = np.arange(-self.num_frames + 1, self.num_frames)
-            ax['A'].plot(x_axis, arr_mean, color='blue')
+            ax['A'].plot(x_axis, arr_mean, color='orange')
             ax['A'].fill_between(x_axis, 
                                  arr_mean - arr_std, 
                                  arr_mean + arr_std, 
-                                 color='blue', 
+                                 color='orange', 
                                  alpha=0.2)
             ax['A'].set_title(f'{channel} Mean Autocorrelation Curve ± Standard Deviation') 
             ax['B'].hist(shifts_or_periods)
@@ -320,6 +322,8 @@ class TotalSignalProcessor:
             '''
             Space saving function for plotting the mean autocorrelation or crosscorrelation curve. Returns a figure object.
             '''
+            plt.style.use('dark_background')
+
             fig, ax = plt.subplot_mosaic(mosaic = '''
                                                   AA
                                                   BC
@@ -366,6 +370,11 @@ class TotalSignalProcessor:
         be easily visualized by or saved to a file using the key value as a file name.
         '''
         def return_figure(min_array: np.ndarray, max_array: np.ndarray, amp_array: np.ndarray, width_array: np.ndarray, latent_per_arr: np.ndarray, Ch_name: str):
+            '''
+            Space saving function for plotting the mean peak props. Returns a figure object.
+            '''
+            plt.style.use('dark_background')
+
             fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2)
             # filter nans out of arrays
             min_array = [val for val in min_array if not np.isnan(val)]
@@ -374,8 +383,8 @@ class TotalSignalProcessor:
             width_array = [val for val in width_array if not np.isnan(val)]
             latent_per_array = [val for val in latent_per_arr if not np.isnan(val)]
 
-            plot_params = { 'amp' : (amp_array, 'tab:blue'),
-                            'min' : (min_array, 'tab:purple'),
+            plot_params = { 'amp' : (amp_array, 'tab:red'),
+                            'min' : (min_array, 'tab:blue'),
                             'max' : (max_array, 'tab:orange')}
             for labels, (arr, arr_color) in plot_params.items():
                 ax1.hist(arr, color = arr_color, label = labels, alpha = 0.75)
@@ -391,23 +400,23 @@ class TotalSignalProcessor:
             ax2.set_xlabel(f'{Ch_name} boxplot of peak values')
             ax2.set_ylabel('Value (AU)')
             
-            ax3.hist(width_array, color = 'dimgray', alpha = 0.75)
+            ax3.hist(width_array, color = 'white', alpha = 0.75)
             ax3.set_xlabel(f'{Ch_name} histogram of peak widths')
             ax3.set_ylabel('Occurances')
 
             bp = ax4.boxplot(width_array, vert=True, patch_artist=True)
-            bp['boxes'][0].set_facecolor('dimgray')
+            bp['boxes'][0].set_facecolor('black')
             ax4.set_xlabel(f'{Ch_name} boxplot of peak widths')
             ax4.set_ylabel('Peak width (frames)')
 
-            ax5.hist(latent_per_array, color = 'dimgray', alpha = 0.75)
+            ax5.hist(latent_per_array, color = 'white', alpha = 0.75)
             ax5.set_xlabel(f'{Ch_name} histogram of latent periods')
             ax5.set_ylabel('Occurances')
 
             lat_bp = ax6.boxplot(latent_per_array, vert=True, patch_artist=True)
-            lat_bp['boxes'][0].set_facecolor('dimgray')
-            ax6.set_xlabel(f'{Ch_name} latent period values')
-            ax6.set_ylabel('Latent Period (Frames)')
+            lat_bp['boxes'][0].set_facecolor('black')
+            ax6.set_xlabel(f'{Ch_name} boxplot latent periods')
+            ax6.set_ylabel('Latent Period')
 
             fig.subplots_adjust(hspace=0.6, wspace=0.6)
             plt.close(fig)
@@ -436,6 +445,8 @@ class TotalSignalProcessor:
             '''
             space saving function to generate individual plots with variable input
             '''
+            plt.style.use('dark_background')
+
             fig, (ax1, ax2) = plt.subplots(2, 1)
             ax1.plot(raw_signal)
             ax1.set_xlabel(f'{Ch_name} Raw Signal')
@@ -444,7 +455,7 @@ class TotalSignalProcessor:
             ax2.set_ylabel('Autocorrelation')
             
             if not period == np.nan:
-                color = 'red'
+                color = 'orange'
                 ax2.axvline(x = period, alpha = 0.5, c = color, linestyle = '--')
                 ax2.axvline(x = -period, alpha = 0.5, c = color, linestyle = '--')
                 ax2.set_xlabel(f'Period is {period} frames')
@@ -479,6 +490,8 @@ class TotalSignalProcessor:
             '''
             Space saving function to generate individual plots with variable input. returns a figure object.
             '''
+            plt.style.use('dark_background')
+
             fig, (ax1, ax2) = plt.subplots(2, 1)
             ax1.plot(ch1, color = 'tab:blue', label = ch1_name)
             ax1.plot(ch2, color = 'tab:orange', label = ch2_name)
@@ -489,7 +502,7 @@ class TotalSignalProcessor:
             ax2.set_ylabel('Crosscorrelation')
             
             if not shift == np.nan:
-                color = 'red'
+                color = 'orange'
                 ax2.axvline(x = shift, alpha = 0.5, c = color, linestyle = '--')
                 if shift < 1:
                     ax2.set_xlabel(f'{ch1_name} leads by {int(abs(shift))} frames')
@@ -538,6 +551,7 @@ class TotalSignalProcessor:
         be easily visualized by or saved to a file using the key value as a file name.
         '''
         def return_figure(box_signal: np.ndarray, prop_dict: dict, trough_dict: dict, Ch_name: str):
+            plt.style.use('dark_background')
 
             smoothed_signal = prop_dict['smoothed']
             peaks = prop_dict['peaks']
@@ -552,7 +566,7 @@ class TotalSignalProcessor:
 
             fig, ax = plt.subplots()
             ax.plot(box_signal, color = 'tab:gray', label = 'raw signal')
-            ax.plot(smoothed_signal, color = 'tab:cyan', label = 'smoothed signal')
+            ax.plot(smoothed_signal, color = 'tab:orange', label = 'smoothed signal')
 
             # plot all of the peak widths and amps in a loop
             for i in range(peaks.shape[0]):
