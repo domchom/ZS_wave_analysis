@@ -1,9 +1,11 @@
 import os
+import csv
 import numpy as np
 import pandas as pd
 import scipy.signal as sig
 import multiprocessing
 from tqdm import tqdm
+from itertools import zip_longest
 import matplotlib.pyplot as plt
 from tifffile import imread, TiffFile
 import scipy.ndimage as nd
@@ -353,7 +355,7 @@ class TotalSignalProcessor:
             arr_mean = np.nanmean(arr, axis = 0)
             arr_std = np.nanstd(arr, axis = 0)
 
-            mean_CCF_values = zip(range(len(arr_mean)), arr_mean, arr_std)
+            mean_CCF_values = list(zip_longest(range(1, len(arr_mean) + 1), arr_mean, arr_std, fillvalue=None))
 
             return mean_CCF_values
 
@@ -581,7 +583,7 @@ class TotalSignalProcessor:
                         ccf_curve = self.ccfs[combo_number, box]
 
                         # Saving measurements to a CSV file for each box
-                        measurements = zip(range(len(ch1_normalized)), ch1_normalized, ch2_normalized, ccf_curve)
+                        measurements = list(zip_longest(range(1, len(ccf_curve) + 1), ch1_normalized, ch2_normalized, ccf_curve, fillvalue=None))
                         filename = f'Box{box + 1}_CCF_values.csv'
                         save_indv_CCFs_to_csv(measurements, filename)
 
