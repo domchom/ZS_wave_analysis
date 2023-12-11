@@ -1,5 +1,6 @@
 import os                                       
 import sys 
+import csv
 import timeit
 import datetime
 import numpy as np
@@ -36,6 +37,7 @@ def main():
     plot_ind_CCFs = gui.plot_ind_CCFs
     plot_ind_peaks = gui.plot_ind_peaks
     fast_process = gui.fast_process
+    save_ind_CCF_values = gui.save_ind_CCF_values
     
 
     # if rolling GUI specified, make rolling GUI object and display the window
@@ -85,6 +87,7 @@ def main():
                     "Plot Summary Peaks" : plot_summary_peaks,
                     "Plot Individual ACFs" : plot_ind_ACFs,
                     "Plot Individual CCFs" : plot_ind_CCFs,
+                    "Save Individual CCF values" : save_ind_CCF_values,
                     "Plot Individual Peaks" : plot_ind_peaks,
                     "Group Matching Errors" : [],
                     "Files Processed" : [],
@@ -245,9 +248,16 @@ def main():
                     for plot_name, plot in summ_acf_plots.items():
                         plot.savefig(f'{im_save_path}/{plot_name}.png')
                 if plot_summary_CCFs:
-                    summ_ccf_plots = processor.plot_mean_CCF()
+                    summ_ccf_plots, mean_ccf_values = processor.plot_mean_CCF()
                     for plot_name, plot in summ_ccf_plots.items():
                         plot.savefig(f'{im_save_path}/{plot_name}.png')
+                    for csv_filename, CCF_values in mean_ccf_values.items():
+                        with open(os.path.join(im_save_path, csv_filename), 'w', newline='') as csvfile:
+                            writer = csv.writer(csvfile)
+                            writer.writerow(['Time', 'CCF_Value', 'STD'])
+                            for time, ccf_val, arr_std in CCF_values:
+                                writer.writerow([time, ccf_val, arr_std])
+                                
                 if plot_summary_peaks:
                     summ_peak_plots = processor.plot_mean_peak_props()
                     for plot_name, plot in summ_peak_plots.items():
@@ -266,6 +276,13 @@ def main():
                             log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
                         ind_ccf_plots = processor.plot_ind_ccfs()
                         processor.save_plots(plots=ind_ccf_plots, plot_dir=os.path.join(im_save_path, 'Individual_CCF_plots'))
+                    if save_ind_CCF_values:
+                        if processor.num_channels == 1:
+                            log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
+                        ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
+                        if not os.path.exists(ind_ccf_val_path):
+                            os.makedirs(ind_ccf_val_path)
+                        processor.save_ind_ccf_values(save_folder=ind_ccf_val_path)
 
                 else:
                     if plot_ind_peaks:
@@ -275,6 +292,14 @@ def main():
                             os.makedirs(ind_peak_path)
                         for plot_name, plot in ind_peak_plots.items():
                             plot.savefig(f'{ind_peak_path}/{plot_name}.png')
+
+                    if plot_ind_ACFs:
+                        ind_acfs_plots = processor.plot_ind_acfs()
+                        ind_acf_path = os.path.join(im_save_path, 'Individual_ACF_plots')
+                        if not os.path.exists(ind_acf_path):
+                            os.makedirs(ind_acf_path)
+                        for plot_name, plot in ind_acfs_plots.items():
+                            plot.savefig(f'{ind_acf_path}/{plot_name}.png')
 
                     if plot_ind_CCFs:
                         if processor.num_channels == 1:
@@ -286,13 +311,13 @@ def main():
                         for plot_name, plot in ind_ccf_plots.items():
                             plot.savefig(f'{ind_ccf_path}/{plot_name}.png')
 
-                    if plot_ind_ACFs:
-                        ind_acfs_plots = processor.plot_ind_acfs()
-                        ind_acf_path = os.path.join(im_save_path, 'Individual_ACF_plots')
-                        if not os.path.exists(ind_acf_path):
-                            os.makedirs(ind_acf_path)
-                        for plot_name, plot in ind_acfs_plots.items():
-                            plot.savefig(f'{ind_acf_path}/{plot_name}.png')
+                    if save_ind_CCF_values:
+                        if processor.num_channels == 1:
+                            log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
+                        ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
+                        if not os.path.exists(ind_ccf_val_path):
+                            os.makedirs(ind_ccf_val_path)
+                        processor.save_ind_ccf_values(save_folder=ind_ccf_val_path)
 
 
                 # Summarize the data for current image as dataframe, and save as .csv
@@ -333,7 +358,7 @@ def main():
 
             # save the summary csv file
             summary_df = summary_df.sort_values('File Name', ascending=True)
-            summary_df.to_csv(f'{main_save_path}/summary.csv', index = False)
+            summary_df.to_csv(f"{main_save_path}/0_{now.strftime('%Y%m%d%H%M)')}_summary.csv", index = False)
 
             # if group names were entered into the gui, generate comparisons between each group
             if group_names != ['']:

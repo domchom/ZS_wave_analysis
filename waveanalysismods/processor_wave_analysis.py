@@ -348,9 +348,18 @@ class TotalSignalProcessor:
             fig.subplots_adjust(hspace=0.25, wspace=0.5)   
             plt.close(fig)
             return fig
+        
+        def return_mean_CCF_val(arr: np.ndarray):
+            arr_mean = np.nanmean(arr, axis = 0)
+            arr_std = np.nanstd(arr, axis = 0)
+
+            mean_CCF_values = zip(range(len(arr_mean)), arr_mean, arr_std)
+
+            return mean_CCF_values
 
         # empty dict to fill with figures, in the event that we make more than one
         self.ccf_figs = {}
+        self.mean_ccf_values = {}
                
         if hasattr(self, 'ccfs'):
             if self.num_channels > 1:
@@ -358,8 +367,9 @@ class TotalSignalProcessor:
                     self.ccf_figs[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Mean CCF'] = return_figure(self.ccfs[combo_number], 
                                                                                                 self.shifts[combo_number], 
                                                                                                 f'Ch{combo[0] + 1}-Ch{combo[1] + 1}')
+                    self.mean_ccf_values[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Mean CCF values.csv'] = return_mean_CCF_val(self.ccfs[combo_number])
 
-        return self.ccf_figs
+        return self.ccf_figs, self.mean_ccf_values
 
     def plot_mean_peak_props(self):
         '''
@@ -471,7 +481,7 @@ class TotalSignalProcessor:
 
         its = self.num_channels*self.num_boxes
         with tqdm(total=its, miniters=its/100) as pbar:
-            pbar.set_description('ind acfs')
+            pbar.set_description('plotting individual ACFs')
             for channel in range(self.num_channels):
                 for box in range(self.num_boxes):
                     pbar.update(1)
@@ -480,7 +490,7 @@ class TotalSignalProcessor:
                                                                                             f'Ch{channel + 1}', 
                                                                                             self.periods[channel, box])
         return self.ind_acf_plots
-
+    
     def plot_ind_ccfs(self):
         '''
         Plot the raw signals and corresponding crosscurve for each box in each unique channel combo. 
@@ -493,8 +503,8 @@ class TotalSignalProcessor:
             plt.style.use('dark_background')
 
             fig, (ax1, ax2) = plt.subplots(2, 1)
-            ax1.plot(ch1, color = 'tab:blue', label = ch1_name)
-            ax1.plot(ch2, color = 'tab:orange', label = ch2_name)
+            ax1.plot(ch1, color = 'tab:red', label = ch1_name)
+            ax1.plot(ch2, color = 'tab:green', label = ch2_name)
             ax1.set_xlabel('time (frames)')
             ax1.set_ylabel('Mean box px value')
             ax1.legend(loc='upper right', fontsize = 'small', ncol = 1)
@@ -529,7 +539,7 @@ class TotalSignalProcessor:
         if self.num_channels > 1:
             its = len(self.channel_combos)*self.num_boxes
             with tqdm(total=its, miniters=its/100) as pbar:
-                pbar.set_description('ind ccfs')
+                pbar.set_description('plotting individual CCFs')
                 for combo_number, combo in enumerate(self.channel_combos):
                     for box in range(self.num_boxes):
                         pbar.update(1)
@@ -541,6 +551,40 @@ class TotalSignalProcessor:
                                                                                                         shift = self.shifts[combo_number, box])
         
         return self.ind_ccf_plots
+    
+    def save_ind_ccf_values(self, save_folder):
+        def save_indv_CCFs_to_csv(measurements, filename):
+            new_filename = os.path.join(save_folder, filename)
+            
+            with open(new_filename, 'w', newline='') as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(['Time', 'Ch1_Value', 'Ch2_Value', 'CCF_Value'])
+
+                for time, ch1_val, ch2_val, ccf_val in measurements:
+                    writer.writerow([time, ch1_val, ch2_val, ccf_val])
+
+        def normalize(signal: np.ndarray):
+            '''
+            Normalize between 0 and 1
+            '''
+            return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
+
+        if self.num_channels > 1:
+            its = len(self.channel_combos)*self.num_boxes
+            with tqdm(total=its, miniters=its/100) as pbar:
+                pbar.set_description('saving individual CCF values')
+                for combo_number, combo in enumerate(self.channel_combos):
+                    for box in range(self.num_boxes):
+                        pbar.update(1)
+                        ch1_normalized = normalize(self.means[:, combo[0], box])
+                        ch2_normalized = normalize(self.means[:, combo[1], box])
+                        ccf_curve = self.ccfs[combo_number, box]
+
+                        # Saving measurements to a CSV file for each box
+                        measurements = zip(range(len(ch1_normalized)), ch1_normalized, ch2_normalized, ccf_curve)
+                        filename = f'Box{box + 1}_CCF_values.csv'
+                        save_indv_CCFs_to_csv(measurements, filename)
+
 
     def plot_ind_peak_props(self):
         '''

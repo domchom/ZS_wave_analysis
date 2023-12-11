@@ -30,13 +30,20 @@ class BaseGUI(tk.Tk):
         self.fast_process = tk.BooleanVar()
         self.fast_process.set(False)
         self.plot_ind_ACFs = tk.BooleanVar()
+        self.plot_ind_ACFs.set(False)
         self.plot_ind_CCFs = tk.BooleanVar()
+        self.plot_ind_CCFs.set(False)
+        self.save_ind_CCF_values = tk.BooleanVar()
+        self.save_ind_CCF_values.set(True)
         self.plot_ind_peaks = tk.BooleanVar()
-        self.plot_ind_peaks.set(True)
+        self.plot_ind_peaks.set(False)
         self.acf_peak_thresh = tk.DoubleVar()
         self.acf_peak_thresh.set(0.1)
         self.group_names = tk.StringVar()
+        # self.group_names.set('')
         self.folder_path = tk.StringVar()
+        self.folder_path.set('/Users/domchom/random_movies')
+
         # set default value for 'roll' to False
         self.roll = False
 
@@ -46,7 +53,6 @@ class BaseGUI(tk.Tk):
         self.file_path_button = ttk.Button(self, text = 'Select folder')
 
         # make a default path
-        self.folder_path.set('/Users/domchom/Desktop/random_movies/latent_per_analysis_testing/crop')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 
@@ -68,7 +74,6 @@ class BaseGUI(tk.Tk):
         self.acf_peak_thresh_label.grid(row = 3, column = 1, padx = 10, sticky = 'W')
 
         # create group names entry widget
-        self.group_names.set('200ng,T835')
         self.group_names_entry = ttk.Entry(self, textvariable = self.group_names)
         self.group_names_entry.grid(row = 4, column = 0, padx = 10, sticky = 'E')
 
@@ -105,6 +110,12 @@ class BaseGUI(tk.Tk):
         self.plot_ind_CCFs_checkbox.grid(row = 6, column = 2, padx = 10, sticky = 'E')
         self.plot_ind_CCFs_label = ttk.Label(self, text = 'Plot individual CCFs')
         self.plot_ind_CCFs_label.grid(row = 6, column = 3, padx = 10, sticky = 'W')
+
+        # create checkbox for saving individual CCF values
+        self.save_ind_CCF_checkbox = ttk.Checkbutton(self, variable = self.save_ind_CCF_values)
+        self.save_ind_CCF_checkbox.grid(row = 9, column = 2, padx = 10, sticky = 'E')
+        self.save_ind_CCF_label = ttk.Label(self, text = 'Save individual CCF values')
+        self.save_ind_CCF_label.grid(row = 9, column = 3, padx = 10, sticky = 'W')
 
         # create checkbox for plotting individual peaks
         self.plot_ind_peaks_checkbox = ttk.Checkbutton(self, variable = self.plot_ind_peaks)
@@ -154,6 +165,7 @@ class BaseGUI(tk.Tk):
         self.plot_summary_peaks = self.plot_summary_peaks.get()
         self.plot_ind_ACFs = self.plot_ind_ACFs.get()
         self.plot_ind_CCFs = self.plot_ind_CCFs.get()
+        self.save_ind_CCF_values = self.save_ind_CCF_values.get()
         self.plot_ind_peaks = self.plot_ind_peaks.get()
         self.folder_path = self.folder_path.get()
         self.fast_process = self.fast_process.get()
