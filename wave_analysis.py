@@ -36,7 +36,6 @@ def main():
     plot_ind_ACFs = gui.plot_ind_ACFs
     plot_ind_CCFs = gui.plot_ind_CCFs
     plot_ind_peaks = gui.plot_ind_peaks
-    fast_process = gui.fast_process
     save_ind_CCF_values = gui.save_ind_CCF_values
     
 
@@ -263,62 +262,39 @@ def main():
                     for plot_name, plot in summ_peak_plots.items():
                         plot.savefig(f'{im_save_path}/{plot_name}.png')
                 
-                # plot and save the individual autocorrelation, crosscorrelation, and peak properties for each box in channel
-                if fast_process:
-                    if plot_ind_peaks:        
-                        ind_peak_plots = processor.plot_ind_peak_props()
-                        processor.save_plots(plots=ind_peak_plots, plot_dir=os.path.join(im_save_path, 'Individual_peak_plots'))
-                    if plot_ind_ACFs:
-                        ind_acf_plots = processor.plot_ind_acfs()
-                        processor.save_plots(plots=ind_acf_plots, plot_dir=os.path.join(im_save_path, 'Individual_ACF_plots'))
-                    if plot_ind_CCFs:
-                        if processor.num_channels == 1:
+                if plot_ind_peaks:
+                    ind_peak_plots = processor.plot_ind_peak_props()
+                    ind_peak_path = os.path.join(im_save_path, 'Individual_peak_plots')
+                    if not os.path.exists(ind_peak_path):
+                        os.makedirs(ind_peak_path)
+                    for plot_name, plot in ind_peak_plots.items():
+                        plot.savefig(f'{ind_peak_path}/{plot_name}.png')
+
+                if plot_ind_ACFs:
+                    ind_acfs_plots = processor.plot_ind_acfs()
+                    ind_acf_path = os.path.join(im_save_path, 'Individual_ACF_plots')
+                    if not os.path.exists(ind_acf_path):
+                        os.makedirs(ind_acf_path)
+                    for plot_name, plot in ind_acfs_plots.items():
+                        plot.savefig(f'{ind_acf_path}/{plot_name}.png')
+
+                if plot_ind_CCFs:
+                    if processor.num_channels == 1:
                             log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
-                        ind_ccf_plots = processor.plot_ind_ccfs()
-                        processor.save_plots(plots=ind_ccf_plots, plot_dir=os.path.join(im_save_path, 'Individual_CCF_plots'))
-                    if save_ind_CCF_values:
-                        if processor.num_channels == 1:
-                            log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
-                        ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
-                        if not os.path.exists(ind_ccf_val_path):
-                            os.makedirs(ind_ccf_val_path)
-                        processor.save_ind_ccf_values(save_folder=ind_ccf_val_path)
+                    ind_ccf_plots = processor.plot_ind_ccfs()
+                    ind_ccf_path = os.path.join(im_save_path, 'Individual_CCF_plots')
+                    if not os.path.exists(ind_ccf_path):
+                        os.makedirs(ind_ccf_path)
+                    for plot_name, plot in ind_ccf_plots.items():
+                        plot.savefig(f'{ind_ccf_path}/{plot_name}.png')
 
-                else:
-                    if plot_ind_peaks:
-                        ind_peak_plots = processor.plot_ind_peak_props()
-                        ind_peak_path = os.path.join(im_save_path, 'Individual_peak_plots')
-                        if not os.path.exists(ind_peak_path):
-                            os.makedirs(ind_peak_path)
-                        for plot_name, plot in ind_peak_plots.items():
-                            plot.savefig(f'{ind_peak_path}/{plot_name}.png')
-
-                    if plot_ind_ACFs:
-                        ind_acfs_plots = processor.plot_ind_acfs()
-                        ind_acf_path = os.path.join(im_save_path, 'Individual_ACF_plots')
-                        if not os.path.exists(ind_acf_path):
-                            os.makedirs(ind_acf_path)
-                        for plot_name, plot in ind_acfs_plots.items():
-                            plot.savefig(f'{ind_acf_path}/{plot_name}.png')
-
-                    if plot_ind_CCFs:
-                        if processor.num_channels == 1:
-                                log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
-                        ind_ccf_plots = processor.plot_ind_ccfs()
-                        ind_ccf_path = os.path.join(im_save_path, 'Individual_CCF_plots')
-                        if not os.path.exists(ind_ccf_path):
-                            os.makedirs(ind_ccf_path)
-                        for plot_name, plot in ind_ccf_plots.items():
-                            plot.savefig(f'{ind_ccf_path}/{plot_name}.png')
-
-                    if save_ind_CCF_values:
-                        if processor.num_channels == 1:
-                            log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
-                        ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
-                        if not os.path.exists(ind_ccf_val_path):
-                            os.makedirs(ind_ccf_val_path)
-                        processor.save_ind_ccf_values(save_folder=ind_ccf_val_path)
-
+                if save_ind_CCF_values:
+                    if processor.num_channels == 1:
+                        log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
+                    ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
+                    if not os.path.exists(ind_ccf_val_path):
+                        os.makedirs(ind_ccf_val_path)
+                    processor.save_ind_ccf_values(save_folder=ind_ccf_val_path)
 
                 # Summarize the data for current image as dataframe, and save as .csv
                 im_measurements_df = processor.organize_measurements()

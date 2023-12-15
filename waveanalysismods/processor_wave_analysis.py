@@ -3,7 +3,6 @@ import csv
 import numpy as np
 import pandas as pd
 import scipy.signal as sig
-import multiprocessing
 from tqdm import tqdm
 from itertools import zip_longest
 import matplotlib.pyplot as plt
@@ -848,45 +847,6 @@ class TotalSignalProcessor:
                 for col in table.columns:
                     table[col] = sorted(table[col], key=lambda x: 1 if pd.isna(x) or x == '' else 0)
                 table.to_csv(output_path, index=False)
-
-        
-    def save_plot(self, plot, plot_name, plot_dir):
-        """
-        Saves a Matplotlib plot to a PNG file with the given name in the specified directory.
-
-        Parameters:
-        -----------
-        - plot (matplotlib.pyplot.plot): The plot to be saved.
-        - plot_name (str): The name to give to the saved plot.
-        - plot_dir (str): A string representing the path to the directory where the plot should be saved. If the directory
-                        doesn't exist, it will be created.
-        """
-        if not os.path.exists(plot_dir):
-            os.makedirs(plot_dir)
-        plot.savefig(f'{plot_dir}/{plot_name}.png')
-
-    def save_plots(self, plots, plot_dir):
-        """
-        Saves a dictionary of Matplotlib plots to PNG files in the specified directory using multiprocessing.
-
-        Parameters:
-        -----------
-        - plots (dict): A dictionary of Matplotlib plots, where the keys are the names of the plots and the values
-                        are the actual plot objects.
-        - plot_dir (str): A string representing the path to the directory where the plots should be saved. If the directory
-                        doesn't exist, it will be created.
-        """
-        # Create a multiprocessing Pool with as many processes as there are CPUs
-        pool = multiprocessing.Pool()
-
-        # Iterate over the plot dictionary and add each plot and its name to a list of arguments to pass to the function
-        args_list = [(plot, plot_name, plot_dir) for plot_name, plot in plots.items()]
-
-        # Use the multiprocessing Pool to run the save_plot function in parallel for all the plots
-        pool.starmap(self.save_plot, args_list)
-
-        # Close the multiprocessing Pool to free up resources
-        pool.close()
 
 ##############################################################################################################################################################################
 ##############################################################################################################################################################################

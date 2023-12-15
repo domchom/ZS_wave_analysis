@@ -27,8 +27,6 @@ class BaseGUI(tk.Tk):
         self.plot_summary_CCFs.set(True)
         self.plot_summary_peaks = tk.BooleanVar()
         self.plot_summary_peaks.set(True)
-        self.fast_process = tk.BooleanVar()
-        self.fast_process.set(False)
         self.plot_ind_ACFs = tk.BooleanVar()
         self.plot_ind_ACFs.set(False)
         self.plot_ind_CCFs = tk.BooleanVar()
@@ -133,12 +131,6 @@ class BaseGUI(tk.Tk):
         self.cancel_button['command'] = self.cancel_analysis
         self.cancel_button.grid(row = 10, column = 1, padx = 10, sticky = 'W')
 
-        # create button to multiprocessing
-        self.fast_process_checkbox = ttk.Checkbutton(self, variable = self.fast_process)
-        self.fast_process_checkbox.grid(row = 8, column = 2, padx = 10, sticky = 'E')
-        self.fast_process_label = ttk.Label(self, text = 'Faster save for indv plots')
-        self.fast_process_label.grid(row = 8, column = 3, padx = 10, sticky = 'W')
-
         # create button to launch rolling analysis gui
         self.rolling_button = ttk.Button(self, text = 'Launch rolling analysis')
         self.rolling_button['command'] = self.launch_rolling_analysis
@@ -168,7 +160,6 @@ class BaseGUI(tk.Tk):
         self.save_ind_CCF_values = self.save_ind_CCF_values.get()
         self.plot_ind_peaks = self.plot_ind_peaks.get()
         self.folder_path = self.folder_path.get()
-        self.fast_process = self.fast_process.get()
         
         # convert group names to list of strings
         self.group_names = [group_name.strip() for group_name in self.group_names.split(',')]
