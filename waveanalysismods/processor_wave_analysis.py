@@ -190,6 +190,20 @@ class TotalSignalProcessor:
                                                             'heights': heights, 
                                                             'leftIndex': leftIndex, 
                                                             'rightIndex': rightIndex}   
+                
+                # If no peaks detected
+                else:
+                    self.peak_widths[channel, box_num] = np.nan
+                    self.peak_maxs[channel, box_num] = np.nan
+                    self.peak_mins[channel, box_num] = np.nan
+
+                    # store the smoothed signal, peak locations, maxs, mins, and widths for each box in each channel
+                    self.ind_peak_props[f'Ch {channel} Box {box_num}'] = {'smoothed': np.nan, 
+                                                            'peaks': np.nan,
+                                                            'proms': np.nan, 
+                                                            'heights': np.nan, 
+                                                            'leftIndex': np.nan, 
+                                                            'rightIndex': np.nan}
 
         self.peak_amps = self.peak_maxs - self.peak_mins
         self.peak_rel_amps = self.peak_amps / self.peak_mins
