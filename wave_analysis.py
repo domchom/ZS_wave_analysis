@@ -347,7 +347,7 @@ def main():
                 # make a list of parameters to compare
                 stats_to_compare = ['Mean']
                 channels_to_compare = [f'Ch {i+1}' for i in range(processor.num_channels)]
-                measurements_to_compare = ['Period', 'Shift', 'Peak Width', 'Peak Max', 'Peak Min', 'Peak Amp', 'Peak Rel Amp', 'Latent Period']
+                measurements_to_compare = ['Period', 'Shift', 'Peak Width', 'Peak Max', 'Peak Min', 'Peak Amp', 'Peak Rel Amp']
                 params_to_compare = []
                 for channel in channels_to_compare:
                     for stat in stats_to_compare:
