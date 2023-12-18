@@ -824,7 +824,7 @@ class TotalSignalProcessor:
             summary_df (pandas DataFrame): The summary DataFrame containing the data to be analyzed.
         """
         for channel in range(self.num_channels):
-            data_to_extract = [f"Ch {channel + 1} {data}" for data in ['Mean Period', 'Mean Peak Width', 'Mean Peak Max', 'Mean Peak Min', 'Mean Peak Amp', 'Mean Peak Rel Amp', 'Norm Mean Rel Amp', 'Mean Latent Period']]
+            data_to_extract = [f"Ch {channel + 1} {data}" for data in ['Mean Period', 'Mean Peak Width', 'Mean Peak Max', 'Mean Peak Min', 'Mean Peak Amp', 'Mean Peak Rel Amp', 'Mean Latent Period']]
 
             # Set up the output file paths
             output_file_paths = {}
