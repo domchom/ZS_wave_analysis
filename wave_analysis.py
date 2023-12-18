@@ -37,7 +37,6 @@ def main():
     plot_ind_CCFs = gui.plot_ind_CCFs
     plot_ind_peaks = gui.plot_ind_peaks
     save_ind_CCF_values = gui.save_ind_CCF_values
-    
 
     # if rolling GUI specified, make rolling GUI object and display the window
     if gui.roll:
