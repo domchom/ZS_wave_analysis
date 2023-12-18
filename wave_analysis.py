@@ -322,16 +322,6 @@ def main():
             # create dataframe from summary list    
             summary_df = pd.DataFrame(summary_list, columns = col_headers)
 
-            # Get column names for all channels
-            channel_cols = [col for col in summary_df.columns if 'Ch' in col and 'Mean Peak Rel Amp' in col]
-
-            # Normalize mean peak relative amplitude for each channel
-            for col in channel_cols:
-                channel_mean_rel_amp = summary_df[col]
-                norm_mean_rel_amp = channel_mean_rel_amp / channel_mean_rel_amp.min()
-                norm_col_name = col.replace('Mean Peak Rel Amp', 'Norm Mean Rel Amp')
-                summary_df[norm_col_name] = norm_mean_rel_amp
-
             # save the summary csv file
             summary_df = summary_df.sort_values('File Name', ascending=True)
             summary_df.to_csv(f"{main_save_path}/0_{now.strftime('%Y%m%d%H%M)')}_summary.csv", index = False)
