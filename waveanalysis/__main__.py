@@ -34,6 +34,7 @@ def main():
     plot_ind_ACFs = gui.plot_ind_ACFs
     plot_ind_CCFs = gui.plot_ind_CCFs
     plot_ind_peaks = gui.plot_ind_peaks
+
     analysis_type = "standard"
 
     # if rolling GUI specified, make rolling GUI object and display the window
@@ -51,11 +52,7 @@ def main():
         plot_sf_peaks = gui.plot_sf_peaks
         subframe_size = gui.subframe_size
         subframe_roll = gui.subframe_roll
-
         group_names = ['']
-        plot_summary_ACFs = False
-        plot_summary_CCFs = False
-        plot_summary_peaks = False
 
         analysis_type = "rolling"
 
@@ -211,7 +208,6 @@ def main():
 
     print('Processing files...')
 
-
     with tqdm(total = len(file_names)) as pbar:
         pbar.set_description('Files processed:')
         for file_name in file_names: 
@@ -237,22 +233,30 @@ def main():
             # name without the extension
             name_wo_ext = file_name.rsplit(".",1)[0]
 
+            # if user entered group name(s) into GUI, match the group for this file. If no match, keep set to None
+            group_name = None
+            if group_names != ['']:
+                try:
+                    group_name = [group for group in group_names if group in name_wo_ext][0]
+                except IndexError:
+                    pass
+
+            # calculate the population signal properties
+            processor.calc_indv_ACFs(peak_thresh = acf_peak_thresh)
+            processor.calc_indv_peak_props()
+            if processor.num_channels > 1:
+                processor.calc_indv_CCFs()
+
+            # create a subfolder within the main save path with the same name as the image file
+            im_save_path = os.path.join(main_save_path, name_wo_ext)
+            if not os.path.exists(im_save_path):
+                os.makedirs(im_save_path)
+
             if analysis_type == "rolling":
 
                 # calculate the number of subframes used
                 num_submovies = processor.num_submovies
                 log_params['Submovies Used'].append(num_submovies)
-
-                # calculate the population signal properties
-                processor.calc_ACF(peak_thresh = acf_peak_thresh)
-                processor.calc_peak_props()
-                if processor.num_channels > 1:
-                    processor.calc_CCF()
-            
-                # create a subfolder within the main save path with the same name as the image file
-                im_save_path = os.path.join(main_save_path, name_wo_ext)
-                if not os.path.exists(im_save_path):
-                    os.makedirs(im_save_path)
 
                 # summarize the data for each subframe as individual dataframes, and save as .csv
                 submovie_meas_list = processor.get_submovie_measurements()
@@ -276,25 +280,6 @@ def main():
                 pbar.update(1)
 
             else:
-                # if user entered group name(s) into GUI, match the group for this file. If no match, keep set to None
-                group_name = None
-                if group_names != ['']:
-                    try:
-                        group_name = [group for group in group_names if group in name_wo_ext][0]
-                    except IndexError:
-                        pass
-
-                # calculate the population signal properties
-                processor.calc_indv_ACFs(peak_thresh = acf_peak_thresh)
-                processor.calc_indv_peak_props()
-                if processor.num_channels > 1:
-                    processor.calc_indv_CCFs()
-                
-                # create a subfolder within the main save path with the same name as the image file
-                im_save_path = os.path.join(main_save_path, name_wo_ext)
-                if not os.path.exists(im_save_path):
-                    os.makedirs(im_save_path)
-
                 # plot and save the population autocorrelation, crosscorrelation, and peak properties for each channel
                 if plot_summary_ACFs:
                     summ_acf_plots = processor.plot_mean_ACF()
@@ -310,7 +295,6 @@ def main():
                         plot.savefig(f'{im_save_path}/{plot_name}.png')
                 
                 # plot and save the individual autocorrelation, crosscorrelation, and peak properties for each box in channel
-
                 if plot_ind_peaks:        
                     ind_peak_plots = processor.plot_indv_peak_props()
                     ind_peak_path = os.path.join(im_save_path, 'Individual_peak_plots')
