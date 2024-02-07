@@ -62,14 +62,17 @@ class TotalSignalProcessor:
         ind = self.kernel_size // 2
         self.means = nd.uniform_filter(self.image[:, 0, :, :, :], size=(1, 1, self.kernel_size, self.kernel_size))[:, :, ind::self.step, ind::self.step]
         self.xpix, self.ypix = self.means.shape[-2:]
+        # we are either binning the image into boxes (standard) or columns (kymographs), so just call bins for simplicity
         self.total_bins = self.xpix * self.ypix
         self.means = self.means.reshape(self.means.shape[0], self.means.shape[1], self.total_bins)
 
     def standardize_image_dimensions_for_kymograph(self):
         '''Reshape the kymograph image for future analysis'''
         self.image = self.image.reshape(self.num_channels, *self.image.shape[-2:])
-        self.total_bins = self.image.shape[-1] # we are either binning the image into boxes (standard) or columns (kymographs), so just call bins for simplicity
-        self.num_frames = self.image.shape[-2] # the number of rows in a kymograph is equal to the number to number of frames, so just call frames for simplicity
+        # we are either binning the image into boxes (standard) or columns (kymographs), so just call bins for simplicity
+        self.total_bins = self.image.shape[-1] 
+        # the number of rows in a kymograph is equal to the number to number of frames, so just call frames for simplicity
+        self.num_frames = self.image.shape[-2] 
         
     def calculate_line_values(self):
         '''Generate and calculate the mean signal for the specified line width over the kymograph images'''
@@ -678,10 +681,55 @@ class TotalSignalProcessor:
         return self.peak_figs
 
 ##############################################################################################################################################################################
-# DATA ORGANIZATION ###########################################################################################################################################################
+# DATA ORGANIZATION for standard and kymograph ###########################################################################################################################################################
 ##############################################################################################################################################################################
-   
+    
+    def summarize_image(self, file_name = None, group_name = None):
+        '''
+        Summarizes the results of all the measurements performed on the image.
+        Returns dictionary object:
+        self.file_data_summary contains the name of every summarized result for 
+        each channel or channel combination as a key and the summarized results as a value.
+        '''
+        # dictionary to store the summarized measurements for each image
+        self.file_data_summary = {}
+        
+        if file_name:
+            self.file_data_summary['File Name'] = file_name
+        if group_name:
+            self.file_data_summary['Group Name'] = group_name
+        self.file_data_summary['Num Bins'] = self.total_bins
 
+        stats_location = ['Mean', 'Median', 'StdDev', 'SEM']
+
+        if hasattr(self, 'periods_with_stats'):
+            pcnt_no_period = [np.count_nonzero(np.isnan(self.periods[channel])) / self.periods[channel].shape[0] * 100 for channel in range(self.num_channels)]
+            for channel in range(self.num_channels):
+                self.file_data_summary[f'Ch {channel + 1} Pcnt No Periods'] = pcnt_no_period[channel]
+                for ind, stat in enumerate(stats_location):
+                    self.file_data_summary[f'Ch {channel + 1} {stat} Period'] = self.periods_with_stats[channel][ind + 1]
+        
+        if hasattr(self, 'shifts_with_stats'):
+            pcnt_no_shift = [np.count_nonzero(np.isnan(self.indv_shifts[combo_number])) / self.indv_shifts[combo_number].shape[0] * 100 for combo_number, combo in enumerate(self.channel_combos)]
+            for combo_number, combo in enumerate(self.channel_combos):
+                self.file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Pcnt No Shifts'] = pcnt_no_shift[combo_number]
+                for ind, stat in enumerate(stats_location):
+                    self.file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} Shift'] = self.shifts_with_stats[combo_number][ind + 1]
+
+        if hasattr(self, 'peak_widths_with_stats'):
+            # using widths, but because these are all assigned together it applies to all peak properties
+            pcnt_no_peaks = [np.count_nonzero(np.isnan(self.ind_peak_widths[channel])) / self.ind_peak_widths[channel].shape[0] * 100 for channel in range(self.num_channels)]
+            for channel in range(self.num_channels):
+                self.file_data_summary[f'Ch {channel + 1} Pcnt No Peaks'] = pcnt_no_peaks[channel]
+                for ind, stat in enumerate(stats_location):
+                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Width'] = self.peak_widths_with_stats[channel][ind + 1]
+                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Max'] = self.peak_maxs_with_stats[channel][ind + 1]
+                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Min'] = self.peak_mins_with_stats[channel][ind + 1]
+                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Amp'] = self.peak_amps_with_stats[channel][ind + 1]
+                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Rel Amp'] = self.peak_relamp_with_stats[channel][ind + 1]
+            
+        return self.file_data_summary
+    
     def organize_measurements(self):
         # function to summarize measurements statistics by appending them to the beginning of the measurement list
         def add_stats(measurements: np.ndarray, measurement_name: str):
@@ -790,53 +838,51 @@ class TotalSignalProcessor:
                 self.submovie_measurements.append(submovie_meas_df)
 
                 return self.submovie_measurements       
+  
+    def save_means_to_csv(self, main_save_path, group_names, summary_df):
+        """
+        Save the mean values of certain metrics to separate CSV files for each group.
 
-    def summarize_image(self, file_name = None, group_name = None):
-        '''
-        Summarizes the results of all the measurements performed on the image.
-        Returns dictionary object:
-        self.file_data_summary contains the name of every summarized result for 
-        each channel or channel combination as a key and the summarized results as a value.
-        '''
-        # dictionary to store the summarized measurements for each image
-        self.file_data_summary = {}
-        
-        if file_name:
-            self.file_data_summary['File Name'] = file_name
-        if group_name:
-            self.file_data_summary['Group Name'] = group_name
-        self.file_data_summary['Num Bins'] = self.total_bins
-
-        stats_location = ['Mean', 'Median', 'StdDev', 'SEM']
-
-        if hasattr(self, 'periods_with_stats'):
-            pcnt_no_period = [np.count_nonzero(np.isnan(self.periods[channel])) / self.periods[channel].shape[0] * 100 for channel in range(self.num_channels)]
-            for channel in range(self.num_channels):
-                self.file_data_summary[f'Ch {channel + 1} Pcnt No Periods'] = pcnt_no_period[channel]
-                for ind, stat in enumerate(stats_location):
-                    self.file_data_summary[f'Ch {channel + 1} {stat} Period'] = self.periods_with_stats[channel][ind + 1]
-        
-        if hasattr(self, 'shifts_with_stats'):
-            pcnt_no_shift = [np.count_nonzero(np.isnan(self.indv_shifts[combo_number])) / self.indv_shifts[combo_number].shape[0] * 100 for combo_number, combo in enumerate(self.channel_combos)]
-            for combo_number, combo in enumerate(self.channel_combos):
-                self.file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Pcnt No Shifts'] = pcnt_no_shift[combo_number]
-                for ind, stat in enumerate(stats_location):
-                    self.file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} Shift'] = self.shifts_with_stats[combo_number][ind + 1]
-
-        if hasattr(self, 'peak_widths_with_stats'):
-            # using widths, but because these are all assigned together it applies to all peak properties
-            pcnt_no_peaks = [np.count_nonzero(np.isnan(self.ind_peak_widths[channel])) / self.ind_peak_widths[channel].shape[0] * 100 for channel in range(self.num_channels)]
-            for channel in range(self.num_channels):
-                self.file_data_summary[f'Ch {channel + 1} Pcnt No Peaks'] = pcnt_no_peaks[channel]
-                for ind, stat in enumerate(stats_location):
-                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Width'] = self.peak_widths_with_stats[channel][ind + 1]
-                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Max'] = self.peak_maxs_with_stats[channel][ind + 1]
-                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Min'] = self.peak_mins_with_stats[channel][ind + 1]
-                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Amp'] = self.peak_amps_with_stats[channel][ind + 1]
-                    self.file_data_summary[f'Ch {channel + 1} {stat} Peak Rel Amp'] = self.peak_relamp_with_stats[channel][ind + 1]
+        Args:
+            main_save_path (str): The path where the CSV files will be saved.
+            group_names (list): A list of strings representing the names of the groups to be analyzed.
+            summary_df (pandas DataFrame): The summary DataFrame containing the data to be analyzed.
+        """
+        for channel in range(self.num_channels):
+            # Define data metrics to extract
+            metrics_to_extract = [f"Ch {channel + 1} {data}" for data in ['Mean Period', 'Mean Peak Width', 'Mean Peak Max', 'Mean Peak Min', 'Mean Peak Amp', 'Mean Peak Rel Amp']]
             
-        return self.file_data_summary
-    
+            # Create folder for storing results
+            folder_path = os.path.join(main_save_path, "!channel_mean_measurements")
+            if not os.path.exists(folder_path):
+                os.makedirs(folder_path)
+
+            # Extract data for each group and metric
+            result_df = pd.DataFrame(columns=['Data Type', 'Group Name', 'Value'])
+            for metric in metrics_to_extract:
+                for group_name in group_names:
+                    group_data = summary_df.loc[summary_df['File Name'].str.contains(group_name)]
+                    values = group_data[metric].tolist()
+                    result_df = pd.concat([result_df, pd.DataFrame({'Data Type': metric, 'Group Name': group_name, 'Value': values})], ignore_index=True)
+
+            # Save individual tables for each metric
+            for metric in metrics_to_extract:
+                # Define output path for CSV
+                output_path = os.path.join(folder_path, f"{metric.lower().replace(' ', '_')}_means.csv")
+
+                # Prepare and sort table 
+                metric_table = result_df[result_df['Data Type'] == metric][['Group Name', 'Value']]
+                metric_table = pd.pivot_table(metric_table, index=metric_table.index, columns='Group Name', values='Value')
+                for col in metric_table.columns:
+                    metric_table[col] = sorted(metric_table[col], key=lambda x: 1 if pd.isna(x) or x == '' else 0)
+                
+                # Save table to CSV
+                metric_table.to_csv(output_path, index=False)
+
+##############################################################################################################################################################################
+# DATA ORGANIZATION for rolling ###########################################################################################################################################################
+##############################################################################################################################################################################
+   
     # function to summarize the results in the acf_results, ccf_results, and peak_results dictionaries as a dataframe
     def get_submovie_measurements(self):
         '''
@@ -1032,43 +1078,3 @@ class TotalSignalProcessor:
 
         return self.plot_list
     
-    def save_means_to_csv(self, main_save_path, group_names, summary_df):
-        """
-        Save the mean values of certain metrics to separate CSV files for each group.
-
-        Args:
-            main_save_path (str): The path where the CSV files will be saved.
-            group_names (list): A list of strings representing the names of the groups to be analyzed.
-            summary_df (pandas DataFrame): The summary DataFrame containing the data to be analyzed.
-        """
-        for channel in range(self.num_channels):
-            # Define data metrics to extract
-            metrics_to_extract = [f"Ch {channel + 1} {data}" for data in ['Mean Period', 'Mean Peak Width', 'Mean Peak Max', 'Mean Peak Min', 'Mean Peak Amp', 'Mean Peak Rel Amp']]
-            
-            # Create folder for storing results
-            folder_path = os.path.join(main_save_path, "!channel_mean_measurements")
-            if not os.path.exists(folder_path):
-                os.makedirs(folder_path)
-
-            # Extract data for each group and metric
-            result_df = pd.DataFrame(columns=['Data Type', 'Group Name', 'Value'])
-            for metric in metrics_to_extract:
-                for group_name in group_names:
-                    group_data = summary_df.loc[summary_df['File Name'].str.contains(group_name)]
-                    values = group_data[metric].tolist()
-                    result_df = pd.concat([result_df, pd.DataFrame({'Data Type': metric, 'Group Name': group_name, 'Value': values})], ignore_index=True)
-
-            # Save individual tables for each metric
-            for metric in metrics_to_extract:
-                # Define output path for CSV
-                output_path = os.path.join(folder_path, f"{metric.lower().replace(' ', '_')}_means.csv")
-
-                # Prepare and sort table 
-                metric_table = result_df[result_df['Data Type'] == metric][['Group Name', 'Value']]
-                metric_table = pd.pivot_table(metric_table, index=metric_table.index, columns='Group Name', values='Value')
-                for col in metric_table.columns:
-                    metric_table[col] = sorted(metric_table[col], key=lambda x: 1 if pd.isna(x) or x == '' else 0)
-                
-                # Save table to CSV
-                metric_table.to_csv(output_path, index=False)
-
