@@ -25,7 +25,6 @@ class TotalSignalProcessor:
             self.kernel_size = kern
             self.step = step
             self.standardize_image_dimensions(metadata)
-            self.max_project_image_stack()
             # Specific functions for rolling analysis
             if analysis_type == "rolling":
                 self.roll_size = roll_size
@@ -46,10 +45,7 @@ class TotalSignalProcessor:
         self.num_slices = metadata.get('slices', 1)
         self.image = self.image.reshape(self.num_frames, self.num_slices, self.num_channels, *self.image.shape[-2:])
 
-    def max_project_image_stack(self):
-        '''
-        Max project the image if it is not already max_projected
-        '''
+        # Max project if multiple slices
         if self.num_slices > 1:
             print('Max projecting image stack')
             self.image = np.max(self.image, axis=1)
@@ -113,9 +109,9 @@ class TotalSignalProcessor:
                 else:
                     print("ERROR: line width must be odd!")
 
-##############################################################################################################################################################################
-# INDIVIDUAL CALCULATION #####################################################################################################################################################
-##############################################################################################################################################################################
+############################################
+######## INDIVIDUAL BIN CALCULATION ########
+############################################
 
     def calc_indv_ACFs(self, peak_thresh=0.1):
         """
@@ -382,12 +378,12 @@ class TotalSignalProcessor:
         self.ind_peak_amps = self.ind_peak_maxs - self.ind_peak_mins
         self.ind_peak_rel_amps = self.ind_peak_amps / self.ind_peak_mins
 
+      
         return self.ind_peak_widths, self.ind_peak_maxs, self.ind_peak_mins, self.ind_peak_amps, self.ind_peak_rel_amps, self.ind_peak_props
-
-##############################################################################################################################################################################
-# Indv plotting ###########################################################################################################################################################
-##############################################################################################################################################################################
-
+############################################
+########### INDIVIDUAL BIN PLOTS ###########
+############################################
+    
     def plot_indv_acfs(self):
         """
         This method generates and plots individual autocorrelation functions (ACFs) for each channel and bin.
@@ -608,10 +604,10 @@ class TotalSignalProcessor:
 
         return self.indv_peak_figs
 
-##############################################################################################################################################################################
-# MEAN plotting ###########################################################################################################################################################
-##############################################################################################################################################################################
-    
+############################################
+############## MEAN BIN PLOTS ##############
+############################################
+
     def plot_mean_ACF(self):
         """
         This method generates and plots the mean autocorrelation curve with shaded standard deviation area,
@@ -819,10 +815,75 @@ class TotalSignalProcessor:
                                                                               f'Ch{channel + 1}')
 
         return self.peak_figs
+    
+    def plot_rolling_summary(self):
+        """
+        This method plots a rolling summary of the measurements over time.
 
-##############################################################################################################################################################################
-# DATA ORGANIZATION  ###########################################################################################################################################################
-##############################################################################################################################################################################
+        Returns:
+            - dict: A dictionary containing the generated plots.
+        """
+        def return_plot(independent_variable, dependent_variable, dependent_error, y_label):    
+            '''
+            Space saving function to generate the rolling summary plots'''      
+            fig, ax = plt.subplots()
+
+            # plot the dataframe
+            ax.plot(self.full_movie_summary[independent_variable], 
+                         self.full_movie_summary[dependent_variable])
+            
+            # fill between the ± standard deviation of the dependent variable
+            ax.fill_between(x = self.full_movie_summary[independent_variable],
+                            y1 = self.full_movie_summary[dependent_variable] - self.full_movie_summary[dependent_error],
+                            y2 = self.full_movie_summary[dependent_variable] + self.full_movie_summary[dependent_error],
+                            color = 'blue',
+                            alpha = 0.25)
+
+            # set axis labels
+            ax.set_xlabel('Frame Number')
+            ax.set_ylabel(y_label)
+            ax.set_title(f'{y_label} over time')
+            
+            plt.close(fig)
+            return fig
+        
+        # empty dictionary to fill with plots
+        self.plot_list = {}
+
+        def add_peak_plots(channel, prop_name):
+            '''
+            Space saving function
+            '''
+            self.plot_list[f'Ch {channel} Peak {prop_name}'] = return_plot('Submovie',
+                                                                            f'Ch {channel} Mean Peak {prop_name}',
+                                                                            f'Ch {channel} StdDev Peak {prop_name}',
+                                                                            f'Ch {channel} Mean ± StdDev Peak {prop_name} (frames)')
+        
+        if hasattr(self, 'periods'):
+            for channel in range(self.num_channels):
+                self.plot_list[f'Ch {channel + 1} Period'] = return_plot('Submovie',
+                                                                          f'Ch {channel + 1} Mean Period',
+                                                                          f'Ch {channel + 1} StdDev Period',
+                                                                          f'Ch {channel + 1} Mean ± StdDev Period (frames)')
+        
+        if hasattr(self, 'shifts'):
+            for combo_number, combo in enumerate(self.channel_combos):
+                self.plot_list[f'Ch{combo[0]+1}-Ch{combo[1]+1} Shift'] = return_plot('Submovie',
+                                                                                      f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift',
+                                                                                      f'Ch{combo[0]+1}-Ch{combo[1]+1} StdDev Shift',
+                                                                                      f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean ± StdDev Shift (frames)')
+
+        if hasattr(self, 'peak_widths'):
+            for channel in range(self.num_channels):
+                for prop_name in ['Width', 'Max', 'Min', 'Amp']:
+                    add_peak_plots(channel + 1, prop_name)
+
+        
+        return self.plot_list
+    
+############################################
+############ DATA ORGANIZATION #############
+############################################ 
     
     def summarize_image(self, file_name = None, group_name = None):
         """
@@ -1083,73 +1144,3 @@ class TotalSignalProcessor:
                 
                 # Save table to CSV
                 metric_table.to_csv(output_path, index=False)
-
-##############################################################################################################################################################################
-# DATA ORGANIZATION for rolling ###########################################################################################################################################################
-##############################################################################################################################################################################
-
-    def plot_rolling_summary(self):
-        """
-        This method plots a rolling summary of the measurements over time.
-
-        Returns:
-            - dict: A dictionary containing the generated plots.
-        """
-        def return_plot(independent_variable, dependent_variable, dependent_error, y_label):    
-            '''
-            Space saving function to generate the rolling summary plots'''      
-            fig, ax = plt.subplots()
-
-            # plot the dataframe
-            ax.plot(self.full_movie_summary[independent_variable], 
-                         self.full_movie_summary[dependent_variable])
-            
-            # fill between the ± standard deviation of the dependent variable
-            ax.fill_between(x = self.full_movie_summary[independent_variable],
-                            y1 = self.full_movie_summary[dependent_variable] - self.full_movie_summary[dependent_error],
-                            y2 = self.full_movie_summary[dependent_variable] + self.full_movie_summary[dependent_error],
-                            color = 'blue',
-                            alpha = 0.25)
-
-            # set axis labels
-            ax.set_xlabel('Frame Number')
-            ax.set_ylabel(y_label)
-            ax.set_title(f'{y_label} over time')
-            
-            plt.close(fig)
-            return fig
-        
-        # empty dictionary to fill with plots
-        self.plot_list = {}
-
-        def add_peak_plots(channel, prop_name):
-            '''
-            Space saving function
-            '''
-            self.plot_list[f'Ch {channel} Peak {prop_name}'] = return_plot('Submovie',
-                                                                            f'Ch {channel} Mean Peak {prop_name}',
-                                                                            f'Ch {channel} StdDev Peak {prop_name}',
-                                                                            f'Ch {channel} Mean ± StdDev Peak {prop_name} (frames)')
-        
-        if hasattr(self, 'periods'):
-            for channel in range(self.num_channels):
-                self.plot_list[f'Ch {channel + 1} Period'] = return_plot('Submovie',
-                                                                          f'Ch {channel + 1} Mean Period',
-                                                                          f'Ch {channel + 1} StdDev Period',
-                                                                          f'Ch {channel + 1} Mean ± StdDev Period (frames)')
-        
-        if hasattr(self, 'shifts'):
-            for combo_number, combo in enumerate(self.channel_combos):
-                self.plot_list[f'Ch{combo[0]+1}-Ch{combo[1]+1} Shift'] = return_plot('Submovie',
-                                                                                      f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift',
-                                                                                      f'Ch{combo[0]+1}-Ch{combo[1]+1} StdDev Shift',
-                                                                                      f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean ± StdDev Shift (frames)')
-
-        if hasattr(self, 'peak_widths'):
-            for channel in range(self.num_channels):
-                for prop_name in ['Width', 'Max', 'Min', 'Amp']:
-                    add_peak_plots(channel + 1, prop_name)
-
-        
-        return self.plot_list
-    

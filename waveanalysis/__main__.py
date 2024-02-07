@@ -15,6 +15,8 @@ np.seterr(divide='ignore', invalid='ignore')
 
 ####################################################################################################################################
 ####################################################################################################################################
+def get_gui_rolling_parameters(gui):
+    """Get GUI parameters and return them."""
 
 def main():
     '''** GUI Window and sanity checks'''
@@ -22,7 +24,7 @@ def main():
     gui = BaseGUI()
     gui.mainloop()
 
-    # get GUI parameters
+    # get standard GUI parameters
     box_size = gui.box_size
     box_shift = gui.box_shift
     folder_path = gui.folder_path
@@ -266,6 +268,26 @@ def main():
             im_save_path = os.path.join(main_save_path, name_wo_ext)
             if not os.path.exists(im_save_path):
                 os.makedirs(im_save_path)
+
+
+            if analysis_type == "rolling":
+                if processor.num_submovies > 1:
+                    
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
             # if standard or kymograph analysis
             if analysis_type != "rolling":
