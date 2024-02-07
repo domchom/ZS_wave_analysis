@@ -38,8 +38,8 @@ class BaseGUI(tk.Tk):
         self.group_names = tk.StringVar()
         self.group_names.set('001,002')
         self.folder_path = tk.StringVar()
-        # set default value for 'roll' to False
-        self.roll = False
+        # set default value for 'rolling' and 'kymograph' to False
+        self.rolling = False
         self.kymograph = False
 
         # file path selection widget
@@ -138,13 +138,13 @@ class BaseGUI(tk.Tk):
         self.folder_path.set(askdirectory())
 
     def launch_rolling_analysis(self):
-        self.roll = True
+        self.rolling = True
         self.kymograph = False
         self.destroy()
 
     def launch_kymograph_analysis(self):
         self.kymograph = True
-        self.roll = False
+        self.rolling = False
         self.destroy()
 
     def cancel_analysis(self):
@@ -424,7 +424,7 @@ class KymographGUI(tk.Tk):
         self.folder_path = self.folder_path.get()
         self.acf_peak_thresh = self.acf_peak_thresh.get()
 
-        self.roll = False
+        self.rolling = False
         
         # convert group names to list of strings
         self.group_names = [group_name.strip() for group_name in self.group_names.split(',')]

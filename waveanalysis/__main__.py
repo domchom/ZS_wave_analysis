@@ -21,9 +21,8 @@ def main():
     # make GUI object and display the window
     gui = BaseGUI()
     gui.mainloop()
+
     # get GUI parameters
-    rolling = False
-    kymograph_analysis = False
     box_size = gui.box_size
     box_shift = gui.box_shift
     folder_path = gui.folder_path
@@ -35,16 +34,21 @@ def main():
     plot_ind_ACFs = gui.plot_ind_ACFs
     plot_ind_CCFs = gui.plot_ind_CCFs
     plot_ind_peaks = gui.plot_ind_peaks
+
+    # set parameters to 'None' unless their specific GUIs are opened
     subframe_size = None
     subframe_roll = None
     line_width = None
 
+    # set the analysis type
     analysis_type = "standard"
 
     # if rolling GUI specified, make rolling GUI object and display the window
-    if gui.roll:
+    if gui.rolling:
+        # make GUI object and display the window
         gui = RollingGUI()
         gui.mainloop()
+
         # get GUI parameters
         box_size = gui.box_size
         box_shift = gui.box_shift
@@ -55,18 +59,21 @@ def main():
         plot_sf_peaks = gui.plot_sf_peaks
         subframe_size = gui.subframe_size
         subframe_roll = gui.subframe_roll
+
+        # set these to None to make sure they are not triggered in the script
         line_width = None
         group_names = ['']
 
-        rolling = True
+        # set the analysis type
         analysis_type = "rolling"
-        
 
-
+    # if kymograph GUI specified, make kymograph GUI object and display the window
     if gui.kymograph:
         # make GUI object and display the window
         gui = KymographGUI()
         gui.mainloop()
+
+        # get GUI parameters
         folder_path = gui.folder_path
         plot_summary_CCFs = gui.plot_summary_CCFs
         plot_summary_peaks = gui.plot_summary_peaks
@@ -77,12 +84,14 @@ def main():
         line_width = gui.line_width
         group_names = gui.group_names
         acf_peak_thresh = gui.acf_peak_thresh
+
+        # set these to None to make sure they are not triggered in the script
         subframe_size = None
         subframe_roll = None
         box_size = None
         box_shift = None
-        kymograph_analysis = True
 
+        # set the analysis type
         analysis_type = "kymograph"
 
     # identify and report errors in GUI input
@@ -117,7 +126,7 @@ def main():
                     "Files Not Processed" : [],
                     'Plotting errors' : []
                 } 
-    if rolling:
+    if analysis_type == 'rolling':
         log_params = {  "Box Size(px)" : box_size,
                         "Box Shift(px)" : box_shift,
                         "Base Directory" : folder_path,
@@ -129,7 +138,7 @@ def main():
                         "Files Not Processed" : [],
                         'Submovies Used' : []
                 } 
-    if kymograph_analysis:
+    if analysis_type == 'kymograph':
         log_params = {"Base Directory": folder_path,
                   "Plot Summary ACFs": plot_summary_ACFs,
                 "Plot Summary CCFs": plot_summary_CCFs,
@@ -224,12 +233,7 @@ def main():
         for file_name in file_names: 
             print('******'*10)
             print(f'Processing {file_name}...')
-            if analysis_type == "standard":
-                processor = TotalSignalProcessor(analysis_type = analysis_type, image_path = f'{folder_path}/{file_name}', kern = box_size, step = box_shift)
-            elif analysis_type == "rolling":
-                processor = TotalSignalProcessor(analysis_type = analysis_type, image_path = f'{folder_path}/{file_name}', kern = box_size, step = box_shift, roll_size = subframe_size, roll_by = subframe_roll)
-            else:
-                processor = TotalSignalProcessor(analysis_type = analysis_type, image_path = f'{folder_path}/{file_name}', line_width = line_width)
+            processor = TotalSignalProcessor(analysis_type = analysis_type, image_path = f'{folder_path}/{file_name}', kern = box_size, step = box_shift, roll_size = subframe_size, roll_by = subframe_roll, line_width = line_width)
             # log error and skip image if frames < 2 
             if processor.num_frames < 2:
                 print(f"****** ERROR ******",
@@ -263,8 +267,62 @@ def main():
             if not os.path.exists(im_save_path):
                 os.makedirs(im_save_path)
 
-            if analysis_type == "rolling":
+            # if standard or kymograph analysis
+            if analysis_type != "rolling":
+                # plot and save the mean autocorrelation, crosscorrelation, and peak properties for each channel
+                if plot_summary_ACFs:
+                    summ_acf_plots = processor.plot_mean_ACF()
+                    for plot_name, plot in summ_acf_plots.items():
+                        plot.savefig(f'{im_save_path}/{plot_name}.png')
 
+                if plot_summary_CCFs:
+                    summ_ccf_plots, mean_ccf_values = processor.plot_mean_CCF()
+                    for plot_name, plot in summ_ccf_plots.items():
+                        plot.savefig(f'{im_save_path}/{plot_name}.png')
+                        for csv_filename, CCF_values in mean_ccf_values.items():
+                            with open(os.path.join(im_save_path, csv_filename), 'w', newline='') as csvfile:
+                                writer = csv.writer(csvfile)
+                                writer.writerow(['Time', 'CCF_Value', 'STD'])
+                                for time, ccf_val, arr_std in CCF_values:
+                                    writer.writerow([time, ccf_val, arr_std])
+
+                if plot_summary_peaks:
+                    summ_peak_plots = processor.plot_mean_peak_props()
+                    for plot_name, plot in summ_peak_plots.items():
+                        plot.savefig(f'{im_save_path}/{plot_name}.png')
+                
+                # plot and save the individual autocorrelation, crosscorrelation, and peak properties for each bin in channel
+                if plot_ind_peaks:        
+                    ind_peak_plots = processor.plot_indv_peak_props()
+                    ind_peak_path = os.path.join(im_save_path, 'Individual_peak_plots')
+                    if not os.path.exists(ind_peak_path):
+                        os.makedirs(ind_peak_path)
+                    for plot_name, plot in ind_peak_plots.items():
+                        plot.savefig(f'{ind_peak_path}/{plot_name}.png')
+
+                if plot_ind_ACFs:
+                    ind_acf_plots = processor.plot_indv_acfs()
+                    ind_acf_path = os.path.join(im_save_path, 'Individual_ACF_plots')
+                    if not os.path.exists(ind_acf_path):
+                        os.makedirs(ind_acf_path)
+                    for plot_name, plot in ind_acf_plots.items():
+                        plot.savefig(f'{ind_acf_path}/{plot_name}.png')
+
+                if plot_ind_CCFs:
+                    if processor.num_channels == 1:
+                        log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
+                    ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
+                    if not os.path.exists(ind_ccf_val_path):
+                        os.makedirs(ind_ccf_val_path)
+                    ind_ccf_plots = processor.plot_indv_ccfs(save_folder=ind_ccf_val_path)
+                    ind_ccf_path = os.path.join(im_save_path, 'Individual_CCF_plots')
+                    if not os.path.exists(ind_ccf_path):
+                        os.makedirs(ind_ccf_path)
+                    for plot_name, plot in ind_ccf_plots.items():
+                        plot.savefig(f'{ind_ccf_path}/{plot_name}.png')
+
+            # if rolling analysis            
+            else:
                 # calculate the number of subframes used
                 num_submovies = processor.num_submovies
                 log_params['Submovies Used'].append(num_submovies)
@@ -288,89 +346,37 @@ def main():
                     os.makedirs(plot_save_path)
                 for title, plot in summary_plots.items():
                     plot.savefig(f'{plot_save_path}/{name_wo_ext}_{title}.png')
-                pbar.update(1)
 
-            else:
-                # plot and save the population autocorrelation, crosscorrelation, and peak properties for each channel
-                if plot_summary_ACFs:
-                    summ_acf_plots = processor.plot_mean_ACF()
-                    for plot_name, plot in summ_acf_plots.items():
-                        plot.savefig(f'{im_save_path}/{plot_name}.png')
-                if plot_summary_CCFs:
-                    summ_ccf_plots, mean_ccf_values = processor.plot_mean_CCF()
-                    for plot_name, plot in summ_ccf_plots.items():
-                        plot.savefig(f'{im_save_path}/{plot_name}.png')
-                        for csv_filename, CCF_values in mean_ccf_values.items():
-                            with open(os.path.join(im_save_path, csv_filename), 'w', newline='') as csvfile:
-                                writer = csv.writer(csvfile)
-                                writer.writerow(['Time', 'CCF_Value', 'STD'])
-                                for time, ccf_val, arr_std in CCF_values:
-                                    writer.writerow([time, ccf_val, arr_std])
-                if plot_summary_peaks:
-                    summ_peak_plots = processor.plot_mean_peak_props()
-                    for plot_name, plot in summ_peak_plots.items():
-                        plot.savefig(f'{im_save_path}/{plot_name}.png')
-                
-                # plot and save the individual autocorrelation, crosscorrelation, and peak properties for each bin in channel
-                if plot_ind_peaks:        
-                    ind_peak_plots = processor.plot_indv_peak_props()
-                    ind_peak_path = os.path.join(im_save_path, 'Individual_peak_plots')
-                    if not os.path.exists(ind_peak_path):
-                        os.makedirs(ind_peak_path)
-                    for plot_name, plot in ind_peak_plots.items():
-                        plot.savefig(f'{ind_peak_path}/{plot_name}.png')
-                if plot_ind_ACFs:
-                    ind_acf_plots = processor.plot_indv_acfs()
-                    ind_acf_path = os.path.join(im_save_path, 'Individual_ACF_plots')
-                    if not os.path.exists(ind_acf_path):
-                        os.makedirs(ind_acf_path)
-                    for plot_name, plot in ind_acf_plots.items():
-                        plot.savefig(f'{ind_acf_path}/{plot_name}.png')
-                if plot_ind_CCFs:
-                    if processor.num_channels == 1:
-                        log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
-                    ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
-                    if not os.path.exists(ind_ccf_val_path):
-                        os.makedirs(ind_ccf_val_path)
-                    ind_ccf_plots = processor.plot_indv_ccfs(save_folder=ind_ccf_val_path)
-                    ind_ccf_path = os.path.join(im_save_path, 'Individual_CCF_plots')
-                    if not os.path.exists(ind_ccf_path):
-                        os.makedirs(ind_ccf_path)
-                    for plot_name, plot in ind_ccf_plots.items():
-                        plot.savefig(f'{ind_ccf_path}/{plot_name}.png')
+            # Summarize the data for current image as dataframe, and save as .csv
+            im_measurements_df = processor.organize_measurements()
+            im_measurements_df.to_csv(f'{im_save_path}/{name_wo_ext}_measurements.csv', index = False)
 
+            # generate summary data for current image
+            im_summary_dict = processor.summarize_image(file_name = file_name, group_name = group_name)
 
+            # populate column headers list with keys from the measurements dictionary
+            for key in im_summary_dict.keys(): 
+                if key not in col_headers: 
+                    col_headers.append(key) 
+        
+            # append summary data to the summary list
+            summary_list.append(im_summary_dict)
 
-                # Summarize the data for current image as dataframe, and save as .csv
-                im_measurements_df = processor.organize_measurements()
-                im_measurements_df.to_csv(f'{im_save_path}/{name_wo_ext}_measurements.csv', index = False)
+            # useless progress bar to force completion of previous bars
+            with tqdm(total = 10, miniters = 1) as dummy_pbar:
+                dummy_pbar.set_description('cleanup:')
+                for i in range(10):
+                    dummy_pbar.update(1)
 
-                # generate summary data for current image
-                im_summary_dict = processor.summarize_image(file_name = file_name, group_name = group_name)
+            pbar.update(1)
 
-                # populate column headers list with keys from the measurements dictionary
-                for key in im_summary_dict.keys(): 
-                    if key not in col_headers: 
-                        col_headers.append(key) 
-            
-                # append summary data to the summary list
-                summary_list.append(im_summary_dict)
+        # create dataframe from summary list
+        summary_df = pd.DataFrame(summary_list, columns=col_headers)
 
-                # useless progress bar to force completion of previous bars
-                with tqdm(total = 10, miniters = 1) as dummy_pbar:
-                    dummy_pbar.set_description('cleanup:')
-                    for i in range(10):
-                        dummy_pbar.update(1)
+        # save the summary csv file
+        summary_df = summary_df.sort_values('File Name', ascending=True)
 
-                pbar.update(1)
-
-                # create dataframe from summary list
-                summary_df = pd.DataFrame(summary_list, columns=col_headers)
-
-                # save the summary csv file
-                summary_df = summary_df.sort_values('File Name', ascending=True)
-
-                summary_df.to_csv(f"{main_save_path}/!{now.strftime('%Y%m%d%H%M')}_summary.csv", index = False)
+        summary_df.to_csv(f"{main_save_path}/!{now.strftime('%Y%m%d%H%M')}_summary.csv", index = False)
 
         # if group names were entered into the gui, generate comparisons between each group
         if group_names != ['']:
