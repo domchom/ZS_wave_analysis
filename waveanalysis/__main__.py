@@ -269,26 +269,6 @@ def main():
             if not os.path.exists(im_save_path):
                 os.makedirs(im_save_path)
 
-
-            if analysis_type == "rolling":
-                if processor.num_submovies > 1:
-                    
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
             # if standard or kymograph analysis
             if analysis_type != "rolling":
                 # plot and save the mean autocorrelation, crosscorrelation, and peak properties for each channel
