@@ -34,12 +34,14 @@ def main():
     plot_ind_ACFs = gui.plot_ind_ACFs
     plot_ind_CCFs = gui.plot_ind_CCFs
     plot_ind_peaks = gui.plot_ind_peaks
+    subframe_size = None
+    subframe_roll = None
+    line_width = None
 
     analysis_type = "standard"
 
     # if rolling GUI specified, make rolling GUI object and display the window
     if gui.roll:
-        rolling = True
         gui = RollingGUI()
         gui.mainloop()
         # get GUI parameters
@@ -52,6 +54,7 @@ def main():
         plot_sf_peaks = gui.plot_sf_peaks
         subframe_size = gui.subframe_size
         subframe_roll = gui.subframe_roll
+        line_width = None
         group_names = ['']
 
         analysis_type = "rolling"
@@ -71,6 +74,10 @@ def main():
         line_width = gui.line_width
         group_names = gui.group_names
         acf_peak_thresh = gui.acf_peak_thresh
+        subframe_size = None
+        subframe_roll = None
+        box_size = None
+        box_shift = None
 
         analysis_type = "kymograph"
 
