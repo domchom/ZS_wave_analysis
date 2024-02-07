@@ -1,4 +1,5 @@
 import os
+import csv
 import scipy
 import numpy as np
 import pandas as pd
@@ -438,6 +439,34 @@ class TotalSignalProcessor:
                                                                                                         shift = self.indv_shifts[combo_number, box])
         
         return self.indv_ccf_plots
+
+    def save_ind_ccf_values(self, save_folder):
+        def normalize(signal: np.ndarray):
+            '''
+            Normalize between 0 and 1
+            '''
+            return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
+
+        for combo_number, combo in enumerate(self.channel_combos):
+            for box in range(self.num_boxes_or_cols):
+                if self.analysis_type == "standard":
+                    ch1_normalized = normalize(self.means[:, combo[0], box])
+                    ch2_normalized = normalize(self.means[:, combo[1], box])
+                else:   
+                    ch1_normalized = normalize(self.indv_line_values[combo[0], box, :])
+                    ch2_normalized = normalize(self.indv_line_values[combo[1], box, :])
+                ccf_curve = self.indv_ccfs[combo_number, box]
+
+                # Saving measurements to a CSV file for each box
+                measurements = list(zip_longest(range(1, len(ccf_curve) + 1), ch1_normalized, ch2_normalized, ccf_curve, fillvalue=None))
+                indv_ccfs_filename = os.path.join(save_folder, f'Box{box + 1}_CCF_values.csv')
+            
+                with open(indv_ccfs_filename, 'w', newline='') as csvfile:
+                    writer = csv.writer(csvfile)
+                    writer.writerow(['Time', 'Ch1_Value', 'Ch2_Value', 'CCF_Value'])
+
+                    for time, ch1_val, ch2_val, ccf_val in measurements:
+                        writer.writerow([time, ch1_val, ch2_val, ccf_val])
 
     def plot_indv_peak_props(self):
         '''

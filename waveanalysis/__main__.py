@@ -332,6 +332,10 @@ def main():
                         os.makedirs(ind_ccf_path)
                     for plot_name, plot in ind_ccf_plots.items():
                         plot.savefig(f'{ind_ccf_path}/{plot_name}.png')
+                    ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
+                    if not os.path.exists(ind_ccf_val_path):
+                        os.makedirs(ind_ccf_val_path)
+                    processor.save_ind_ccf_values(save_folder=ind_ccf_val_path)
 
 
                 # Summarize the data for current image as dataframe, and save as .csv
