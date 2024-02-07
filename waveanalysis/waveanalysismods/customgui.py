@@ -28,11 +28,11 @@ class BaseGUI(tk.Tk):
         self.plot_summary_peaks = tk.BooleanVar()
         self.plot_summary_peaks.set(True)
         self.plot_ind_ACFs = tk.BooleanVar()
-        self.plot_ind_ACFs.set(True)
+        self.plot_ind_ACFs.set(False)
         self.plot_ind_CCFs = tk.BooleanVar()
-        self.plot_ind_CCFs.set(True)
+        self.plot_ind_CCFs.set(False)
         self.plot_ind_peaks = tk.BooleanVar()
-        self.plot_ind_peaks.set(True)
+        self.plot_ind_peaks.set(False)
         self.acf_peak_thresh = tk.DoubleVar()
         self.acf_peak_thresh.set(0.1)
         self.group_names = tk.StringVar()
@@ -139,10 +139,12 @@ class BaseGUI(tk.Tk):
 
     def launch_rolling_analysis(self):
         self.roll = True
+        self.kymograph = False
         self.destroy()
 
     def launch_kymograph_analysis(self):
         self.kymograph = True
+        self.roll = False
         self.destroy()
 
     def cancel_analysis(self):
@@ -202,6 +204,7 @@ class RollingGUI(tk.Tk):
         self.file_path_entry.grid(row = 0, column = 0, padx = 10, sticky = 'E')
         self.file_path_button = ttk.Button(self, text = 'Select folder')
         # make a default path
+        self.folder_path.set('/Users/domchom/Desktop/rolling')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 
@@ -271,10 +274,6 @@ class RollingGUI(tk.Tk):
     def get_folder_path(self):
         self.folder_path.set(askdirectory())
 
-    def launch_rolling_analysis(self):
-        self.roll = True
-        self.destroy()
-
     def cancel_analysis(self):
         sys.exit('You have cancelled the analysis')
     
@@ -290,6 +289,7 @@ class RollingGUI(tk.Tk):
         self.subframe_size = self.subframe_size.get()
         self.subframe_roll = self.subframe_roll.get()
 
+        self.kymograph = False
 
         # destroy the widget
         self.destroy()
@@ -408,10 +408,6 @@ class KymographGUI(tk.Tk):
     def get_folder_path(self):
         self.folder_path.set(askdirectory())
 
-    def launch_kymograph_analysis(self):
-        self.kymograph = True
-        self.destroy()
-
     def cancel_analysis(self):
         sys.exit('You have cancelled the analysis')
     
@@ -427,6 +423,8 @@ class KymographGUI(tk.Tk):
         self.plot_ind_peaks = self.plot_ind_peaks.get()
         self.folder_path = self.folder_path.get()
         self.acf_peak_thresh = self.acf_peak_thresh.get()
+
+        self.roll = False
         
         # convert group names to list of strings
         self.group_names = [group_name.strip() for group_name in self.group_names.split(',')]

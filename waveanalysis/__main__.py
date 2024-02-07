@@ -58,7 +58,9 @@ def main():
         line_width = None
         group_names = ['']
 
+        rolling = True
         analysis_type = "rolling"
+        
 
 
     if gui.kymograph:
@@ -79,6 +81,7 @@ def main():
         subframe_roll = None
         box_size = None
         box_shift = None
+        kymograph_analysis = True
 
         analysis_type = "kymograph"
 

@@ -149,10 +149,10 @@ class TotalSignalProcessor:
                 corr_signal1 = signal1 - signal1.mean()
                 corr_signal2 = signal2 - signal2.mean()
                 # Calculate cross-correlation curve
+                cc_curve = np.correlate(corr_signal1, corr_signal2, mode='full')
                 if rolling:
                     cc_curve = cc_curve / (self.roll_size * signal1.std() * signal2.std())
                 else:
-                    cc_curve = np.correlate(corr_signal1, corr_signal2, mode='full')
                     cc_curve = sig.savgol_filter(cc_curve, window_length=11, polyorder=3)
                     cc_curve = cc_curve / (self.num_frames * signal1.std() * signal2.std())
                 # Find peaks in the cross-correlation curve
@@ -166,7 +166,7 @@ class TotalSignalProcessor:
                 # Otherwise, return NaNs
                 else:
                     delay_frames = np.nan
-                    cc_curve = np.full((self.num_frames * 2 - 1), np.nan)
+                    cc_curve = np.full((self.roll_size*2-1 if rolling else self.num_frames * 2 - 1), np.nan)
             else:
                 # If no peaks found, return NaNs
                 delay_frames = np.nan
@@ -214,6 +214,8 @@ class TotalSignalProcessor:
                         signal1 = self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, combo[0], bin]
                         signal2 = self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, combo[1], bin]
 
+                        delay_frames, cc_curve = calc_shifts(signal1, signal2, prominence=0.1, rolling = True)
+
                         self.indv_shifts[submovie, combo_number, bin] = delay_frames
                         self.indv_ccfs[submovie, combo_number, bin] = cc_curve
 
@@ -241,7 +243,7 @@ class TotalSignalProcessor:
                 rightIndex = np.nan
 
             # If rolling analysis
-            if submovie:
+            if submovie != None:
                 # Store peak measurements for each bin in each channel of a submovie
                 self.ind_peak_widths[submovie, channel, bin] = mean_width
                 self.ind_peak_maxs[submovie, channel, bin] = mean_max
