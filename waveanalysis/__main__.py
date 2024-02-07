@@ -228,7 +228,7 @@ def main():
             else:
                 processor = TotalSignalProcessor(analysis_type = analysis_type, image_path = f'{folder_path}/{file_name}', line_width = line_width)
             # log error and skip image if frames < 2 
-            if processor.num_frames_or_rows < 2:
+            if processor.num_frames < 2:
                 print(f"****** ERROR ******",
                     f"\n{file_name} has less than 2 frames",
                     "\n****** ERROR ******")
@@ -308,7 +308,7 @@ def main():
                     for plot_name, plot in summ_peak_plots.items():
                         plot.savefig(f'{im_save_path}/{plot_name}.png')
                 
-                # plot and save the individual autocorrelation, crosscorrelation, and peak properties for each box in channel
+                # plot and save the individual autocorrelation, crosscorrelation, and peak properties for each bin in channel
                 if plot_ind_peaks:        
                     ind_peak_plots = processor.plot_indv_peak_props()
                     ind_peak_path = os.path.join(im_save_path, 'Individual_peak_plots')
@@ -408,8 +408,9 @@ def main():
         log_params["Time Elapsed"] = f"{end - start:.2f} seconds"
         # log parameters and errors
         make_log(main_save_path, log_params)
-        print('Done!')
 
 
 if __name__ == '__main__':
     main()
+
+print('Done with script!')

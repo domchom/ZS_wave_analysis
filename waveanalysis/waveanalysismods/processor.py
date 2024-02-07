@@ -32,51 +32,51 @@ class TotalSignalProcessor:
                 self.roll_size = roll_size
                 self.roll_by = roll_by
                 self.check_and_set_rolling_parameters()
-            self.calculate_means()
+            self.calculate_box_values()
         # some specific functions for kymograph analysis
         else:
             self.line_width = line_width
             self.standardize_image_dimensions_for_kymograph()
-            self.calculate_individual_line_values()
+            self.calculate_line_values()
 
     def standardize_image_dimensions(self, metadata):
-        self.num_frames_or_rows = metadata.get('frames', 1)
+        self.num_frames = metadata.get('frames', 1)
         self.num_slices = metadata.get('slices', 1)
-        self.image = self.image.reshape(self.num_frames_or_rows, self.num_slices, self.num_channels, *self.image.shape[-2:])
+        self.image = self.image.reshape(self.num_frames, self.num_slices, self.num_channels, *self.image.shape[-2:])
 
     def max_project_image_stack(self):
         if self.num_slices > 1:
             print('Max projecting image stack')
             self.image = np.max(self.image, axis=1)
             self.num_slices = 1
-            self.image = self.image.reshape(self.num_frames_or_rows, self.num_slices, self.num_channels, *self.image.shape[-2:])
+            self.image = self.image.reshape(self.num_frames, self.num_slices, self.num_channels, *self.image.shape[-2:])
 
     def check_and_set_rolling_parameters(self):
         assert isinstance(self.roll_size, int) and isinstance(self.roll_by, int), 'Roll size and roll by must be integers'
-        self.num_submovies = (self.num_frames_or_rows - self.roll_size) // self.roll_by
+        self.num_submovies = (self.num_frames - self.roll_size) // self.roll_by
 
-    def calculate_means(self):
+    def calculate_box_values(self):
         ind = self.kernel_size // 2
         self.means = nd.uniform_filter(self.image[:, 0, :, :, :], size=(1, 1, self.kernel_size, self.kernel_size))[:, :, ind::self.step, ind::self.step]
         self.xpix, self.ypix = self.means.shape[-2:]
-        self.num_boxes_or_cols = self.xpix * self.ypix
-        self.means = self.means.reshape(self.means.shape[0], self.means.shape[1], self.num_boxes_or_cols)
+        self.total_bins = self.xpix * self.ypix
+        self.means = self.means.reshape(self.means.shape[0], self.means.shape[1], self.total_bins)
 
     def standardize_image_dimensions_for_kymograph(self):
         self.image = self.image.reshape(self.num_channels, *self.image.shape[-2:])
-        self.num_boxes_or_cols = self.image.shape[-1]
-        self.num_frames_or_rows = self.image.shape[-2]
+        self.total_bins = self.image.shape[-1] #we are either binning the image into boxes or columns, so just call bins for simplicity
+        self.num_frames = self.image.shape[-2] #The number of rows is equal to the number to number of frames, so just call frames for simplicity
         
-    def calculate_individual_line_values(self):
-        self.indv_line_values = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols, self.num_frames_or_rows))
+    def calculate_line_values(self):
+        self.indv_line_values = np.zeros(shape=(self.num_channels, self.total_bins, self.num_frames))
         for channel in range(self.num_channels):
-            for col_num in range(self.num_boxes_or_cols):
+            for col_num in range(self.total_bins):
                 if self.line_width == 1:
                     signal = sig.savgol_filter(self.image[channel, :, col_num], window_length=25, polyorder=2)
                     self.indv_line_values[channel, col_num] = signal
                 elif self.line_width % 2 != 0:
                     line_width_extra = int((self.line_width - 1) / 2)
-                    if col_num + line_width_extra < self.num_boxes_or_cols and col_num - line_width_extra > -1:
+                    if col_num + line_width_extra < self.total_bins and col_num - line_width_extra > -1:
                         signal = np.mean(self.image[channel, :, col_num - line_width_extra:col_num + line_width_extra], axis=1)
                         signal = sig.savgol_filter(signal, window_length=25, polyorder=2)
                         self.indv_line_values[channel, col_num] = signal
@@ -85,43 +85,8 @@ class TotalSignalProcessor:
 # INDIVIDUAL CALCULATION #####################################################################################################################################################
 ##############################################################################################################################################################################
 
-    # function to return the autocorrelation of each box in the image stack for each channel
+    # function to return the autocorrelation of each bin in the image stack for each channel
     def calc_indv_ACFs(self, peak_thresh=0.1):
-        # make empty arrays to populate with 1) period measurements and 2) acf curves
-        self.periods = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
-        self.acfs = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols, self.num_frames_or_rows*2-1))
-
-        if self.analysis_type == "standard":
-            for channel in range(self.num_channels):
-                for box in range(self.num_boxes_or_cols):
-                    # calculate full autocorrelation
-                    signal = self.means[:,channel, box]
-                    delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = self.num_frames_or_rows)
-                    self.periods[channel, box] = delay
-                    self.acfs[channel, box] = acf_curve
-                    
-        elif self.analysis_type == "rolling":
-            self.periods = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
-            self.acfs = np.zeros(shape = (self.num_submovies, self.num_channels, self.num_boxes_or_cols, self.roll_size*2-1))
-
-            for submovie in range(self.num_submovies):
-                for channel in range(self.num_channels):
-                    for box in range(self.num_boxes_or_cols):
-                        # calculate full autocorrelation
-                        signal = self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, channel, box]
-                        delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = self.roll_size)
-                        self.periods[channel, box] = delay
-                        self.acfs[channel, box] = acf_curve
-
-        elif self.analysis_type == "kymograph":
-            for channel in range(self.num_channels):
-                for col_num in range(self.num_boxes_or_cols):
-                    # calculate full autocorrelation
-                    signal = self.indv_line_values[channel, col_num, :]
-                    delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = self.num_frames_or_rows)
-                    self.periods[channel, col_num] = delay
-                    self.acfs[channel, col_num] = acf_curve
-
         def norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = None):
             corr_signal = signal - signal.mean()
             acf_curve = np.correlate(corr_signal, corr_signal, mode='full')
@@ -139,59 +104,46 @@ class TotalSignalProcessor:
                 acf_curve = np.full((num_frames_or_rows_or_rollsize*2-1), np.nan)
 
             return delay, acf_curve
+        
+        # make empty arrays to populate with 1) period measurements and 2) acf curves
+        self.periods = np.zeros(shape=(self.num_channels, self.total_bins))
+        self.acfs = np.zeros(shape=(self.num_channels, self.total_bins, self.num_frames*2-1))
+
+        if self.analysis_type == "standard":
+            for channel in range(self.num_channels):
+                for bin in range(self.total_bins):
+                    # calculate full autocorrelation
+                    signal = self.means[:,channel, bin]
+                    delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = self.num_frames)
+                    self.periods[channel, bin] = delay
+                    self.acfs[channel, bin] = acf_curve
+                    
+        elif self.analysis_type == "rolling":
+            self.periods = np.zeros(shape=(self.num_submovies, self.num_channels, self.total_bins))
+            self.acfs = np.zeros(shape = (self.num_submovies, self.num_channels, self.total_bins, self.roll_size*2-1))
+
+            for submovie in range(self.num_submovies):
+                for channel in range(self.num_channels):
+                    for bin in range(self.total_bins):
+                        # calculate full autocorrelation
+                        signal = self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, channel, bin]
+                        delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = self.roll_size)
+                        self.periods[channel, bin] = delay
+                        self.acfs[channel, bin] = acf_curve
+
+        elif self.analysis_type == "kymograph":
+            for channel in range(self.num_channels):
+                for bin in range(self.total_bins):
+                    # calculate full autocorrelation
+                    signal = self.indv_line_values[channel, bin, :]
+                    delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = self.num_frames)
+                    self.periods[channel, bin] = delay
+                    self.acfs[channel, bin] = acf_curve
 
         return self.acfs, self.periods
 
 
     def calc_indv_CCFs(self):
-        # make a list of unique channel combinations to calculate CCF for
-        channels = list(range(self.num_channels))
-        self.channel_combos = []
-        for i in range(self.num_channels):
-            for j in channels[i+1:]:
-                self.channel_combos.append([channels[i],j])
-        num_combos = len(self.channel_combos)
-
-        # make empty arrays to populate with 1) period measurements and 2) acf curves   
-        self.indv_shifts = np.zeros(shape=(num_combos, self.num_boxes_or_cols))
-        self.indv_ccfs = np.zeros(shape=(num_combos, self.num_boxes_or_cols, self.num_frames_or_rows*2-1))
-
-        if self.analysis_type == "standard":
-            for combo_number, combo in enumerate(self.channel_combos):
-                for box in range(self.num_boxes_or_cols):
-                    signal1 = self.means[:, combo[0], box]
-                    signal2 = self.means[:, combo[1], box]
-
-                    delay_frames, cc_curve = calc_shifts(signal1, signal2, prominence=0.1)
-
-                    self.indv_shifts[combo_number, box] = delay_frames
-                    self.indv_ccfs[combo_number, box] = cc_curve
-
-        elif self.analysis_type == "rolling":
-            # make empty arrays to populate with 1) period measurements and 2) acf curves   
-            self.indv_shifts = np.zeros(shape=(self.num_submovies, num_combos, self.num_boxes_or_cols))
-            self.indv_ccfs = np.zeros(shape=(self.num_submovies, num_combos, self.num_boxes_or_cols, self.roll_size*2-1))
-
-            for submovie in range(self.num_submovies):
-                for combo_number, combo in enumerate(self.channel_combos):
-                    for box in range(self.num_boxes_or_cols):
-                        signal1 = self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, combo[0], box]
-                        signal2 = self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, combo[1], box]
-
-                        self.indv_shifts[submovie, combo_number, box] = delay_frames
-                        self.indv_ccfs[submovie, combo_number, box] = cc_curve
-        
-        elif self.analysis_type == "kymograph":
-            for combo_number, combo in enumerate(self.channel_combos):
-                for col_num in range(self.num_boxes_or_cols):
-                    signal1 = self.indv_line_values[combo[0], col_num]
-                    signal2 = self.indv_line_values[combo[1], col_num]
-
-                    delay_frames, cc_curve = calc_shifts(signal1, signal2, prominence=0.1)
-
-                    self.indv_shifts[combo_number, col_num] = delay_frames
-                    self.indv_ccfs[combo_number, col_num] = cc_curve
-
         def calc_shifts(signal1, signal2, prominence=0.1, rolling = False):
             #smooth signals and find peaks in the signals. Sanity check to continue on with calculating the individual shifts
             signal1 = scipy.signal.savgol_filter(signal1, window_length=11, polyorder=3)
@@ -209,7 +161,7 @@ class TotalSignalProcessor:
                     # smooth the curve
                     cc_curve = sig.savgol_filter(cc_curve, window_length=11, polyorder=3)
                     # normalize the curve
-                    cc_curve = cc_curve / (self.num_frames_or_rows * signal1.std() * signal2.std())
+                    cc_curve = cc_curve / (self.num_frames * signal1.std() * signal2.std())
                 # find peaks
                 peaks, _ = sig.find_peaks(cc_curve, prominence=prominence)
                 # absolute difference between each peak and zero
@@ -222,56 +174,68 @@ class TotalSignalProcessor:
                 # otherwise, return NaNs for both period and autocorrelation curve
                 else:
                     delay_frames = np.nan
-                    cc_curve = np.full((self.num_frames_or_rows * 2 - 1), np.nan)
+                    cc_curve = np.full((self.num_frames * 2 - 1), np.nan)
             else:
                 delay_frames = np.nan
                 if rolling == True:
                     cc_curve = np.full((self.roll_size*2-1), np.nan)
                 else:
-                    cc_curve = np.full((self.num_frames_or_rows * 2 - 1), np.nan)
+                    cc_curve = np.full((self.num_frames * 2 - 1), np.nan)
 
             return delay_frames, cc_curve
         
+        # make a list of unique channel combinations to calculate CCF for
+        channels = list(range(self.num_channels))
+        self.channel_combos = []
+        for i in range(self.num_channels):
+            for j in channels[i+1:]:
+                self.channel_combos.append([channels[i],j])
+        num_combos = len(self.channel_combos)
+
+        # make empty arrays to populate with 1) period measurements and 2) acf curves   
+        self.indv_shifts = np.zeros(shape=(num_combos, self.total_bins))
+        self.indv_ccfs = np.zeros(shape=(num_combos, self.total_bins, self.num_frames*2-1))
+
+        if self.analysis_type == "standard":
+            for combo_number, combo in enumerate(self.channel_combos):
+                for bin in range(self.total_bins):
+                    signal1 = self.means[:, combo[0], bin]
+                    signal2 = self.means[:, combo[1], bin]
+
+                    delay_frames, cc_curve = calc_shifts(signal1, signal2, prominence=0.1)
+
+                    self.indv_shifts[combo_number, bin] = delay_frames
+                    self.indv_ccfs[combo_number, bin] = cc_curve
+
+        elif self.analysis_type == "rolling":
+            # make empty arrays to populate with 1) period measurements and 2) acf curves   
+            self.indv_shifts = np.zeros(shape=(self.num_submovies, num_combos, self.total_bins))
+            self.indv_ccfs = np.zeros(shape=(self.num_submovies, num_combos, self.total_bins, self.roll_size*2-1))
+
+            for submovie in range(self.num_submovies):
+                for combo_number, combo in enumerate(self.channel_combos):
+                    for bin in range(self.total_bins):
+                        signal1 = self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, combo[0], bin]
+                        signal2 = self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, combo[1], bin]
+
+                        self.indv_shifts[submovie, combo_number, bin] = delay_frames
+                        self.indv_ccfs[submovie, combo_number, bin] = cc_curve
         
+        elif self.analysis_type == "kymograph":
+            for combo_number, combo in enumerate(self.channel_combos):
+                for bin in range(self.total_bins):
+                    signal1 = self.indv_line_values[combo[0], bin]
+                    signal2 = self.indv_line_values[combo[1], bin]
+
+                    delay_frames, cc_curve = calc_shifts(signal1, signal2, prominence=0.1)
+
+                    self.indv_shifts[combo_number, bin] = delay_frames
+                    self.indv_ccfs[combo_number, bin] = cc_curve
+
         return self.indv_shifts, self.indv_ccfs, self.channel_combos
 
     def calc_indv_peak_props(self):
-        # make empty arrays to fill with peak measurements for each channel
-        self.ind_peak_widths = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
-        self.ind_peak_maxs = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
-        self.ind_peak_mins = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
-        # make a dictionary to store the arrays and measurements generated by this function so they don't have to be re-calculated later
-        self.ind_peak_props = {}
-
-        if self.analysis_type == "standard":
-            for channel in range(self.num_channels):
-                for box in range(self.num_boxes_or_cols):
-
-                    signal = sig.savgol_filter(self.means[:,channel, box], window_length = 11, polyorder = 2)
-                    indv_props(signal, box)
-
-        elif self.analysis_type == "rolling":
-            self.ind_peak_widths = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
-            self.ind_peak_maxs = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
-            self.ind_peak_mins = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
-
-            for submovie in range(self.num_submovies):
-                for channel in range(self.num_channels):
-                    for box in range(self.num_boxes_or_cols):
-                        signal = sig.savgol_filter(self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, channel, box], window_length=11, polyorder=2)
-                        indv_props(signal, box, submovie)
-
-        elif self.analysis_type == "kymograph":
-            for channel in range(self.num_channels):
-                for col_num in range(self.num_boxes_or_cols):
-
-                    signal = sig.savgol_filter(self.indv_line_values[channel, col_num], window_length = 11, polyorder = 2)
-                    indv_props(signal, col_num)
-
-        self.ind_peak_amps = self.ind_peak_maxs - self.ind_peak_mins
-        self.ind_peak_rel_amps = self.ind_peak_amps / self.ind_peak_mins
-
-        def indv_props(signal, box_or_col_num, submovie = False):
+        def indv_props(signal, bin, submovie = False):
             peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*0.1)
 
             # if peaks detected, calculate properties and return property averages. Otherwise return nans
@@ -292,12 +256,12 @@ class TotalSignalProcessor:
                 rightIndex = np.nan
 
             if submovie == False:
-                self.ind_peak_widths[channel, box_or_col_num] = mean_width
-                self.ind_peak_maxs[channel, box_or_col_num] = mean_max
-                self.ind_peak_mins[channel, box_or_col_num] = mean_min
+                self.ind_peak_widths[channel, bin] = mean_width
+                self.ind_peak_maxs[channel, bin] = mean_max
+                self.ind_peak_mins[channel, bin] = mean_min
             
-                # store the smoothed signal, peak locations, maxs, mins, and widths for each box in each channel
-                self.ind_peak_props[f'Ch {channel} Box {box_or_col_num}'] = {'smoothed': signal, 
+                # store the smoothed signal, peak locations, maxs, mins, and widths for each bin in each channel
+                self.ind_peak_props[f'Ch {channel} Bin {bin}'] = {'smoothed': signal, 
                                                         'peaks': peaks,
                                                         'proms': proms, 
                                                         'heights': heights, 
@@ -305,10 +269,44 @@ class TotalSignalProcessor:
                                                         'rightIndex': rightIndex}
             
             else:
-                self.ind_peak_widths[submovie, channel, box_or_col_num] = mean_width
-                self.ind_peak_maxs[submovie, channel, box_or_col_num] = mean_max
-                self.ind_peak_mins[submovie, channel, box_or_col_num] = mean_min
-        
+                self.ind_peak_widths[submovie, channel, bin] = mean_width
+                self.ind_peak_maxs[submovie, channel, bin] = mean_max
+                self.ind_peak_mins[submovie, channel, bin] = mean_min
+                
+        # make empty arrays to fill with peak measurements for each channel
+        self.ind_peak_widths = np.zeros(shape=(self.num_channels, self.total_bins))
+        self.ind_peak_maxs = np.zeros(shape=(self.num_channels, self.total_bins))
+        self.ind_peak_mins = np.zeros(shape=(self.num_channels, self.total_bins))
+        # make a dictionary to store the arrays and measurements generated by this function so they don't have to be re-calculated later
+        self.ind_peak_props = {}
+
+        if self.analysis_type == "standard":
+            for channel in range(self.num_channels):
+                for bin in range(self.total_bins):
+
+                    signal = sig.savgol_filter(self.means[:,channel, bin], window_length = 11, polyorder = 2)
+                    indv_props(signal, bin)
+
+        elif self.analysis_type == "rolling":
+            self.ind_peak_widths = np.zeros(shape=(self.num_submovies, self.num_channels, self.total_bins))
+            self.ind_peak_maxs = np.zeros(shape=(self.num_submovies, self.num_channels, self.total_bins))
+            self.ind_peak_mins = np.zeros(shape=(self.num_submovies, self.num_channels, self.total_bins))
+
+            for submovie in range(self.num_submovies):
+                for channel in range(self.num_channels):
+                    for bin in range(self.total_bins):
+                        signal = sig.savgol_filter(self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, channel, bin], window_length=11, polyorder=2)
+                        indv_props(signal, bin, submovie)
+
+        elif self.analysis_type == "kymograph":
+            for channel in range(self.num_channels):
+                for bin in range(self.total_bins):
+
+                    signal = sig.savgol_filter(self.indv_line_values[channel, bin], window_length = 11, polyorder = 2)
+                    indv_props(signal, bin)
+
+        self.ind_peak_amps = self.ind_peak_maxs - self.ind_peak_mins
+        self.ind_peak_rel_amps = self.ind_peak_amps / self.ind_peak_mins
 
         return self.ind_peak_widths, self.ind_peak_maxs, self.ind_peak_mins, self.ind_peak_amps, self.ind_peak_rel_amps, self.ind_peak_props
 
@@ -318,7 +316,7 @@ class TotalSignalProcessor:
 
     def plot_indv_acfs(self):
         '''
-        Plot the raw signal and individual autocorrelation curve for each box in each channel. Annotates the first peak
+        Plot the raw signal and individual autocorrelation curve for each bin in each channel. Annotates the first peak
         identified to estimate the period. 
         '''
         def return_figure(raw_signal: np.ndarray, acf_curve: np.ndarray, Ch_name: str, period: int):
@@ -328,8 +326,8 @@ class TotalSignalProcessor:
             fig, (ax1, ax2) = plt.subplots(2, 1)
             ax1.plot(raw_signal)
             ax1.set_xlabel(f'{Ch_name} Raw Signal')
-            ax1.set_ylabel('Mean box px value')
-            ax2.plot(np.arange(-self.num_frames_or_rows + 1, self.num_frames_or_rows), acf_curve)
+            ax1.set_ylabel('Mean bin px value')
+            ax2.plot(np.arange(-self.num_frames + 1, self.num_frames), acf_curve)
             ax2.set_ylabel('Autocorrelation')
             
             if not period == np.nan:
@@ -347,25 +345,25 @@ class TotalSignalProcessor:
         # empty dictionary to fill with figures, in the event that we make more than one
         self.indv_acf_plots = {}
 
-        its = self.num_channels*self.num_boxes_or_cols
+        its = self.num_channels*self.total_bins
         with tqdm(total=its, miniters=its/100) as pbar:
             pbar.set_description('ind acfs')
             for channel in range(self.num_channels):
-                for box in range(self.num_boxes_or_cols):
+                for bin in range(self.total_bins):
                     pbar.update(1)
                     if self.analysis_type == "standard":
-                        to_plot = self.means[:,channel, box]
+                        to_plot = self.means[:,channel, bin]
                     elif self.analysis_type == "kymograph":
-                        to_plot = self.indv_line_values[channel, box, :]
-                    self.indv_acf_plots[f'Ch{channel + 1} Box{box + 1} ACF'] = return_figure(to_plot, 
-                                                                                            self.acfs[channel, box], 
+                        to_plot = self.indv_line_values[channel, bin, :]
+                    self.indv_acf_plots[f'Ch{channel + 1} Bin {bin + 1} ACF'] = return_figure(to_plot, 
+                                                                                            self.acfs[channel, bin], 
                                                                                             f'Ch{channel + 1}', 
-                                                                                            self.periods[channel, box])
+                                                                                            self.periods[channel, bin])
         return self.indv_acf_plots
 
     def plot_indv_ccfs(self):
         '''
-        Plot the raw signals and corresponding cross-curve for each box in each unique channel combo. 
+        Plot the raw signals and corresponding cross-curve for each bin in each unique channel combo. 
         Annotates the first peak identified to estimate the temporal shift between signals. 
         '''
         def return_figure(ch1: np.ndarray, ch2: np.ndarray, ccf_curve: np.ndarray, ch1_name: str, ch2_name: str, shift: int):
@@ -376,9 +374,9 @@ class TotalSignalProcessor:
             ax1.plot(ch1, color = 'tab:blue', label = ch1_name)
             ax1.plot(ch2, color = 'tab:orange', label = ch2_name)
             ax1.set_xlabel('time (frames)')
-            ax1.set_ylabel('Mean box px value')
+            ax1.set_ylabel('Mean bin px value')
             ax1.legend(loc='upper right', fontsize = 'small', ncol = 1)
-            ax2.plot(np.arange(-self.num_frames_or_rows + 1, self.num_frames_or_rows), ccf_curve)
+            ax2.plot(np.arange(-self.num_frames + 1, self.num_frames), ccf_curve)
             ax2.set_ylabel('Crosscorrelation')
             
             if not shift == np.nan:
@@ -407,24 +405,24 @@ class TotalSignalProcessor:
         self.indv_ccf_plots = {}
 
         if self.num_channels > 1:
-            its = len(self.channel_combos)*self.num_boxes_or_cols
+            its = len(self.channel_combos)*self.total_bins
             with tqdm(total=its, miniters=its/100) as pbar:
                 pbar.set_description('ind ccfs')
                 for combo_number, combo in enumerate(self.channel_combos):
-                    for box in range(self.num_boxes_or_cols):
+                    for bin in range(self.total_bins):
                         pbar.update(1)
                         if self.analysis_type == "standard":
-                            Ch1 = normalize(self.means[:, combo[0], box])
-                            Ch2 = normalize(self.means[:, combo[1], box])
+                            Ch1 = normalize(self.means[:, combo[0], bin])
+                            Ch2 = normalize(self.means[:, combo[1], bin])
                         elif self.analysis_type == "kymograph":
-                            Ch1 = normalize(self.indv_line_values[combo[0], box, :])
-                            Ch2 = normalize(self.indv_line_values[combo[1], box, :])
-                        self.indv_ccf_plots[f'Ch{combo[0]}-Ch{combo[1]} Box{box + 1} CCF'] = return_figure(ch1 = Ch1,
+                            Ch1 = normalize(self.indv_line_values[combo[0], bin, :])
+                            Ch2 = normalize(self.indv_line_values[combo[1], bin, :])
+                        self.indv_ccf_plots[f'Ch{combo[0]}-Ch{combo[1]} Bin {bin + 1} CCF'] = return_figure(ch1 = Ch1,
                                                                                                         ch2 = Ch2,
-                                                                                                        ccf_curve = self.indv_ccfs[combo_number, box],
+                                                                                                        ccf_curve = self.indv_ccfs[combo_number, bin],
                                                                                                         ch1_name = f'Ch{combo[0] + 1}',
                                                                                                         ch2_name = f'Ch{combo[1] + 1}',
-                                                                                                        shift = self.indv_shifts[combo_number, box])
+                                                                                                        shift = self.indv_shifts[combo_number, bin])
         
         return self.indv_ccf_plots
 
@@ -436,18 +434,18 @@ class TotalSignalProcessor:
             return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
 
         for combo_number, combo in enumerate(self.channel_combos):
-            for box in range(self.num_boxes_or_cols):
+            for bin in range(self.total_bins):
                 if self.analysis_type == "standard":
-                    ch1_normalized = normalize(self.means[:, combo[0], box])
-                    ch2_normalized = normalize(self.means[:, combo[1], box])
+                    ch1_normalized = normalize(self.means[:, combo[0], bin])
+                    ch2_normalized = normalize(self.means[:, combo[1], bin])
                 else:   
-                    ch1_normalized = normalize(self.indv_line_values[combo[0], box, :])
-                    ch2_normalized = normalize(self.indv_line_values[combo[1], box, :])
-                ccf_curve = self.indv_ccfs[combo_number, box]
+                    ch1_normalized = normalize(self.indv_line_values[combo[0], bin, :])
+                    ch2_normalized = normalize(self.indv_line_values[combo[1], bin, :])
+                ccf_curve = self.indv_ccfs[combo_number, bin]
 
-                # Saving measurements to a CSV file for each box
+                # Saving measurements to a CSV file for each bin
                 measurements = list(zip_longest(range(1, len(ccf_curve) + 1), ch1_normalized, ch2_normalized, ccf_curve, fillvalue=None))
-                indv_ccfs_filename = os.path.join(save_folder, f'Box{box + 1}_CCF_values.csv')
+                indv_ccfs_filename = os.path.join(save_folder, f'Bin {bin + 1}_CCF_values.csv')
             
                 with open(indv_ccfs_filename, 'w', newline='') as csvfile:
                     writer = csv.writer(csvfile)
@@ -458,13 +456,13 @@ class TotalSignalProcessor:
 
     def plot_indv_peak_props(self):
         '''
-        Plots the individual peaks measured with annotated peak properties for each box in each channel.
+        Plots the individual peaks measured with annotated peak properties for each bin in each channel.
 
         Returns:
         self.peak_figs is a dictionary object containing the plot names as keys and the figure objects as values. These can
         be easily visualized by or saved to a file using the key value as a file name.
         '''
-        def return_figure(box_signal: np.ndarray, prop_dict: dict, Ch_name: str):
+        def return_figure(bin_signal: np.ndarray, prop_dict: dict, Ch_name: str):
 
             smoothed_signal = prop_dict['smoothed']
             peaks = prop_dict['peaks']
@@ -474,7 +472,7 @@ class TotalSignalProcessor:
             rightIndex = prop_dict['rightIndex']
 
             fig, ax = plt.subplots()
-            ax.plot(box_signal, color = 'tab:gray', label = 'raw signal')
+            ax.plot(bin_signal, color = 'tab:gray', label = 'raw signal')
             ax.plot(smoothed_signal, color = 'tab:cyan', label = 'smoothed signal')
 
             # plot all of the peak widths and amps in a loop
@@ -515,19 +513,19 @@ class TotalSignalProcessor:
         self.indv_peak_figs = {}
         # fill the dictionary with plots for each channel
         if hasattr(self, 'ind_peak_widths'):
-            its = self.num_channels*self.num_boxes_or_cols
+            its = self.num_channels*self.total_bins
             with tqdm(total=its, miniters=its/100) as pbar:
                 pbar.set_description('ind peaks')
                 for channel in range(self.num_channels):
-                    for box in range(self.num_boxes_or_cols):
+                    for bin in range(self.total_bins):
                         pbar.update(1)
                         if self.analysis_type == "standard":
-                            to_plot = self.means[:,channel, box]
+                            to_plot = self.means[:,channel, bin]
                         elif self.analysis_type == "kymograph":
-                            to_plot = self.indv_line_values[channel, box, :]
-                        self.indv_peak_figs[f'Ch{channel + 1} Box{box + 1} Peak Props'] = return_figure(to_plot,
-                                                                                                    self.ind_peak_props[f'Ch {channel} Box {box}'],
-                                                                                                    f'Ch{channel + 1} Box{box + 1}')
+                            to_plot = self.indv_line_values[channel, bin, :]
+                        self.indv_peak_figs[f'Ch{channel + 1} Bin {bin + 1} Peak Props'] = return_figure(to_plot,
+                                                                                                    self.ind_peak_props[f'Ch {channel} Bin {bin}'],
+                                                                                                    f'Ch{channel + 1} Bin {bin + 1}')
 
         return self.indv_peak_figs
 
@@ -544,7 +542,7 @@ class TotalSignalProcessor:
                                                   ''')
             arr_mean = np.nanmean(arr, axis = 0)
             arr_std = np.nanstd(arr, axis = 0)
-            x_axis = np.arange(-self.num_frames_or_rows + 1, self.num_frames_or_rows)
+            x_axis = np.arange(-self.num_frames + 1, self.num_frames)
             ax['A'].plot(x_axis, arr_mean, color='blue')
             ax['A'].fill_between(x_axis, 
                                  arr_mean - arr_std, 
@@ -583,7 +581,7 @@ class TotalSignalProcessor:
                                                   ''')
             arr_mean = np.nanmean(arr, axis = 0)
             arr_std = np.nanstd(arr, axis = 0)
-            x_axis = np.arange(-self.num_frames_or_rows + 1, self.num_frames_or_rows)
+            x_axis = np.arange(-self.num_frames + 1, self.num_frames)
             ax['A'].plot(x_axis, arr_mean, color='blue')
             ax['A'].fill_between(x_axis, 
                                  arr_mean - arr_std, 
@@ -680,7 +678,7 @@ class TotalSignalProcessor:
         '''
         Organizes the results of the ACF, CCF, and peak measurements into a dataframe. If any measurements were not
         performed, they will be excluded from the summary. Returns a dataframe with every measured parameter summarized
-        by channel as well as the raw values measured for each box.
+        by channel as well as the raw values measured for each bin.
 
         Returns:
         self.im_measurements is a dataframe object containing the summarized results of the ACF, CCF, and peak measurements.
@@ -726,9 +724,9 @@ class TotalSignalProcessor:
                     statified.append(meas_list)
             return(statified)
 
-        # column names for the dataframe summarizing the box results
+        # column names for the dataframe summarizing the bin results
         col_names = ["Parameter", "Mean", "Median", "StdDev", "SEM"]
-        col_names.extend([f'Box{i}' for i in range(self.num_boxes_or_cols)])
+        col_names.extend([f'Bin {i}' for i in range(self.total_bins)])
         
         
         if self.analysis_type != "rolling":
@@ -815,7 +813,7 @@ class TotalSignalProcessor:
             self.file_data_summary['File Name'] = file_name
         if group_name:
             self.file_data_summary['Group Name'] = group_name
-        self.file_data_summary['Num Boxes'] = self.num_boxes_or_cols
+        self.file_data_summary['Num Bins'] = self.total_bins
 
         stats_location = ['Mean', 'Median', 'StdDev', 'SEM']
 
@@ -868,14 +866,14 @@ class TotalSignalProcessor:
             submovie_summary['Submovie'] = submovie + 1 
             if hasattr(self, 'periods'):
                 for channel in range(self.num_channels):
-                    pcnt_no_period = (np.count_nonzero(np.isnan(self.periods[submovie, channel])) / self.num_boxes_or_cols) * 100
+                    pcnt_no_period = (np.count_nonzero(np.isnan(self.periods[submovie, channel])) / self.total_bins) * 100
                     submovie_summary[f'Ch {channel + 1} Pcnt No Periods'] = pcnt_no_period
                     for stat_name, func in stat_name_and_func.items():
                         submovie_summary[f'Ch {channel + 1} {stat_name} Period'] = func(self.periods[submovie, channel])
 
             if hasattr(self, 'shifts'):
                 for combo_number, combo in enumerate(self.channel_combos):
-                    pcnt_no_shift = np.count_nonzero(np.isnan(self.indv_ccfs[submovie, combo_number])) / self.num_boxes_or_cols * 100
+                    pcnt_no_shift = np.count_nonzero(np.isnan(self.indv_ccfs[submovie, combo_number])) / self.total_bins * 100
                     submovie_summary[f'Ch{combo[0]+1}-Ch{combo[1]+1} Pcnt No Shifts'] = pcnt_no_shift
                     for stat_name, func in stat_name_and_func.items():
                         submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat_name} Shift'] = func(self.indv_shifts[submovie, combo_number])
@@ -883,7 +881,7 @@ class TotalSignalProcessor:
             if hasattr(self, 'peak_widths'):
                 for channel in range(self.num_channels):
                     # using widths, but because these are all assigned together it applies to all peak properties
-                    pcnt_no_peaks = np.count_nonzero(np.isnan(self.ind_peak_widths[submovie, channel])) / self.num_boxes_or_cols * 100
+                    pcnt_no_peaks = np.count_nonzero(np.isnan(self.ind_peak_widths[submovie, channel])) / self.total_bins * 100
                     submovie_summary[f'Ch {channel + 1} Pcnt No Peaks'] = pcnt_no_peaks
                     for stat_name, func in stat_name_and_func.items():
                         submovie_summary[f'Ch {channel + 1} {stat_name} Peak Width'] = func(self.ind_peak_widths[submovie, channel])
