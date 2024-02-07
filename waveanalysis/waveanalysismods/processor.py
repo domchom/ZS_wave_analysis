@@ -13,84 +13,73 @@ np.seterr(divide='ignore', invalid='ignore')
 
 class TotalSignalProcessor:
     
-    def __init__(self, analysis_type, image_path, kern = None, step=None, roll_size = None, roll_by = None, line_width = None):
+    def __init__(self, analysis_type, image_path, kern=None, step=None, roll_size=None, roll_by=None, line_width=None):
+        # image import and common metadata
         self.analysis_type = analysis_type
-        if self.analysis_type != "kymograph":
-            self.image_path = image_path
+        self.image_path = image_path
+        self.image = imread(self.image_path)
+        with TiffFile(self.image_path) as tif_file:
+            metadata = tif_file.imagej_metadata
+        self.num_channels = metadata.get('channels', 1)
+
+        if analysis_type != "kymograph":
             self.kernel_size = kern
-            self.image = imread(self.image_path)
-            self.step  = step
-
-            # standardize image dimensions
-            with TiffFile(self.image_path) as tif_file:
-                metadata = tif_file.imagej_metadata
-            self.num_channels = metadata.get('channels', 1)
-            self.num_slices = metadata.get('slices', 1)
-            self.num_frames_or_rows = metadata.get('frames', 1)
-            self.image = self.image.reshape(self.num_frames_or_rows, 
-                                            self.num_slices, 
-                                            self.num_channels, 
-                                            self.image.shape[-2], 
-                                            self.image.shape[-1])
-
-            # max project image stack if num_slices > 1
-            if self.num_slices > 1:
-                print(f'Max projecting image stack')
-                self.image = np.max(self.image, axis = 1)
-                self.num_slices = 1
-                self.image = self.image.reshape(self.num_frames_or_rows, 
-                                                self.num_slices, 
-                                                self.num_channels, 
-                                                self.image.shape[-2], 
-                                                self.image.shape[-1])
-                
+            self.step = step
+            self.standardize_image_dimensions(metadata)
+            self.max_project_image_stack()
+            # some specific functions for rolling analysis
             if analysis_type == "rolling":
                 self.roll_size = roll_size
                 self.roll_by = roll_by
-
-                # sanity checks
-                assert type(self.roll_size) == int and type(self.roll_by) == int, 'Roll size and roll by must be integers'
-                # specify the number of submovies to analyze
-                self.num_submovies = (self.num_frames_or_rows - roll_size) // roll_by
-
-            # return the time-axis means for each channel
-            ind = kern // 2
-            self.means = nd.uniform_filter(self.image[:,0,:,:,:], size = (1,1,kern,kern))[:,:,ind:-ind:step, ind:-ind:step]
-            self.xpix = self.means.shape[-2]
-            self.ypix = self.means.shape[-1]
-            self.num_boxes_or_cols = self.xpix*self.ypix
-            self.means = self.means.reshape(self.means.shape[0], self.means.shape[1], self.num_boxes_or_cols)
-        
+                self.check_and_set_rolling_parameters()
+            self.calculate_means()
+        # some specific functions for kymograph analysis
         else:
-            self.image_path = image_path
             self.line_width = line_width
-            self.image = imread(self.image_path)
+            self.standardize_image_dimensions_for_kymograph()
+            self.calculate_individual_line_values()
 
-            # standardize image dimensions
-            with TiffFile(self.image_path) as tif_file:
-                metadata = tif_file.imagej_metadata
-            self.num_channels = metadata.get('channels', 1)
-            self.image = self.image.reshape(self.num_channels, 
-                                        self.image.shape[-2],  # rows
-                                        self.image.shape[-1])  # cols
-            
-            self.num_boxes_or_cols = self.image.shape[-1]
-            self.num_frames_or_rows = self.image.shape[-2]
-            
-            smooth_length = 25
+    def standardize_image_dimensions(self, metadata):
+        self.num_frames_or_rows = metadata.get('frames', 1)
+        self.num_slices = metadata.get('slices', 1)
+        self.image = self.image.reshape(self.num_frames_or_rows, self.num_slices, self.num_channels, *self.image.shape[-2:])
 
-            self.indv_line_values = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols, self.num_frames_or_rows))
-            for channel in range(self.num_channels):
-                for col_num in range(self.num_boxes_or_cols):
-                    if self.line_width == 1:
-                        signal = sig.savgol_filter(self.image[channel, :, col_num], window_length = smooth_length, polyorder = 2)
+    def max_project_image_stack(self):
+        if self.num_slices > 1:
+            print('Max projecting image stack')
+            self.image = np.max(self.image, axis=1)
+            self.num_slices = 1
+            self.image = self.image.reshape(self.num_frames_or_rows, self.num_slices, self.num_channels, *self.image.shape[-2:])
+
+    def check_and_set_rolling_parameters(self):
+        assert isinstance(self.roll_size, int) and isinstance(self.roll_by, int), 'Roll size and roll by must be integers'
+        self.num_submovies = (self.num_frames_or_rows - self.roll_size) // self.roll_by
+
+    def calculate_means(self):
+        ind = self.kernel_size // 2
+        self.means = nd.uniform_filter(self.image[:, 0, :, :, :], size=(1, 1, self.kernel_size, self.kernel_size))[:, :, ind::self.step, ind::self.step]
+        self.xpix, self.ypix = self.means.shape[-2:]
+        self.num_boxes_or_cols = self.xpix * self.ypix
+        self.means = self.means.reshape(self.means.shape[0], self.means.shape[1], self.num_boxes_or_cols)
+
+    def standardize_image_dimensions_for_kymograph(self):
+        self.image = self.image.reshape(self.num_channels, *self.image.shape[-2:])
+        self.num_boxes_or_cols = self.image.shape[-1]
+        self.num_frames_or_rows = self.image.shape[-2]
+        
+    def calculate_individual_line_values(self):
+        self.indv_line_values = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols, self.num_frames_or_rows))
+        for channel in range(self.num_channels):
+            for col_num in range(self.num_boxes_or_cols):
+                if self.line_width == 1:
+                    signal = sig.savgol_filter(self.image[channel, :, col_num], window_length=25, polyorder=2)
+                    self.indv_line_values[channel, col_num] = signal
+                elif self.line_width % 2 != 0:
+                    line_width_extra = int((self.line_width - 1) / 2)
+                    if col_num + line_width_extra < self.num_boxes_or_cols and col_num - line_width_extra > -1:
+                        signal = np.mean(self.image[channel, :, col_num - line_width_extra:col_num + line_width_extra], axis=1)
+                        signal = sig.savgol_filter(signal, window_length=25, polyorder=2)
                         self.indv_line_values[channel, col_num] = signal
-                    elif self.line_width % 2 != 0:
-                        line_width_extra = int((self.line_width - 1) / 2)
-                        if col_num + line_width_extra < self.num_boxes_or_cols and col_num - line_width_extra > -1:
-                            signal = np.mean(self.image[channel, :, col_num-line_width_extra:col_num+line_width_extra], axis=1)
-                            signal = sig.savgol_filter(signal, window_length = smooth_length, polyorder=2)
-                            self.indv_line_values[channel, col_num] = signal
 
 ##############################################################################################################################################################################
 # INDIVIDUAL CALCULATION #####################################################################################################################################################
@@ -98,24 +87,6 @@ class TotalSignalProcessor:
 
     # function to return the autocorrelation of each box in the image stack for each channel
     def calc_indv_ACFs(self, peak_thresh=0.1):
-        def norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = None):
-            corr_signal = signal - signal.mean()
-            acf_curve = np.correlate(corr_signal, corr_signal, mode='full')
-            # normalize the curve
-            acf_curve = acf_curve / (num_frames_or_rows_or_rollsize * signal.std() ** 2)
-            peaks, _ = sig.find_peaks(acf_curve, prominence=peak_thresh)
-            # absolute difference between each peak and zero
-            peaks_abs = abs(peaks - acf_curve.shape[0]//2)
-            # if peaks were identified, pick the one closest to the center
-            if len(peaks) > 1:
-                delay = np.min(peaks_abs[np.nonzero(peaks_abs)])
-            # otherwise, return nans for both period and autocorrelation curve
-            else:
-                delay = np.nan
-                acf_curve = np.full((num_frames_or_rows_or_rollsize*2-1), np.nan)
-
-            return delay, acf_curve
-
         # make empty arrays to populate with 1) period measurements and 2) acf curves
         self.periods = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
         self.acfs = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols, self.num_frames_or_rows*2-1))
@@ -151,50 +122,28 @@ class TotalSignalProcessor:
                     self.periods[channel, col_num] = delay
                     self.acfs[channel, col_num] = acf_curve
 
+        def norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = None):
+            corr_signal = signal - signal.mean()
+            acf_curve = np.correlate(corr_signal, corr_signal, mode='full')
+            # normalize the curve
+            acf_curve = acf_curve / (num_frames_or_rows_or_rollsize * signal.std() ** 2)
+            peaks, _ = sig.find_peaks(acf_curve, prominence=peak_thresh)
+            # absolute difference between each peak and zero
+            peaks_abs = abs(peaks - acf_curve.shape[0]//2)
+            # if peaks were identified, pick the one closest to the center
+            if len(peaks) > 1:
+                delay = np.min(peaks_abs[np.nonzero(peaks_abs)])
+            # otherwise, return nans for both period and autocorrelation curve
+            else:
+                delay = np.nan
+                acf_curve = np.full((num_frames_or_rows_or_rollsize*2-1), np.nan)
+
+            return delay, acf_curve
+
         return self.acfs, self.periods
 
 
     def calc_indv_CCFs(self):
-        def calc_shifts(signal1, signal2, prominence=0.1, rolling = False):
-            #smooth signals and find peaks in the signals. Sanity check to continue on with calculating the individual shifts
-            signal1 = scipy.signal.savgol_filter(signal1, window_length=11, polyorder=3)
-            signal2 = scipy.signal.savgol_filter(signal2, window_length=11, polyorder=3)
-            peaks1, _ = scipy.signal.find_peaks(signal1, prominence=(np.max(signal1)-np.min(signal1))*0.25)
-            peaks2, _ = scipy.signal.find_peaks(signal2, prominence=(np.max(signal2)-np.min(signal2))*0.25)
-
-            if len(peaks1) > 0 and len(peaks2) > 0:
-                corr_signal1 = signal1 - signal1.mean()
-                corr_signal2 = signal2 - signal2.mean()
-                if rolling == True:
-                    cc_curve = cc_curve / (self.roll_size * signal1.std() * signal2.std())
-                else:
-                    cc_curve = np.correlate(corr_signal1, corr_signal2, mode='full')
-                    # smooth the curve
-                    cc_curve = sig.savgol_filter(cc_curve, window_length=11, polyorder=3)
-                    # normalize the curve
-                    cc_curve = cc_curve / (self.num_frames_or_rows * signal1.std() * signal2.std())
-                # find peaks
-                peaks, _ = sig.find_peaks(cc_curve, prominence=prominence)
-                # absolute difference between each peak and zero
-                peaks_abs = abs(peaks - cc_curve.shape[0] // 2)
-                # if peaks were identified, pick the one closest to the center
-                if len(peaks) > 1:
-                    delay = np.argmin(peaks_abs[np.nonzero(peaks_abs)])
-                    delayIndex = peaks[delay]
-                    delay_frames = delayIndex - cc_curve.shape[0] // 2
-                # otherwise, return NaNs for both period and autocorrelation curve
-                else:
-                    delay_frames = np.nan
-                    cc_curve = np.full((self.num_frames_or_rows * 2 - 1), np.nan)
-            else:
-                delay_frames = np.nan
-                if rolling == True:
-                    cc_curve = np.full((self.roll_size*2-1), np.nan)
-                else:
-                    cc_curve = np.full((self.num_frames_or_rows * 2 - 1), np.nan)
-
-            return delay_frames, cc_curve
-        
         # make a list of unique channel combinations to calculate CCF for
         channels = list(range(self.num_channels))
         self.channel_combos = []
@@ -242,11 +191,85 @@ class TotalSignalProcessor:
 
                     self.indv_shifts[combo_number, col_num] = delay_frames
                     self.indv_ccfs[combo_number, col_num] = cc_curve
+
+        def calc_shifts(signal1, signal2, prominence=0.1, rolling = False):
+            #smooth signals and find peaks in the signals. Sanity check to continue on with calculating the individual shifts
+            signal1 = scipy.signal.savgol_filter(signal1, window_length=11, polyorder=3)
+            signal2 = scipy.signal.savgol_filter(signal2, window_length=11, polyorder=3)
+            peaks1, _ = scipy.signal.find_peaks(signal1, prominence=(np.max(signal1)-np.min(signal1))*0.25)
+            peaks2, _ = scipy.signal.find_peaks(signal2, prominence=(np.max(signal2)-np.min(signal2))*0.25)
+
+            if len(peaks1) > 0 and len(peaks2) > 0:
+                corr_signal1 = signal1 - signal1.mean()
+                corr_signal2 = signal2 - signal2.mean()
+                if rolling == True:
+                    cc_curve = cc_curve / (self.roll_size * signal1.std() * signal2.std())
+                else:
+                    cc_curve = np.correlate(corr_signal1, corr_signal2, mode='full')
+                    # smooth the curve
+                    cc_curve = sig.savgol_filter(cc_curve, window_length=11, polyorder=3)
+                    # normalize the curve
+                    cc_curve = cc_curve / (self.num_frames_or_rows * signal1.std() * signal2.std())
+                # find peaks
+                peaks, _ = sig.find_peaks(cc_curve, prominence=prominence)
+                # absolute difference between each peak and zero
+                peaks_abs = abs(peaks - cc_curve.shape[0] // 2)
+                # if peaks were identified, pick the one closest to the center
+                if len(peaks) > 1:
+                    delay = np.argmin(peaks_abs[np.nonzero(peaks_abs)])
+                    delayIndex = peaks[delay]
+                    delay_frames = delayIndex - cc_curve.shape[0] // 2
+                # otherwise, return NaNs for both period and autocorrelation curve
+                else:
+                    delay_frames = np.nan
+                    cc_curve = np.full((self.num_frames_or_rows * 2 - 1), np.nan)
+            else:
+                delay_frames = np.nan
+                if rolling == True:
+                    cc_curve = np.full((self.roll_size*2-1), np.nan)
+                else:
+                    cc_curve = np.full((self.num_frames_or_rows * 2 - 1), np.nan)
+
+            return delay_frames, cc_curve
         
         
         return self.indv_shifts, self.indv_ccfs, self.channel_combos
 
     def calc_indv_peak_props(self):
+        # make empty arrays to fill with peak measurements for each channel
+        self.ind_peak_widths = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
+        self.ind_peak_maxs = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
+        self.ind_peak_mins = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
+        # make a dictionary to store the arrays and measurements generated by this function so they don't have to be re-calculated later
+        self.ind_peak_props = {}
+
+        if self.analysis_type == "standard":
+            for channel in range(self.num_channels):
+                for box in range(self.num_boxes_or_cols):
+
+                    signal = sig.savgol_filter(self.means[:,channel, box], window_length = 11, polyorder = 2)
+                    indv_props(signal, box)
+
+        elif self.analysis_type == "rolling":
+            self.ind_peak_widths = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
+            self.ind_peak_maxs = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
+            self.ind_peak_mins = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
+
+            for submovie in range(self.num_submovies):
+                for channel in range(self.num_channels):
+                    for box in range(self.num_boxes_or_cols):
+                        signal = sig.savgol_filter(self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, channel, box], window_length=11, polyorder=2)
+                        indv_props(signal, box, submovie)
+
+        elif self.analysis_type == "kymograph":
+            for channel in range(self.num_channels):
+                for col_num in range(self.num_boxes_or_cols):
+
+                    signal = sig.savgol_filter(self.indv_line_values[channel, col_num], window_length = 11, polyorder = 2)
+                    indv_props(signal, col_num)
+
+        self.ind_peak_amps = self.ind_peak_maxs - self.ind_peak_mins
+        self.ind_peak_rel_amps = self.ind_peak_amps / self.ind_peak_mins
 
         def indv_props(signal, box_or_col_num, submovie = False):
             peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*0.1)
@@ -286,41 +309,6 @@ class TotalSignalProcessor:
                 self.ind_peak_maxs[submovie, channel, box_or_col_num] = mean_max
                 self.ind_peak_mins[submovie, channel, box_or_col_num] = mean_min
         
-
-        # make empty arrays to fill with peak measurements for each channel
-        self.ind_peak_widths = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
-        self.ind_peak_maxs = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
-        self.ind_peak_mins = np.zeros(shape=(self.num_channels, self.num_boxes_or_cols))
-        # make a dictionary to store the arrays and measurements generated by this function so they don't have to be re-calculated later
-        self.ind_peak_props = {}
-
-        if self.analysis_type == "standard":
-            for channel in range(self.num_channels):
-                for box in range(self.num_boxes_or_cols):
-
-                    signal = sig.savgol_filter(self.means[:,channel, box], window_length = 11, polyorder = 2)
-                    indv_props(signal, box)
-
-        elif self.analysis_type == "rolling":
-            self.ind_peak_widths = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
-            self.ind_peak_maxs = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
-            self.ind_peak_mins = np.zeros(shape=(self.num_submovies, self.num_channels, self.num_boxes_or_cols))
-
-            for submovie in range(self.num_submovies):
-                for channel in range(self.num_channels):
-                    for box in range(self.num_boxes_or_cols):
-                        signal = sig.savgol_filter(self.means[self.roll_by*submovie : self.roll_size + self.roll_by*submovie, channel, box], window_length=11, polyorder=2)
-                        indv_props(signal, box, submovie)
-
-        elif self.analysis_type == "kymograph":
-            for channel in range(self.num_channels):
-                for col_num in range(self.num_boxes_or_cols):
-
-                    signal = sig.savgol_filter(self.indv_line_values[channel, col_num], window_length = 11, polyorder = 2)
-                    indv_props(signal, col_num)
-
-        self.ind_peak_amps = self.ind_peak_maxs - self.ind_peak_mins
-        self.ind_peak_rel_amps = self.ind_peak_amps / self.ind_peak_mins
 
         return self.ind_peak_widths, self.ind_peak_maxs, self.ind_peak_mins, self.ind_peak_amps, self.ind_peak_rel_amps, self.ind_peak_props
 
