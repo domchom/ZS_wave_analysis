@@ -2,9 +2,10 @@ import os
 import scipy
 import numpy as np
 import pandas as pd
-import scipy.signal as sig
 from tqdm import tqdm
+import scipy.signal as sig
 import matplotlib.pyplot as plt
+from itertools import zip_longest
 from tifffile import imread, TiffFile
 import scipy.ndimage as nd
 np.seterr(divide='ignore', invalid='ignore')
@@ -583,18 +584,28 @@ class TotalSignalProcessor:
             fig.subplots_adjust(hspace=0.25, wspace=0.5)   
             plt.close(fig)
             return fig
+        
+        def return_mean_CCF_val(arr: np.ndarray):
+            arr_mean = np.nanmean(arr, axis = 0)
+            arr_std = np.nanstd(arr, axis = 0)
+
+            mean_CCF_values = list(zip_longest(range(1, len(arr_mean) + 1), arr_mean, arr_std, fillvalue=None))
+
+            return mean_CCF_values
 
         # empty dict to fill with figures, in the event that we make more than one
         self.ccf_figs = {}
-               
+        self.mean_ccf_values = {}
+                       
         if hasattr(self, 'indv_ccfs'):
             if self.num_channels > 1:
                 for combo_number, combo in enumerate(self.channel_combos):
                     self.ccf_figs[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Mean CCF'] = return_figure(self.indv_ccfs[combo_number], 
                                                                                                 self.indv_shifts[combo_number], 
                                                                                                 f'Ch{combo[0] + 1}-Ch{combo[1] + 1}')
+                    self.mean_ccf_values[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Mean CCF values.csv'] = return_mean_CCF_val(self.indv_ccfs[combo_number])
 
-        return self.ccf_figs
+        return self.ccf_figs, self.mean_ccf_values
 
     def plot_mean_peak_props(self):
         def return_figure(min_array: np.ndarray, max_array: np.ndarray, amp_array: np.ndarray, width_array: np.ndarray, Ch_name: str):

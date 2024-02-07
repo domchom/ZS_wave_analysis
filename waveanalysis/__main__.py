@@ -1,5 +1,6 @@
 import os                                       
 import sys 
+import csv
 import timeit
 import datetime
 import numpy as np
@@ -293,9 +294,15 @@ def main():
                     for plot_name, plot in summ_acf_plots.items():
                         plot.savefig(f'{im_save_path}/{plot_name}.png')
                 if plot_summary_CCFs:
-                    summ_ccf_plots = processor.plot_mean_CCF()
+                    summ_ccf_plots, mean_ccf_values = processor.plot_mean_CCF()
                     for plot_name, plot in summ_ccf_plots.items():
                         plot.savefig(f'{im_save_path}/{plot_name}.png')
+                        for csv_filename, CCF_values in mean_ccf_values.items():
+                            with open(os.path.join(im_save_path, csv_filename), 'w', newline='') as csvfile:
+                                writer = csv.writer(csvfile)
+                                writer.writerow(['Time', 'CCF_Value', 'STD'])
+                                for time, ccf_val, arr_std in CCF_values:
+                                    writer.writerow([time, ccf_val, arr_std])
                 if plot_summary_peaks:
                     summ_peak_plots = processor.plot_mean_peak_props()
                     for plot_name, plot in summ_peak_plots.items():
