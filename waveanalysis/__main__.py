@@ -329,16 +329,16 @@ def main():
                 if plot_ind_CCFs:
                     if processor.num_channels == 1:
                         log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
-                    ind_ccf_plots = processor.plot_indv_ccfs()
+                    ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
+                    if not os.path.exists(ind_ccf_val_path):
+                        os.makedirs(ind_ccf_val_path)
+                    ind_ccf_plots = processor.plot_indv_ccfs(save_folder=ind_ccf_val_path)
                     ind_ccf_path = os.path.join(im_save_path, 'Individual_CCF_plots')
                     if not os.path.exists(ind_ccf_path):
                         os.makedirs(ind_ccf_path)
                     for plot_name, plot in ind_ccf_plots.items():
                         plot.savefig(f'{ind_ccf_path}/{plot_name}.png')
-                    ind_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
-                    if not os.path.exists(ind_ccf_val_path):
-                        os.makedirs(ind_ccf_val_path)
-                    processor.save_ind_ccf_values(save_folder=ind_ccf_val_path)
+
 
 
                 # Summarize the data for current image as dataframe, and save as .csv

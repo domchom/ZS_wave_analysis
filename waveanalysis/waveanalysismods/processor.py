@@ -39,13 +39,17 @@ class TotalSignalProcessor:
             self.calculate_kymograph_values()
 
     def standardize_image_dimensions(self, metadata):
-        '''Extract more analysis-type specific metadata, and reshape the image'''
+        '''
+        Extract specific metadata for the standard and rolling analysis, and reshape the image
+        '''
         self.num_frames = metadata.get('frames', 1)
         self.num_slices = metadata.get('slices', 1)
         self.image = self.image.reshape(self.num_frames, self.num_slices, self.num_channels, *self.image.shape[-2:])
 
     def max_project_image_stack(self):
-        '''Max project the image if it is not already max_projected'''
+        '''
+        Max project the image if it is not already max_projected
+        '''
         if self.num_slices > 1:
             print('Max projecting image stack')
             self.image = np.max(self.image, axis=1)
@@ -53,12 +57,16 @@ class TotalSignalProcessor:
             self.image = self.image.reshape(self.num_frames, self.num_slices, self.num_channels, *self.image.shape[-2:])
 
     def check_and_set_rolling_parameters(self):
-        '''Specific parameters that are only set in the rolling analysis'''
+        '''
+        Specific parameters that are only set in the rolling analysis
+        '''
         assert isinstance(self.roll_size, int) and isinstance(self.roll_by, int), 'Roll size and roll by must be integers'
         self.num_submovies = (self.num_frames - self.roll_size) // self.roll_by
 
     def calculate_box_values(self):
-        '''Generate and calculate the mean signal for the specified box size over the standard and rolling images'''
+        '''
+        Calculate the mean signal for the specified box size over the standard and rolling images.
+        '''
         # Calculate the index for the center of the kernel
         ind = self.kernel_size // 2
         # Apply uniform filter to calculate mean signal over specified box size
@@ -70,7 +78,9 @@ class TotalSignalProcessor:
         self.means = self.means.reshape(self.means.shape[0], self.means.shape[1], self.total_bins)
 
     def standardize_image_dimensions_for_kymograph(self):
-        '''Reshape the kymograph image for future analysis'''
+        '''
+        Reshape the kymograph image for future analysis
+        '''
         self.image = self.image.reshape(self.num_channels, *self.image.shape[-2:])
         # we are either binning the image into boxes (standard) or columns (kymographs), so just call bins for simplicity
         self.total_bins = self.image.shape[-1] 
@@ -78,7 +88,9 @@ class TotalSignalProcessor:
         self.num_frames = self.image.shape[-2] 
         
     def calculate_kymograph_values(self):
-        '''Generate and calculate the mean signal for the specified line width over the kymograph images'''
+        '''
+        Calculate the mean signal for the specified line width over the kymograph images.
+        '''
         # Initialize an array to store individual line values for each channel
         self.indv_line_values = np.zeros(shape=(self.num_channels, self.total_bins, self.num_frames))
 
@@ -106,11 +118,34 @@ class TotalSignalProcessor:
 ##############################################################################################################################################################################
 
     def calc_indv_ACFs(self, peak_thresh=0.1):
-        def norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize = None):
+        """
+        This method computes the autocorrelation functions (ACFs) for each channel and bin of the analyzed data.
+        It also identifies peaks in the ACF curves to estimate periods.
+
+        Parameters:
+            - peak_thresh (float): Threshold for peak detection in the ACF curves. Defaults to 0.1.
+
+        Returns:
+            - acfs (numpy.ndarray): Array of autocorrelation functions.
+            - periods (numpy.ndarray): Array of periods estimated from the ACF peaks.
+        """
+        def norm_and_calc_shifts(signal, num_frames_or_rollsize):
+            """
+            This function normalizes the input signal and computes the autocorrelation curve.
+            It identifies peaks in the autocorrelation curve to estimate the delay.
+
+            Parameters:
+                - signal (numpy.ndarray): Input signal.
+                - num_frames_or_rows_or_rollsize (int): Number of frames or roll size for normalization.
+
+            Returns:
+                - delay (float): Delay estimated from the autocorrelation curve.
+                - acf_curve (numpy.ndarray): Autocorrelation curve of the normalized signal.
+            """
             corr_signal = signal - np.mean(signal)
             acf_curve = np.correlate(corr_signal, corr_signal, mode='full')
             # Normalize the autocorrelation curve
-            acf_curve = acf_curve / (num_frames_or_rows_or_rollsize * np.std(signal) ** 2)
+            acf_curve = acf_curve / (num_frames_or_rollsize * np.std(signal) ** 2)
             # Find peaks in the autocorrelation curve
             peaks, _ = sig.find_peaks(acf_curve, prominence=peak_thresh)
             # Calculate absolute differences between peaks and center
@@ -121,7 +156,7 @@ class TotalSignalProcessor:
             else:
                 # Otherwise, return NaNs for both delay and autocorrelation curve
                 delay = np.nan
-                acf_curve = np.full((num_frames_or_rows_or_rollsize * 2 - 1), np.nan)
+                acf_curve = np.full((num_frames_or_rollsize * 2 - 1), np.nan)
             return delay, acf_curve
         
         # Initialize arrays to store period measurements and autocorrelation curves
@@ -133,7 +168,7 @@ class TotalSignalProcessor:
             for channel in range(self.num_channels):
                 for bin in range(self.total_bins):
                     signal = self.means[:, channel, bin] if self.analysis_type == "standard" else self.indv_line_values[channel, bin, :]
-                    delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize=self.num_frames)
+                    delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rollsize=self.num_frames)
                     self.periods[channel, bin] = delay
                     self.acfs[channel, bin] = acf_curve
         # If rolling analysis
@@ -146,13 +181,36 @@ class TotalSignalProcessor:
                     for bin in range(self.total_bins):
                         # Extract signal for rolling autocorrelation calculation
                         signal = self.means[self.roll_by * submovie: self.roll_size + self.roll_by * submovie, channel, bin]
-                        delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rows_or_rollsize=self.roll_size)
+                        delay, acf_curve = norm_and_calc_shifts(signal, num_frames_or_rollsize=self.roll_size)
                         self.periods[submovie, channel, bin] = delay
                         self.acfs[submovie, channel, bin] = acf_curve
         return self.acfs, self.periods
 
     def calc_indv_CCFs(self):
+        """
+        This method computes the cross-correlation functions (CCFs) for each combination of channels.
+        It also identifies peaks in the CCF curves to estimate shifts.
+
+        Returns:
+            - indv_shifts (numpy.ndarray): Array of shifts between signals.
+            - indv_ccfs (numpy.ndarray): Array of cross-correlation functions.
+            - channel_combos (list): List of channel combinations.
+        """
         def calc_shifts(signal1, signal2, prominence=0.1, rolling = False):
+            """
+            This function calculates the shifts and cross-correlation curves between two signals.
+            It performs signal smoothing, peak finding, and computes the cross-correlation curve.
+
+            Parameters:
+                - signal1 (numpy.ndarray): First input signal.
+                - signal2 (numpy.ndarray): Second input signal.
+                - prominence (float): Minimum prominence of peaks for peak finding. Defaults to 0.1.
+                - rolling (bool): Flag indicating if the analysis is rolling. Defaults to False.
+
+            Returns:
+                - delay_frames (float): Delay between the signals.
+                - cc_curve (numpy.ndarray): Cross-correlation curve of the signals.
+            """
             # Smoothing signals and finding peaks
             signal1 = sig.savgol_filter(signal1, window_length=11, polyorder=3)
             signal2 = sig.savgol_filter(signal2, window_length=11, polyorder=3)
@@ -237,7 +295,26 @@ class TotalSignalProcessor:
         return self.indv_shifts, self.indv_ccfs, self.channel_combos
 
     def calc_indv_peak_props(self):
+        """
+        This method computes various peak properties for each channel and bin of the analyzed data.
+
+        Returns:
+            - ind_peak_widths (numpy.ndarray): Array of peak widths.
+            - ind_peak_maxs (numpy.ndarray): Array of peak maximum values.
+            - ind_peak_mins (numpy.ndarray): Array of peak minimum values.
+            - ind_peak_amps (numpy.ndarray): Array of peak amplitudes.
+            - ind_peak_rel_amps (numpy.ndarray): Array of relative peak amplitudes.
+            - ind_peak_props (dict): Dictionary containing additional peak properties.
+        """
         def indv_props(signal, bin, submovie = None):
+            """
+            This function calculates various peak properties for a given signal.
+
+            Parameters:
+                - signal (numpy.ndarray): Input signal.
+                - bin (int): Index of the bin.
+                - submovie (int): Index of the submovie. Defaults to None.
+            """
             peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*0.1)
 
             # If peaks detected, calculate properties, otherwise return NaNs
@@ -312,7 +389,16 @@ class TotalSignalProcessor:
 ##############################################################################################################################################################################
 
     def plot_indv_acfs(self):
+        """
+        This method generates and plots individual autocorrelation functions (ACFs) for each channel and bin.
+
+        Returns:
+            - dict: Dictionary containing generated figures of individual ACF plots.
+        """
         def return_figure(raw_signal: np.ndarray, acf_curve: np.ndarray, Ch_name: str, period: int):
+            '''
+            Space saving function to generate the plots for the individual ACF plots
+            '''
             # Create subplots for raw signal and autocorrelation curve
             fig, (ax1, ax2) = plt.subplots(2, 1)
             ax1.plot(raw_signal)
@@ -353,9 +439,23 @@ class TotalSignalProcessor:
                                                                                             self.periods[channel, bin])
         return self.indv_acf_plots
 
-    def plot_indv_ccfs(self):
+    def plot_indv_ccfs(self, save_folder):
+        """
+        This method generates and plots individual cross-correlation functions (CCFs) for each channel and bin.
+
+        It then saves the measurements to CSV files for each channel combination and bin.
+
+        Parameters:
+            - save_folder (str): Path to the folder where CSV files will be saved.
+
+        Returns:
+            - dict: Dictionary containing generated figures of individual CCF plots.
+        """
         # Create subplots for raw signals and cross-correlation curve
         def return_figure(ch1: np.ndarray, ch2: np.ndarray, ccf_curve: np.ndarray, ch1_name: str, ch2_name: str, shift: int):
+            '''
+            Space saving function to generate the plots for the individual CCF plots
+            '''
             fig, (ax1, ax2) = plt.subplots(2, 1)
             ax1.plot(ch1, color = 'tab:blue', label = ch1_name)
             ax1.plot(ch2, color = 'tab:orange', label = ch2_name)
@@ -411,42 +511,36 @@ class TotalSignalProcessor:
                                                                                                         ch1_name = f'Ch{combo[0] + 1}',
                                                                                                         ch2_name = f'Ch{combo[1] + 1}',
                                                                                                         shift = self.indv_shifts[combo_number, bin])
+                        
+                        # Save the individual bin values
+                        ccf_curve = self.indv_ccfs[combo_number, bin]
+
+                        # Combine measurements
+                        measurements = list(zip_longest(range(1, len(ccf_curve) + 1), Ch1, Ch2, ccf_curve, fillvalue=None))
+                        
+                        # Define the filename for saving
+                        indv_ccfs_filename = os.path.join(save_folder, f'Bin {bin + 1}_CCF_values.csv')
+                    
+                        # Write measurements to CSV file
+                        with open(indv_ccfs_filename, 'w', newline='') as csvfile:
+                            writer = csv.writer(csvfile)
+                            writer.writerow(['Time', 'Ch1_Value', 'Ch2_Value', 'CCF_Value'])
+                            for time, ch1_val, ch2_val, ccf_val in measurements:
+                                writer.writerow([time, ch1_val, ch2_val, ccf_val])
         
         return self.indv_ccf_plots
 
-    def save_ind_ccf_values(self, save_folder):
-        def normalize(signal: np.ndarray):
-            # Normalize between 0 and 1
-            return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
-
-        # Iterate through channel combinations and bins
-        for combo_number, combo in enumerate(self.channel_combos):
-            for bin in range(self.total_bins):
-                # Normalize the signals
-                if self.analysis_type == "standard":
-                    ch1_normalized = normalize(self.means[:, combo[0], bin])
-                    ch2_normalized = normalize(self.means[:, combo[1], bin])
-                else:   
-                    ch1_normalized = normalize(self.indv_line_values[combo[0], bin, :])
-                    ch2_normalized = normalize(self.indv_line_values[combo[1], bin, :])
-                # Retrieve the CCF curve
-                ccf_curve = self.indv_ccfs[combo_number, bin]
-
-                # Combine measurements
-                measurements = list(zip_longest(range(1, len(ccf_curve) + 1), ch1_normalized, ch2_normalized, ccf_curve, fillvalue=None))
-                
-                # Define the filename for saving
-                indv_ccfs_filename = os.path.join(save_folder, f'Bin {bin + 1}_CCF_values.csv')
-            
-                # Write measurements to CSV file
-                with open(indv_ccfs_filename, 'w', newline='') as csvfile:
-                    writer = csv.writer(csvfile)
-                    writer.writerow(['Time', 'Ch1_Value', 'Ch2_Value', 'CCF_Value'])
-                    for time, ch1_val, ch2_val, ccf_val in measurements:
-                        writer.writerow([time, ch1_val, ch2_val, ccf_val])
-
     def plot_indv_peak_props(self):
+        """
+        This method generates and plots individual peak properties for each channel and bin.
+
+        Returns:
+            - dict: Dictionary containing generated figures of individual peak property plots.
+        """
         def return_figure(bin_signal: np.ndarray, prop_dict: dict, Ch_name: str):
+            '''
+            Space saving function to generate the plots for the individual peak prop plots
+            '''
             # Extract peak properties from the dictionary
             smoothed_signal = prop_dict['smoothed']
             peaks = prop_dict['peaks']
@@ -514,13 +608,22 @@ class TotalSignalProcessor:
 
         return self.indv_peak_figs
 
-
 ##############################################################################################################################################################################
 # MEAN plotting ###########################################################################################################################################################
 ##############################################################################################################################################################################
     
     def plot_mean_ACF(self):
+        """
+        This method generates and plots the mean autocorrelation curve with shaded standard deviation area,
+        a histogram of period values, and a boxplot of period values for each channel.
+
+        Returns:
+            - dict: Dictionary containing generated figures of mean ACF plots.
+        """
         def return_figure(arr: np.ndarray, shifts_or_periods: np.ndarray, channel: str):
+            '''
+            Space saving function to generate the plots for the mean ACF plots
+            '''
             # Plot mean autocorrelation curve with shaded area representing standard deviation
             arr_mean = np.nanmean(arr, axis = 0)
             arr_std = np.nanstd(arr, axis = 0)
@@ -569,7 +672,18 @@ class TotalSignalProcessor:
         return self.acf_figs
     
     def plot_mean_CCF(self):
+        """
+        This method generates and plots the mean cross-correlation curve with shaded standard deviation area,
+        a histogram of shift values, and a boxplot of shift values for each channel combination.
+
+        Returns:
+            - dict: The first dictionary contains generated figures of mean CCF plots.
+            - dict: The second dictionary contains calculated mean CCF values for each channel combination.
+        """
         def return_figure(arr: np.ndarray, shifts_or_periods: np.ndarray, channel_combo: str):
+            '''
+            Space saving function to generate the plots for the mean CCF plots
+            '''
             # Plot mean cross-correlation curve with shaded area representing standard deviation
             arr_mean = np.nanmean(arr, axis = 0)
             arr_std = np.nanstd(arr, axis = 0)
@@ -606,6 +720,9 @@ class TotalSignalProcessor:
             return fig
         
         def return_mean_CCF_val(arr: np.ndarray):
+            '''
+            Space saving function to save the values for the mean CCF curves
+            '''
             # Calculate mean and standard deviation of cross-correlation curve
             arr_mean = np.nanmean(arr, axis = 0)
             arr_std = np.nanstd(arr, axis = 0)
@@ -633,7 +750,17 @@ class TotalSignalProcessor:
         return self.ccf_figs, self.mean_ccf_values
 
     def plot_mean_peak_props(self):
+        """
+        This method generates and plots histograms and boxplots for the mean peak properties
+        (minimum value, maximum value, amplitude, and width) for each channel.
+
+        Returns:
+            - dict: A dictionary containing generated figures of mean peak property plots for each channel.
+        """
         def return_figure(min_array: np.ndarray, max_array: np.ndarray, amp_array: np.ndarray, width_array: np.ndarray, Ch_name: str):
+            '''
+            Space saving function to generate the plots for the mean peak prop plots
+            '''
             # Create subplots for histograms and boxplots
             fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2)
 
@@ -682,6 +809,7 @@ class TotalSignalProcessor:
 
         # Empty dictionary to fill with figures for each channel
         self.peak_figs = {}
+    
         if hasattr(self, 'ind_peak_widths'):
             for channel in range(self.num_channels):
                 self.peak_figs[f'Ch{channel + 1} Peak Props'] = return_figure(self.ind_peak_mins[channel], 
@@ -697,16 +825,21 @@ class TotalSignalProcessor:
 ##############################################################################################################################################################################
     
     def summarize_image(self, file_name = None, group_name = None):
-        '''
-        Summarizes the results of all the measurements performed on the image.
-        Returns dictionary object:
-        self.file_data_summary contains the name of every summarized result for 
-        each channel or channel combination as a key and the summarized results as a value.
-        '''
+        """
+        This method calculates and summarizes various measurements for each image, including statistics on periods,
+        shifts, and peak properties. It returns a dictionary containing the summarized measurements.
+
+        Parameters:
+            - file_name (str, optional): The name of the file.
+            - group_name (str, optional): The name of the group to which the image belongs.
+
+        Returns:
+            - dict: A dictionary containing the summarized measurements for each image.
+        """
         # dictionary to store the summarized measurements for each image
         self.file_data_summary = {}
         
-        if file_name:dchomchai@gmail.com
+        if file_name:
             self.file_data_summary['File Name'] = file_name
         if group_name:
             self.file_data_summary['Group Name'] = group_name
@@ -744,13 +877,13 @@ class TotalSignalProcessor:
     
 
     def summarize_rolling_file(self):
-        '''
-        Summarizes the results of period, shift (if applicable) and peak analyses. Returns a
-        SINGLE dataframe summarizing each of the relevant measurements for each submovie.
+        """
+        This method calculates and summarizes various measurements for each submovie in a rolling analysis, including
+        statistics on periods, shifts, and peak properties. It returns a pandas DataFrame containing the summarized measurements.
 
         Returns:
-        self.full_movie_summary is a dataframe summarizing the results of period, shift, and peak analyses for each submovie
-        '''
+            - pandas.DataFrame: A DataFrame containing the summarized measurements for each submovie in the rolling analysis.
+        """
         all_submovie_summary = []
 
         stat_name_and_func = {'Mean' : np.nanmean,
@@ -761,6 +894,7 @@ class TotalSignalProcessor:
         for submovie in range(self.num_submovies):
             submovie_summary = {}
             submovie_summary['Submovie'] = submovie + 1 
+            
             if hasattr(self, 'periods'):
                 for channel in range(self.num_channels):
                     pcnt_no_period = (np.count_nonzero(np.isnan(self.periods[submovie, channel])) / self.total_bins) * 100
@@ -793,8 +927,17 @@ class TotalSignalProcessor:
         return self.full_movie_summary
     
     def organize_measurements(self):
-        # function to summarize measurements statistics by appending them to the beginning of the measurement list
+        """
+        This method summarizes measurements statistics by appending them to the beginning of the measurement list
+        and returns a pandas DataFrame containing the summarized measurements for each submovie or across all bins.
+
+        Returns:
+            - pandas.DataFrame or list of pandas.DataFrame: A DataFrame containing the summarized measurements for each submovie or across all bins.
+        """
         def add_stats(measurements: np.ndarray, measurement_name: str):
+            '''
+            Space saving function to generate the stats for the different channels or channel combos
+            '''
             # shift measurements need special treatment to generate the correct measurements and names
             if measurement_name == 'Shift':
                 statified = []
@@ -903,12 +1046,12 @@ class TotalSignalProcessor:
   
     def save_means_to_csv(self, main_save_path, group_names, summary_df):
         """
-        Save the mean values of certain metrics to separate CSV files for each group.
+        This method saves the means of measurements to CSV files for each channel and metric.
 
-        Args:
-            main_save_path (str): The path where the CSV files will be saved.
-            group_names (list): A list of strings representing the names of the groups to be analyzed.
-            summary_df (pandas DataFrame): The summary DataFrame containing the data to be analyzed.
+        Parameters:
+            - main_save_path (str): The main directory path where the CSV files will be saved.
+            - group_names (list of str): A list of group names.
+            - summary_df (pandas.DataFrame): A DataFrame containing the summarized measurements.
         """
         for channel in range(self.num_channels):
             # Define data metrics to extract
@@ -946,20 +1089,21 @@ class TotalSignalProcessor:
 ##############################################################################################################################################################################
 
     def plot_rolling_summary(self):
-        '''
-        This function plots the data from the self.full_movie_summary dataframe.
+        """
+        This method plots a rolling summary of the measurements over time.
 
         Returns:
-        self.plot_list is a dictionary containing the names of the summary plots as keys and the fig object as values
-        '''
-        def return_plot(independent_variable, dependent_variable, dependent_error, y_label):
+            - dict: A dictionary containing the generated plots.
+        """
+        def return_plot(independent_variable, dependent_variable, dependent_error, y_label):    
             '''
-            This function returns plot objects to its parent function
-            '''                
+            Space saving function to generate the rolling summary plots'''      
             fig, ax = plt.subplots()
+
             # plot the dataframe
             ax.plot(self.full_movie_summary[independent_variable], 
                          self.full_movie_summary[dependent_variable])
+            
             # fill between the ± standard deviation of the dependent variable
             ax.fill_between(x = self.full_movie_summary[independent_variable],
                             y1 = self.full_movie_summary[dependent_variable] - self.full_movie_summary[dependent_error],
@@ -967,45 +1111,45 @@ class TotalSignalProcessor:
                             color = 'blue',
                             alpha = 0.25)
 
+            # set axis labels
             ax.set_xlabel('Frame Number')
             ax.set_ylabel(y_label)
             ax.set_title(f'{y_label} over time')
+            
             plt.close(fig)
             return fig
-
-        # empty list to fill with plots
+        
+        # empty dictionary to fill with plots
         self.plot_list = {}
+
+        def add_peak_plots(channel, prop_name):
+            '''
+            Space saving function
+            '''
+            self.plot_list[f'Ch {channel} Peak {prop_name}'] = return_plot('Submovie',
+                                                                            f'Ch {channel} Mean Peak {prop_name}',
+                                                                            f'Ch {channel} StdDev Peak {prop_name}',
+                                                                            f'Ch {channel} Mean ± StdDev Peak {prop_name} (frames)')
+        
         if hasattr(self, 'periods'):
             for channel in range(self.num_channels):
                 self.plot_list[f'Ch {channel + 1} Period'] = return_plot('Submovie',
                                                                           f'Ch {channel + 1} Mean Period',
                                                                           f'Ch {channel + 1} StdDev Period',
                                                                           f'Ch {channel + 1} Mean ± StdDev Period (frames)')
+        
         if hasattr(self, 'shifts'):
             for combo_number, combo in enumerate(self.channel_combos):
                 self.plot_list[f'Ch{combo[0]+1}-Ch{combo[1]+1} Shift'] = return_plot('Submovie',
                                                                                       f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift',
                                                                                       f'Ch{combo[0]+1}-Ch{combo[1]+1} StdDev Shift',
                                                                                       f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean ± StdDev Shift (frames)')
-        
+
         if hasattr(self, 'peak_widths'):
             for channel in range(self.num_channels):
-                self.plot_list[f'Ch {channel + 1} Peak Width'] = return_plot('Submovie',
-                                                                            f'Ch {channel + 1} Mean Peak Width',
-                                                                            f'Ch {channel + 1} StdDev Peak Width',
-                                                                            f'Ch {channel + 1} Mean ± StdDev Peak Width (frames)')
-                self.plot_list[f'Ch {channel + 1} Peak Max'] = return_plot('Submovie',
-                                                                            f'Ch {channel + 1} Mean Peak Max',
-                                                                            f'Ch {channel + 1} StdDev Peak Max',
-                                                                            f'Ch {channel + 1} Mean ± StdDev Peak Max (frames)')
-                self.plot_list[f'Ch {channel + 1} Peak Min'] = return_plot('Submovie',
-                                                                            f'Ch {channel + 1} Mean Peak Min',
-                                                                            f'Ch {channel + 1} StdDev Peak Min',
-                                                                            f'Ch {channel + 1} Mean ± StdDev Peak Min (frames)')
-                self.plot_list[f'Ch {channel + 1} Peak Amp'] = return_plot('Submovie',
-                                                                            f'Ch {channel + 1} Mean Peak Amp',
-                                                                            f'Ch {channel + 1} StdDev Peak Amp',
-                                                                            f'Ch {channel + 1} Mean ± StdDev Peak Amp (frames)')    
+                for prop_name in ['Width', 'Max', 'Min', 'Amp']:
+                    add_peak_plots(channel + 1, prop_name)
 
+        
         return self.plot_list
     
