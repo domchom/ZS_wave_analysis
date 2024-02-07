@@ -270,7 +270,7 @@ def main():
                 log_params['Submovies Used'].append(num_submovies)
 
                 # summarize the data for each subframe as individual dataframes, and save as .csv
-                submovie_meas_list = processor.get_submovie_measurements()
+                submovie_meas_list = processor.organize_measurements()
                 csv_save_path = os.path.join(im_save_path, 'rolling_measurements')
                 if not os.path.exists(csv_save_path):
                     os.makedirs(csv_save_path)
