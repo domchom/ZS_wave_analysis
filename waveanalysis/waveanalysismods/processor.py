@@ -80,7 +80,7 @@ class TotalSignalProcessor:
             self.xpix, self.ypix = box_values.shape[-2:]
             # We are either binning the image into boxes (standard) or columns (kymographs), so just call bins for simplicity
             self.total_bins = self.xpix * self.ypix
-            box_values = box_values.reshape(box_values.shape[0], box_values.shape[1], self.total_bins)
+            box_values = box_values.reshape(self.num_frames, self.num_channels, self.total_bins)
 
             return box_values
 
