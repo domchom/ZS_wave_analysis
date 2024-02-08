@@ -412,8 +412,8 @@ def main():
                 except ValueError:
                     log_params['Plotting errors'].append(f'No data to compare for {param}')
             
-            # save the means for the attributes to make them easier to work with in prism
-            processor.save_means_to_csv(main_save_path, group_names, summary_df)
+            # save the means each parameter for the attributes to make them easier to work with in prism
+            processor.save_parameter_means_to_csv(main_save_path, group_names, summary_df)
 
         end = timeit.default_timer()
         log_params["Time Elapsed"] = f"{end - start:.2f} seconds"

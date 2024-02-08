@@ -47,7 +47,7 @@ class BaseGUI(tk.Tk):
         self.file_path_entry.grid(row = 0, column = 0, padx = 10, sticky = 'E')
         self.file_path_button = ttk.Button(self, text = 'Select folder')
         # make a default path
-        self.folder_path.set('/Users/domchom/Desktop/en-face')
+        self.folder_path.set('/Users/domchom/Desktop/wave_analysis_testing/en-face')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 
@@ -320,11 +320,11 @@ class KymographGUI(tk.Tk):
         self.acf_peak_thresh.set(0.1)
 
         self.plot_ind_ACFs = tk.BooleanVar()
-        self.plot_ind_ACFs.set(True)
+        self.plot_ind_ACFs.set(False)
         self.plot_ind_CCFs = tk.BooleanVar()
-        self.plot_ind_CCFs.set(True)
+        self.plot_ind_CCFs.set(False)
         self.plot_ind_peaks = tk.BooleanVar()
-        self.plot_ind_peaks.set(True)
+        self.plot_ind_peaks.set(False)
         self.group_names = tk.StringVar()
         self.group_names.set("003,007")
         self.folder_path = tk.StringVar()
@@ -335,7 +335,7 @@ class KymographGUI(tk.Tk):
         self.file_path_button = ttk.Button(self, text = 'Select folder')
 
         # make a default path
-        self.folder_path.set('/Users/domchom/Desktop/kymo')
+        self.folder_path.set('/Users/domchom/Desktop/wave_analysis_testing/kymo')
         self.file_path_button['command'] = self.get_folder_path
         self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
 
