@@ -13,7 +13,7 @@ np.seterr(divide='ignore', invalid='ignore')
 
 class TotalSignalProcessor:
     def __init__(self, analysis_type, image_path, kern=None, step=None, roll_size=None, roll_by=None, line_width=None):
-        # Image variables
+        # Import variables
         self.roll_size = roll_size
         self.roll_by = roll_by
         self.line_width = line_width
@@ -27,11 +27,13 @@ class TotalSignalProcessor:
         with TiffFile(self.image_path) as tif_file:
             metadata = tif_file.imagej_metadata
         self.num_channels = metadata.get('channels', 1)
-        
         self.standardize_image_dimensions(metadata)
+
         # Specific functions for rolling analysis
         self.check_and_set_rolling_parameters()
-        self.calculate_bin_values()
+
+        # calculate the bin (box or line) values for each movie
+        self.bin_values = self.calculate_bin_values()
 
     def standardize_image_dimensions(self, metadata):
         '''
@@ -66,40 +68,46 @@ class TotalSignalProcessor:
         '''
         Calculate the mean signal for the specified box size over the standard and rolling images.
         '''
+        # Use boxes for the standard and rolling analysis
         if self.analysis_type != "kymograph":
             # Calculate the index for the center of the kernel
             ind = self.kernel_size // 2
             # Apply uniform filter to calculate mean signal over specified box size
-            self.bin_values = nd.uniform_filter(self.image[:, 0, :, :, :], size=(1, 1, self.kernel_size, self.kernel_size))[:, :, ind::self.step, ind::self.step]
+            box_values = nd.uniform_filter(self.image[:, 0, :, :, :], size=(1, 1, self.kernel_size, self.kernel_size))[:, :, ind::self.step, ind::self.step]
             # Get the dimensions of the resulting mean image
-            self.xpix, self.ypix = self.bin_values.shape[-2:]
+            self.xpix, self.ypix = box_values.shape[-2:]
             # We are either binning the image into boxes (standard) or columns (kymographs), so just call bins for simplicity
             self.total_bins = self.xpix * self.ypix
-            self.bin_values = self.bin_values.reshape(self.bin_values.shape[0], self.bin_values.shape[1], self.total_bins)
-        else:
-            self.bin_values = np.zeros(shape=(self.num_channels, self.total_bins, self.num_frames))
+            box_values = box_values.reshape(box_values.shape[0], box_values.shape[1], self.total_bins)
 
+            return box_values
+
+        # Use lines for kymograph analysis
+        else:
+            line_values = np.zeros(shape=(self.num_channels, self.total_bins, self.num_frames))
             for channel in range(self.num_channels):
-                for bin_num in range(self.total_bins):
+                for line_num in range(self.total_bins):
                     # If line width is 1, bin each line and add to array
                     if self.line_width == 1:
-                        signal = sig.savgol_filter(self.image[channel, :, bin_num], window_length=25, polyorder=2)
-                        self.bin_values[channel, bin_num] = signal
+                        signal = sig.savgol_filter(self.image[channel, :, line_num], window_length=25, polyorder=2)
+                        line_values[channel, line_num] = signal
                     # Check if line width is odd
                     elif self.line_width % 2 != 0:
                         # Calculate extra width on each side of the central column
                         line_width_extra = int((self.line_width - 1) / 2)
                         # Ensure that the line extraction does not go beyond image boundaries
-                        if bin_num + line_width_extra < self.total_bins and bin_num - line_width_extra > -1:
+                        if line_num + line_width_extra < self.total_bins and line_num - line_width_extra > -1:
                             # Extract average signal within the specified line width and add to array
-                            signal = np.mean(self.image[channel, :, bin_num - line_width_extra:bin_num + line_width_extra], axis=1)
+                            signal = np.mean(self.image[channel, :, line_num - line_width_extra:line_num + line_width_extra], axis=1)
                             signal = sig.savgol_filter(signal, window_length=25, polyorder=2)
-                            self.bin_values[channel, bin_num] = signal
-                            
+                            line_values[channel, line_num] = signal
                     else:
                         print("ERROR: line width must be odd!")
+
             # reassign and reshape the variable to work with future analysis methods
-            self.bin_values = self.bin_values.reshape(self.bin_values.shape[-1], self.bin_values.shape[0], self.bin_values.shape[-2])
+            line_values = line_values.reshape(line_values.shape[-1], line_values.shape[0], line_values.shape[-2])
+
+            return line_values
 
 ############################################
 ######## INDIVIDUAL BIN CALCULATION ########
