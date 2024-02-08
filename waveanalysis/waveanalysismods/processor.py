@@ -37,7 +37,7 @@ class TotalSignalProcessor:
 
     def standardize_image_dimensions(self, metadata):
         '''
-        Extract specific metadata for the standard and rolling analysis, and reshape the image
+        Extract metadata, and reshape the image
         '''
         if self.analysis_type != "kymograph":
             self.num_frames = metadata.get('frames', 1)
@@ -66,7 +66,7 @@ class TotalSignalProcessor:
 
     def calculate_bin_values(self):
         '''
-        Calculate the mean signal for the specified box size over the standard and rolling images.
+        Calculate the mean signal for the specified box or line size over the images.
         '''
         # Use boxes for the standard and rolling analysis
         if self.analysis_type != "kymograph":
