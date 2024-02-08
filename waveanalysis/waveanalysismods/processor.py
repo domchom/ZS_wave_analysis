@@ -376,6 +376,7 @@ class TotalSignalProcessor:
 
       
         return self.ind_peak_widths, self.ind_peak_maxs, self.ind_peak_mins, self.ind_peak_amps, self.ind_peak_rel_amps, self.ind_peak_props
+
 ############################################
 ########### INDIVIDUAL BIN PLOTS ###########
 ############################################
