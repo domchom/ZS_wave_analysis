@@ -1106,6 +1106,8 @@ class TotalSignalProcessor:
         for channel in range(self.num_channels):
             # Define data metrics to extract
             metrics_to_extract = [f"Ch {channel + 1} {data}" for data in ['Mean Period', 'Mean Peak Width', 'Mean Peak Max', 'Mean Peak Min', 'Mean Peak Amp', 'Mean Peak Rel Amp']]
+            if hasattr(self, 'indv_ccfs'):
+                metrics_to_extract = [f"Ch {channel + 1} {data}" for data in ['Mean Period', 'Mean Peak Width', 'Mean Peak Max', 'Mean Peak Min', 'Mean Peak Amp', 'Mean Peak Rel Amp', 'Mean Shift']]
             
             # Create folder for storing results
             folder_path = os.path.join(main_save_path, "!channel_mean_measurements")
@@ -1115,6 +1117,8 @@ class TotalSignalProcessor:
             # Extract data for each group and metric
             result_df = pd.DataFrame(columns=['Data Type', 'Group Name', 'Value'])
             for metric in metrics_to_extract:
+                if metric == "Ch 1 Mean Shift" or metric == "Ch 2 Mean Shift":
+                    metric = "Ch1-Ch2 Mean Shift"
                 for group_name in group_names:
                     group_data = summary_df.loc[summary_df['File Name'].str.contains(group_name)]
                     values = group_data[metric].tolist()
@@ -1122,6 +1126,8 @@ class TotalSignalProcessor:
 
             # Save individual tables for each metric
             for metric in metrics_to_extract:
+                if metric == "Ch 1 Mean Shift" or metric == "Ch 2 Mean Shift":
+                    metric = "Ch1-Ch2 Mean Shift"
                 # Define output path for CSV
                 output_path = os.path.join(folder_path, f"{metric.lower().replace(' ', '_')}_means.csv")
 
