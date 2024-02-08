@@ -55,6 +55,8 @@ class TotalSignalProcessor:
             self.total_bins = self.image.shape[-1] 
             # the number of rows in a kymograph is equal to the number to number of frames, so just call frames for simplicity
             self.num_frames = self.image.shape[-2] 
+            self.image = self.image.reshape(self.num_frames, self.num_channels, self.total_bins)
+            print(self.image.shape)
 
     def check_and_set_rolling_parameters(self):
         '''
@@ -84,28 +86,25 @@ class TotalSignalProcessor:
 
         # Use lines for kymograph analysis
         else:
-            line_values = np.zeros(shape=(self.num_channels, self.total_bins, self.num_frames))
+            line_values = np.zeros(shape=(self.num_frames,self.num_channels, self.total_bins))
             for channel in range(self.num_channels):
-                for line_num in range(self.total_bins):
-                    # If line width is 1, bin each line and add to array
-                    if self.line_width == 1:
-                        signal = sig.savgol_filter(self.image[channel, :, line_num], window_length=25, polyorder=2)
-                        line_values[channel, line_num] = signal
-                    # Check if line width is odd
-                    elif self.line_width % 2 != 0:
-                        # Calculate extra width on each side of the central column
-                        line_width_extra = int((self.line_width - 1) / 2)
-                        # Ensure that the line extraction does not go beyond image boundaries
-                        if line_num + line_width_extra < self.total_bins and line_num - line_width_extra > -1:
-                            # Extract average signal within the specified line width and add to array
-                            signal = np.mean(self.image[channel, :, line_num - line_width_extra:line_num + line_width_extra], axis=1)
-                            signal = sig.savgol_filter(signal, window_length=25, polyorder=2)
-                            line_values[channel, line_num] = signal
-                    else:
-                        print("ERROR: line width must be odd!")
-
-            # reassign and reshape the variable to work with future analysis methods
-            line_values = line_values.reshape(line_values.shape[-1], line_values.shape[0], line_values.shape[-2])
+                for frame_num in range(self.num_frames):
+                    for line_num in range(self.total_bins):
+                        # If line width is 1, bin each line and add to array
+                        if self.line_width == 1:
+                            pixel = self.image[frame_num, channel, line_num]
+                            line_values[frame_num, channel, line_num] = pixel
+                        # Check if line width is odd
+                        elif self.line_width % 2 != 0:
+                            # Calculate extra width on each side of the central column
+                            line_width_extra = int((self.line_width - 1) / 2)
+                            # Ensure that the line extraction does not go beyond image boundaries
+                            if line_num + line_width_extra < self.total_bins and line_num - line_width_extra > -1:
+                                # Extract average signal within the specified line width and add to array
+                                pixel = np.mean(self.image[frame_num, channel, line_num - line_width_extra:line_num + line_width_extra])
+                                line_values[frame_num, channel, line_num] = pixel
+                        else:
+                            print("ERROR: line width must be odd!")
 
             return line_values
 
@@ -422,11 +421,9 @@ class TotalSignalProcessor:
             pbar.set_description('ind acfs')
             for channel in range(self.num_channels):
                 for bin in range(self.total_bins):
-                    pbar.update(1)
-                    # Select the raw signal based on the analysis type
-                    to_plot = self.bin_values[:,channel, bin]
+                    pbar.update(1) 
                     # Generate and store the figure for the current channel and bin
-                    self.indv_acf_plots[f'Ch{channel + 1} Bin {bin + 1} ACF'] = return_figure(to_plot, 
+                    self.indv_acf_plots[f'Ch{channel + 1} Bin {bin + 1} ACF'] = return_figure(self.bin_values[:,channel, bin], 
                                                                                             self.acfs[channel, bin], 
                                                                                             f'Ch{channel + 1}', 
                                                                                             self.periods[channel, bin])
@@ -500,11 +497,7 @@ class TotalSignalProcessor:
                         
                         # Save the individual bin values
                         ccf_curve = self.indv_ccfs[combo_number, bin]
-
-                        # Combine measurements
                         measurements = list(zip_longest(range(1, len(ccf_curve) + 1),  normalize(self.bin_values[:, combo[0], bin]), normalize(self.bin_values[:, combo[1], bin]), ccf_curve, fillvalue=None))
-                        
-                        # Define the filename for saving
                         indv_ccfs_filename = os.path.join(save_folder, f'Bin {bin + 1}_CCF_values.csv')
                     
                         # Write measurements to CSV file
@@ -585,9 +578,8 @@ class TotalSignalProcessor:
                 for channel in range(self.num_channels):
                     for bin in range(self.total_bins):
                         pbar.update(1)
-                        to_plot = self.bin_values[:,channel, bin]
                         # Generate and store the figure for the current channel and bin
-                        self.indv_peak_figs[f'Ch{channel + 1} Bin {bin + 1} Peak Props'] = return_figure(to_plot,
+                        self.indv_peak_figs[f'Ch{channel + 1} Bin {bin + 1} Peak Props'] = return_figure(self.bin_values[:,channel, bin],
                                                                                                     self.ind_peak_props[f'Ch {channel} Bin {bin}'],
                                                                                                     f'Ch{channel + 1} Bin {bin + 1}')
 
