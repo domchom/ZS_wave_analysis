@@ -86,25 +86,23 @@ class TotalSignalProcessor:
 
         # Use lines for kymograph analysis
         else:
-            line_values = np.zeros(shape=(self.num_frames,self.num_channels, self.total_bins))
+            line_values = np.zeros(shape=(self.num_frames, self.num_channels, self.total_bins))
+
             for channel in range(self.num_channels):
                 for frame_num in range(self.num_frames):
                     for line_num in range(self.total_bins):
-                        # If line width is 1, bin each line and add to array
                         if self.line_width == 1:
                             pixel = self.image[frame_num, channel, line_num]
                             line_values[frame_num, channel, line_num] = pixel
-                        # Check if line width is odd
                         elif self.line_width % 2 != 0:
-                            # Calculate extra width on each side of the central column
-                            line_width_extra = int((self.line_width - 1) / 2)
-                            # Ensure that the line extraction does not go beyond image boundaries
-                            if line_num + line_width_extra < self.total_bins and line_num - line_width_extra > -1:
-                                # Extract average signal within the specified line width and add to array
-                                pixel = np.mean(self.image[frame_num, channel, line_num - line_width_extra:line_num + line_width_extra])
-                                line_values[frame_num, channel, line_num] = pixel
+                            line_width_extra = (self.line_width - 1) // 2
+                            left_bound = max(0, line_num - line_width_extra)
+                            right_bound = min(self.total_bins, line_num + line_width_extra + 1)
+                            line_slice = self.image[frame_num, channel, left_bound:right_bound]
+                            pixel = np.mean(line_slice)
+                            line_values[frame_num, channel, line_num] = pixel
                         else:
-                            print("ERROR: line width must be odd!")
+                            raise ValueError("Line width must be odd!")
 
             return line_values
 
