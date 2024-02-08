@@ -261,6 +261,14 @@ class TotalSignalProcessor:
      
                     delay_frames, cc_curve = calc_shifts(signal1, signal2, prominence=0.1)
 
+                    # The script has issues when the shift is very small or none, so minus the average period from the two channels
+                    period = (self.periods[combo[0],bin] + self.periods[combo[1],bin]) / 2
+                    if abs(delay_frames) > abs(period * .6):
+                        if delay_frames < 0:
+                            delay_frames = delay_frames + period
+                        elif delay_frames > 0:
+                            delay_frames = delay_frames - period
+
                     self.indv_shifts[combo_number, bin] = delay_frames
                     self.indv_ccfs[combo_number, bin] = cc_curve
 
