@@ -1093,7 +1093,8 @@ class TotalSignalProcessor:
                 self.submovie_measurements.append(submovie_meas_df)
 
                 return self.submovie_measurements       
-  
+
+
     def save_parameter_means_to_csv(self, main_save_path, group_names, summary_df):
         """
         This method saves the means of measurements to CSV files for each channel and metric.
