@@ -13,13 +13,13 @@ def define_wave_tracks(file_path):
     '''
     # asking the user to identify the ring of interest
     filename = file_path.split('/')[-1]
-    viewer = napari.Viewer(title=f'Trace a polygon for {filename}. Press "s" to save and close the window')
+    viewer = napari.Viewer(title=f'Trace a polygon for {filename}. Press "u" to save and close the window')
     viewer.open(file_path)
 
     # add a shapes layer to the viewer
     shapes_layer = viewer.add_shapes()
 
-    @viewer.bind_key('u') # user presses "s" to save and close the window
+    @viewer.bind_key('u') # user presses "u" to save and close the window
     def save_and_close_ROIs(viewer):
         '''
         Save and close the ROIs.
