@@ -50,7 +50,6 @@ def calc_wave_speeds(wave_tracks: np.array, pixel_size: float, frame_interval: f
     wave_speeds = []
     for wave_track in wave_tracks:
         # get the x and y coordinates of the wave track
-        print(wave_track)
         x1, y1 = wave_track[0][1], wave_track[0][0]
         x2, y2 =  wave_track[1][1], wave_track[1][0]
         # Ensure we're subtracting larger absolute value from the smaller for both x and y

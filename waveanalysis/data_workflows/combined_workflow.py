@@ -149,30 +149,7 @@ def combined_workflow(
                     image_array = tiff_to_np_array_single_frame(image_path)
                     bin_values, num_bins = create_kymo_bin_array(image = image_array,
                                                                     img_props = img_props_dict)
-                    
-                    if calc_wave_speeds:
-                        # Have the user define the wave tracks for each kymograph
-                        wave_tracks = sp.define_wave_tracks(file_path=image_path)
-                        # wave_tracks = [np.array([[40, 1], [7,  30]]), np.array([[26, 2], [3,  30]]), np.array([[9, 22], [12, 30]])] # for testing
-
-                        # check if wave tracks were created and if they are within the image
-                        hf.check_if_wave_tracks_created(wave_tracks=wave_tracks, 
-                                                        log_params=log_params, 
-                                                        file_name=file_name)
-                        
-                        hf.check_wave_track_coords(wave_tracks=wave_tracks, 
-                                                log_params=log_params, 
-                                                file_name=file_name, 
-                                                num_columns=img_props_dict['num_columns'], 
-                                                num_frames=img_props_dict['num_frames'])
-
-                        # calculate the wave speeds form the wave tracks
-                        wave_speeds = sp.calc_wave_speeds(wave_tracks=wave_tracks, 
-                                                        pixel_size=img_props_dict['pixel_size'], 
-                                                        frame_interval=img_props_dict['frame_interval'])
-                        
-                        print(wave_speeds)
-                    
+                                
                 # get the channel combinations
                 channel_combos = hf.get_channel_combos(num_channels=img_props_dict['num_channels'])
                 num_combos = len(channel_combos)
@@ -207,6 +184,27 @@ def combined_workflow(
                     indv_ccfs = sp.calc_indv_CCF_workflow(bin_values=bin_values, img_props=img_props_dict)
                     indv_shifts = sp.calc_indv_shift_workflow(indv_ccfs=indv_ccfs, indv_periods=indv_periods, img_props=img_props_dict)
 
+                # Have user enter wave tracks to calculate the wave speed if selected for kymographs
+                if calc_wave_speeds and analysis_type == 'kymograph':
+                        # Have the user define the wave tracks for each kymograph
+                        wave_tracks = sp.define_wave_tracks(file_path=image_path)
+
+                        # check if wave tracks were created and if they are within the image
+                        hf.check_if_wave_tracks_created(wave_tracks=wave_tracks, 
+                                                        log_params=log_params, 
+                                                        file_name=file_name)
+                        
+                        hf.check_wave_track_coords(wave_tracks=wave_tracks, 
+                                                log_params=log_params, 
+                                                file_name=file_name, 
+                                                num_columns=img_props_dict['num_columns'], 
+                                                num_frames=img_props_dict['num_frames'])
+
+                        # calculate the wave speeds form the wave tracks
+                        wave_speeds = sp.calc_wave_speeds(wave_tracks=wave_tracks, 
+                                                        pixel_size=img_props_dict['pixel_size'], 
+                                                        frame_interval=img_props_dict['frame_interval'])
+
                 # adjust the different waves properties to be the use the frame interval rather than the number of frames
                 indv_periods = indv_periods * img_props_dict['frame_interval']
                 indv_peak_offsets = indv_peak_offsets * img_props_dict['frame_interval']
@@ -220,7 +218,7 @@ def combined_workflow(
                                 'Peak Width': indv_peak_widths,
                                 'Peak Max': indv_peak_maxs,
                                 'Peak Min': indv_peak_mins,
-                                'Peak Offset': indv_peak_offsets,
+                                'Peak Offset': indv_peak_offsets
                                 }    
                 
                 # add shifts to the dictionary if there are multiple channels
@@ -229,6 +227,9 @@ def combined_workflow(
                     img_parameters_dict['Shift'] = indv_shifts
                     indv_phase_shifts = indv_shifts / np.mean(indv_periods, axis=0)
                     img_parameters_dict['% Phase Shift'] = indv_phase_shifts 
+
+                if calc_wave_speeds:
+                    img_parameters_dict['Wave Speed'] = wave_speeds
                     
                 # create the directory to save the figures and data for the image
                 im_save_path = os.path.join(main_save_path, name_wo_ext)
@@ -266,6 +267,10 @@ def combined_workflow(
                     # save the mean CCF values for the file
                     mean_ccf_values = get_mean_CCF_values(channel_combos=channel_combos, indv_ccfs=indv_ccfs, frame_interval=img_props_dict['frame_interval'])
                     save_ccf_values_to_csv(mean_ccf_values, im_save_path)
+
+                if calc_wave_speeds:
+                    mean_wave_speed_plot = pt.return_mean_wave_speeds_figure(wave_speeds)
+                    mean_wave_speed_plot.savefig(f'{im_save_path}/Wave Speed.png')
 
                 # Error check for plotting individual CCFs
                 elif plot_summary_CCFs and img_props_dict['num_channels'] == 1:

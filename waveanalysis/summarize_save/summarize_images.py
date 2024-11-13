@@ -169,7 +169,6 @@ def combine_stats_for_image_kymo_standard(
         # Wave Speed is a single value, so it doesn't need to be separated by channel
         elif name in ['Wave Speed']:
             for ind, stat in enumerate(stats_location):
-                print(parameters_with_stats_dict[name])
                 file_data_summary[f'{stat} {name}'] = parameters_with_stats_dict[name][0][ind + 1]
 
     return file_data_summary
