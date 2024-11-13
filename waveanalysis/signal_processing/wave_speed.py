@@ -56,7 +56,7 @@ def calc_wave_speeds(wave_tracks: np.array, pixel_size: float, frame_interval: f
         dx = abs(x1) - abs(x2) if abs(x1) >= abs(x2) else abs(x2) - abs(x1)
         dy = abs(y1) - abs(y2) if abs(y1) >= abs(y2) else abs(y2) - abs(y1)
         # calculate the wave speed
-        wave_speed = (dx / dy) # * pixel_size[0] / frame_interval
+        wave_speed = (dx / dy) * pixel_size[0] / frame_interval
         wave_speeds.append(wave_speed)
 
     return wave_speeds
