@@ -178,7 +178,12 @@ def combined_workflow(
                 indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props_dict)
                 indv_peak_amps = indv_peak_maxs - indv_peak_mins
                 indv_peak_rel_amps = indv_peak_amps / indv_peak_mins
-                
+
+                # Calculate coherence
+                indv_coherences = sp.calc_indv_coherence_workflow(acf_curves=indv_acfs, img_props=img_props_dict)
+                median_coherence = np.median(indv_coherences[0][~np.isnan(indv_coherences[0])])
+                print(median_coherence)
+
                 # Calculate the individual CCFs and shifts
                 if img_props_dict['num_channels'] > 1:
                     indv_ccfs = sp.calc_indv_CCF_workflow(bin_values=bin_values, img_props=img_props_dict)
