@@ -286,7 +286,7 @@ def calc_indv_coherence_workflow(
             acf_left = acf_curves[channel, bin_idx][:half_length + 10][::-1]
 
             # Calculate coherence values for both halves
-            coherence_right = calc_indv_coherence(acf_curve=acf_right, peak_thresh=acf_peak_thresh, plot=False)
+            coherence_right = calc_indv_coherence(acf_curve=acf_right, peak_thresh=acf_peak_thresh, plot=True)
             coherence_left = calc_indv_coherence(acf_curve=acf_left, peak_thresh=acf_peak_thresh, plot=False)
 
             # Average coherence from both sides
