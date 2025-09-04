@@ -40,7 +40,6 @@ def calc_indv_peak_props_workflow(
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
             signal = bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
-            signal = sig.savgol_filter(signal, window_length = 11, polyorder = 2)                 
             peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*0.1)
 
             # If peaks detected, calculate properties, otherwise return NaNs
@@ -99,7 +98,7 @@ def calc_indv_peak_props_workflow(
             indv_peak_offsets[channel, bin] = mean_offset
 
             # Store the individual peak properties in the dictionary
-            indv_peak_props[f'Ch {channel} Bin {bin}'] = {'smoothed': signal, 
+            indv_peak_props[f'Ch {channel} Bin {bin}'] = {'signal': signal, 
                                                                 'peaks': peaks,
                                                                 'proms': proms, 
                                                                 'heights': heights, 

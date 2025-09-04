@@ -9,7 +9,7 @@ import waveanalysis.plotting as pt
 import waveanalysis.signal_processing as sp
 import waveanalysis.housekeeping.housekeeping_functions as hf 
 
-from waveanalysis.image_props.image_bin_calc import create_multi_frame_bin_array, create_kymo_bin_array
+from waveanalysis.image_props.image_bin_calc import create_multi_frame_bin_array, create_kymo_bin_array, smooth_signal
 from waveanalysis.image_props.image_to_np_arrays import tiff_to_np_array_multi_frame, tiff_to_np_array_single_frame
 from waveanalysis.image_props.image_properties import get_multi_frame_properties, get_single_frame_properties
 from waveanalysis.summarize_save.save_stats import save_parameter_means_to_csv, get_mean_CCF_values, get_indv_CCF_values, save_ccf_values_to_csv
@@ -34,7 +34,18 @@ def combined_workflow(
     box_size: int = None,
     bin_shift: int = None, 
     line_width: int = None,
-    test: bool = False # for testing purposes
+    test: bool = False, # for testing purposes
+    Ch1_window: int = None,
+    Ch1_poly_order: int = None,
+    Ch2_window: int = None,
+    Ch2_poly_order: int = None,
+    Ch3_window: int = None,
+    Ch3_poly_order: int = None,
+    Ch4_window: int = None,
+    Ch4_poly_order: int = None,
+    CCF_window: int = None,
+    CCF_poly_order: int = None,
+    smoothing: bool = False,
 ) -> pd.DataFrame:
     '''
     This is the combined workflow for kymographs and standard analysis. It processes the image files in the 
@@ -73,7 +84,15 @@ def combined_workflow(
     - box_size (int, optional): The size of the box for standard analysis. Defaults to None.
     - bin_shift (int, optional): The shift value for binning. Defaults to None.
     - line_width (int, optional): The width of the line for kymograph analysis. Defaults to None.
-
+    - test (bool, optional): Whether to run in test mode (does not save files). Defaults to False.
+    - Ch1_window (int, optional): The window size for Savitzky-Golay filter for channel 1. Defaults to None.
+    - Ch1_poly_order (int, optional): The polynomial order for Savitzky-Golay filter for channel 1. Defaults to None.
+    - Ch2_window (int, optional): The window size for Savitzky-Golay filter for channel 2. Defaults to None.
+    - Ch2_poly_order (int, optional): The polynomial order for Savitzky-Golay filter for channel 2. Defaults to None.
+    - CCF_window (int, optional): The window size for Savitzky-Golay filter for CCF. Defaults to None.
+    - CCF_poly_order (int, optional): The polynomial order for Savitzky-Golay filter for CCF. Defaults to None. 
+    - smoothing (bool, optional): Whether to apply smoothing to the signals. Defaults to True.
+    
     Returns:
     - pd.DataFrame: The summary data for each file.
     '''
@@ -144,13 +163,48 @@ def combined_workflow(
                     image_array = tiff_to_np_array_multi_frame(image_path)
                     bin_values, num_bins, _, _ = create_multi_frame_bin_array(image = image_array, 
                                                                                 img_props = img_props_dict)
-                    
+                    if smoothing:
+                        raw_bin_values = bin_values.copy() # keep a copy of the raw bin values before smoothing
+                    else:
+                        raw_bin_values = None
+
+                    # smooth the bin values if specified
+                    for channel in range(img_props_dict['num_channels']):
+                        for bin in range(num_bins):
+                            signal = bin_values[:, channel, bin]
+                            if channel == 0 and Ch1_window is not None and Ch1_poly_order is not None:
+                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch1_window, poly_order=Ch1_poly_order)
+                            elif channel == 1 and Ch2_window is not None and Ch2_poly_order is not None:
+                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch2_window, poly_order=Ch2_poly_order)
+                            elif channel == 2 and Ch3_window is not None and Ch3_poly_order is not None:
+                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch3_window, poly_order=Ch3_poly_order)
+                            elif channel == 3 and Ch4_window is not None and Ch4_poly_order is not None:
+                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch4_window, poly_order=Ch4_poly_order)
+
                     # np.save(f'/Users/domchom/Desktop/{file_name}_bin_values.npy', bin_values)
                                     
                 else: # analysis_type == 'kymograph'
                     image_array = tiff_to_np_array_single_frame(image_path)
                     bin_values, num_bins = create_kymo_bin_array(image = image_array,
                                                                     img_props = img_props_dict)
+                    
+                    if smoothing:
+                        raw_bin_values = bin_values.copy() # keep a copy of the raw bin values before smoothing
+                    else:
+                        raw_bin_values = None
+
+                    # smooth the bin values if specified
+                    for channel in range(img_props_dict['num_channels']):
+                        for bin in range(num_bins):
+                            signal = bin_values[channel, bin]
+                            if channel == 0 and Ch1_window is not None and Ch1_poly_order is not None:
+                                bin_values[channel, bin] = smooth_signal(signal=signal, window=Ch1_window, poly_order=Ch1_poly_order)
+                            elif channel == 1 and Ch2_window is not None and Ch2_poly_order is not None:
+                                bin_values[channel, bin] = smooth_signal(signal=signal, window=Ch2_window, poly_order=Ch2_poly_order)
+                            elif channel == 2 and Ch3_window is not None and Ch3_poly_order is not None:
+                                bin_values[channel, bin] = smooth_signal(signal=signal, window=Ch3_window, poly_order=Ch3_poly_order)
+                            elif channel == 3 and Ch4_window is not None and Ch4_poly_order is not None:
+                                bin_values[channel, bin] = smooth_signal(signal=signal, window=Ch4_window, poly_order=Ch4_poly_order)
                     
                 # get the channel combinations
                 channel_combos = hf.get_channel_combos(num_channels=img_props_dict['num_channels'])
@@ -183,7 +237,7 @@ def combined_workflow(
                 
                 # Calculate the individual CCFs and shifts
                 if img_props_dict['num_channels'] > 1:
-                    indv_ccfs = sp.calc_indv_CCF_workflow(bin_values=bin_values, img_props=img_props_dict)
+                    indv_ccfs = sp.calc_indv_CCF_workflow(bin_values=bin_values, img_props=img_props_dict, CCF_window=CCF_window, CCF_poly_order=CCF_poly_order)
                     indv_shifts = sp.calc_indv_shift_workflow(indv_ccfs=indv_ccfs, indv_periods=indv_periods, img_props=img_props_dict, small_shifts_correction=small_shifts_correction, ccf_peak_thresh=ccf_peak_thresh)
 
                 # adjust the different waves properties to be the use the frame interval rather than the number of frames
@@ -253,6 +307,7 @@ def combined_workflow(
                 # plot the individual ACF figures for the file
                 if plot_indv_ACFs:
                     indv_acf_plots = pt.plot_indv_acf_workflow(
+                        raw_bin_values=raw_bin_values,
                         bin_values=bin_values,
                         indv_acfs=indv_acfs,
                         img_parameters_dict=img_parameters_dict,
@@ -265,7 +320,7 @@ def combined_workflow(
                 # plot the individual peak properties figures for the file
                 if plot_indv_peaks:        
                     indv_peak_figs = pt.plot_indv_peak_workflow(
-                        bin_values=bin_values,
+                        raw_bin_values=raw_bin_values if raw_bin_values is not None else bin_values,
                         img_prop_dict=img_props_dict,
                         indv_peak_props=indv_peak_props,
                         num_frames=img_props_dict['num_frames']

@@ -11,177 +11,175 @@ class BaseGUI(tk.Tk):
         self.title("Define your analysis parameters")
         self.main_frame = ttk.Frame(self, padding="20")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
-        
-        # define variable types for the different widget field
-        self.box_size = tk.IntVar()
-        self.box_size.set(20)
-        self.bin_shift = tk.IntVar()
-        self.bin_shift.set(20)
-        self.small_shifts_correction = tk.BooleanVar()
-        self.small_shifts_correction.set(False)
-        self.plot_summary_ACFs = tk.BooleanVar()
-        self.plot_summary_ACFs.set(True)
-        self.plot_summary_CCFs = tk.BooleanVar()
-        self.plot_summary_CCFs.set(True)
-        self.plot_summary_peaks = tk.BooleanVar()
-        self.plot_summary_peaks.set(True)
-        self.plot_indv_ACFs = tk.BooleanVar()
-        self.plot_indv_ACFs.set(False)
-        self.plot_indv_CCFs = tk.BooleanVar()
-        self.plot_indv_CCFs.set(False)
-        self.plot_indv_peaks = tk.BooleanVar()
-        self.plot_indv_peaks.set(False)
-        self.acf_peak_thresh = tk.DoubleVar()
-        self.acf_peak_thresh.set(0.1)
-        self.ccf_peak_thresh = tk.DoubleVar()
-        self.ccf_peak_thresh.set(0.1)
-        self.group_names = tk.StringVar()
-        # self.group_names.set('001,002')
-        self.folder_path = tk.StringVar()
-        # set default value for 'rolling' and 'kymograph' to False
+
+        # ---- VARIABLES ----
+        self.vars = {
+            "analysis_type": tk.StringVar(value="standard"),
+            "box_size": tk.IntVar(value=20),
+            "bin_shift": tk.IntVar(value=20),
+            "small_shifts_correction": tk.BooleanVar(value=True),
+            "plot_summary_ACFs": tk.BooleanVar(value=True),
+            "plot_summary_CCFs": tk.BooleanVar(value=True),
+            "plot_summary_peaks": tk.BooleanVar(value=True),
+            "plot_indv_ACFs": tk.BooleanVar(value=True),
+            "plot_indv_CCFs": tk.BooleanVar(value=False),
+            "plot_indv_peaks": tk.BooleanVar(value=False),
+            "acf_peak_thresh": tk.DoubleVar(value=0.1),
+            "ccf_peak_thresh": tk.DoubleVar(value=0.1),
+            "group_names": tk.StringVar(value="DC50,DC104"),
+            "smoothing": tk.BooleanVar(value=True),
+            "folder_path": tk.StringVar(value="/Users/domchom/Desktop/test"),
+            "Ch1_smoothing": tk.BooleanVar(value=True),
+            "Ch2_smoothing": tk.BooleanVar(value=True),
+            "Ch3_smoothing": tk.BooleanVar(value=True),
+            "Ch4_smoothing": tk.BooleanVar(value=True),
+            "CCF_smoothing": tk.BooleanVar(value=True),
+        }
+
         self.rolling = False
         self.kymograph = False
 
-        # file path selection widget
-        self.file_path_entry = ttk.Entry(self, textvariable = self.folder_path)
-        self.file_path_entry.grid(row = 0, column = 0, padx = 10, sticky = 'E')
-        self.file_path_button = ttk.Button(self, text = 'Select folder')
-        # make a default path
-        # self.folder_path.set('/Users/domchom/Desktop/wave_analysis_testing/en-face')
-        self.file_path_button['command'] = self.get_folder_path
-        self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
+        # ---- HELPERS ----
+        def add_entry(row, col, var, label_text, width=3):
+            entry = ttk.Entry(self, width=width, textvariable=var)
+            entry.grid(row=row, column=col, padx=10, sticky="E")
+            label = ttk.Label(self, text=label_text)
+            label.grid(row=row, column=col+1, padx=10, sticky="W")
+            return entry, label
 
-        # box size selection widget
-        self.box_size_entry = ttk.Entry(self, width = 3, textvariable = self.box_size)
-        self.box_size_entry.grid(row = 1, column = 0, padx = 10, sticky = 'E')
-        # create box size label text
-        self.box_size_label = ttk.Label(self, text = 'Box size (pixels)')
-        self.box_size_label.grid(row = 1, column = 1, padx = 10, sticky = 'W')
+        def add_checkbutton(row, col, var, label_text):
+            checkbox = ttk.Checkbutton(self, variable=var)
+            checkbox.grid(row=row, column=col, padx=10, sticky="E")
+            label = ttk.Label(self, text=label_text)
+            label.grid(row=row, column=col+1, padx=10, sticky="W")
+            return checkbox, label
 
-        self.bin_shift_entry = ttk.Entry(self, width = 3, textvariable = self.bin_shift)
-        self.bin_shift_entry.grid(row = 2, column = 0, padx = 10, sticky = 'E')
-        # create box size label text
-        self.bin_shift_label = ttk.Label(self, text = 'Box shift (pixels)')
-        self.bin_shift_label.grid(row = 2, column = 1, padx = 10, sticky = 'W')
+        def add_smoothing_channel(row, col, name, label_prefix):
+            cb = ttk.Checkbutton(self, variable=self.vars[f"{name}_smoothing"])
+            cb.grid(row=row, column=col, padx=10, sticky="E")
 
-        # create ACF peak threshold entry widget
-        self.acf_peak_thresh_entry = ttk.Entry(self, width = 3, textvariable = self.acf_peak_thresh)
-        self.acf_peak_thresh_entry.grid(row = 3, column = 0, padx = 10, sticky = 'E')
-        # create ACF peak threshold label text
-        self.acf_peak_thresh_label = ttk.Label(self, text = 'ACF peak threshold')
-        self.acf_peak_thresh_label.grid(row = 3, column = 1, padx = 10, sticky = 'W')
+            win_label = ttk.Label(self, text=f"{label_prefix} window size")
+            win_label.grid(row=row, column=col+1, padx=10, sticky="W")
+            win_scale = tk.Scale(self, from_=3, to=101, orient="horizontal", resolution=2)
+            win_scale.set(11)
+            win_scale.grid(row=row, column=col+2, padx=10, pady=5, sticky="W")
+
+            poly_label = ttk.Label(self, text=f"{label_prefix} poly order")
+            poly_label.grid(row=row+1, column=col+1, padx=10, sticky="W")
+            poly_scale = tk.Scale(self, from_=1, to=10, orient="horizontal", resolution=1)
+            poly_scale.set(3)
+            poly_scale.grid(row=row+1, column=col+2, padx=10, sticky="W")
+
+            return cb, win_scale, poly_scale
         
-        # create ACF peak threshold entry widget
-        self.ccf_peak_thresh_entry = ttk.Entry(self, width = 3, textvariable = self.ccf_peak_thresh)
-        self.ccf_peak_thresh_entry.grid(row = 4, column = 0, padx = 10, sticky = 'E')
-        self.ccf_peak_thresh_label = ttk.Label(self, text = 'CCF peak threshold')
-        self.ccf_peak_thresh_label.grid(row = 4, column = 1, padx = 10, sticky = 'W')
+        # ---- ANALYSIS OPTIONS ----
+        analysis_label = ttk.Label(
+            self,
+            text="ANALYSIS OPTIONS",
+            font=("TkDefaultFont", 16, "bold"),
+            anchor="center"
+        )
+        analysis_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="ew")
 
-        # create group names entry widget
-        self.group_names_entry = ttk.Entry(self, textvariable = self.group_names)
-        self.group_names_entry.grid(row = 5, column = 0, padx = 10, sticky = 'E')
-        # create group names label text
-        self.group_names_label = ttk.Label(self, text = 'Group names')
-        self.group_names_label.grid(row = 5, column = 1, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting summary ACFs
-        self.plot_summary_ACFs_checkbox = ttk.Checkbutton(self, variable = self.plot_summary_ACFs)
-        self.plot_summary_ACFs_checkbox.grid(row = 6, column = 0, padx = 10, sticky = 'E')
-        self.plot_summary_ACFs_label = ttk.Label(self, text = 'Plot summary ACFs')
-        self.plot_summary_ACFs_label.grid(row = 6, column = 1, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting summary CCFs
-        self.plot_summary_CCFs_checkbox = ttk.Checkbutton(self, variable = self.plot_summary_CCFs)
-        self.plot_summary_CCFs_checkbox.grid(row = 7, column = 0, padx = 10, sticky = 'E')
-        self.plot_summary_CCFs_label = ttk.Label(self, text = 'Plot summary CCFs')
-        self.plot_summary_CCFs_label.grid(row = 7, column = 1, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting summary peaks
-        self.plot_summary_peaks_checkbox = ttk.Checkbutton(self, variable = self.plot_summary_peaks)
-        self.plot_summary_peaks_checkbox.grid(row = 8, column = 0, padx = 10, sticky = 'E')
-        self.plot_summary_peaks_label = ttk.Label(self, text = 'Plot summary peaks')
-        self.plot_summary_peaks_label.grid(row = 8, column = 1, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting individual ACFs
-        self.plot_indv_ACFs_checkbox = ttk.Checkbutton(self, variable = self.plot_indv_ACFs)
-        self.plot_indv_ACFs_checkbox.grid(row = 6, column = 2, padx = 10, sticky = 'E')
-        self.plot_indv_ACFs_label = ttk.Label(self, text = 'Plot individual ACFs')
-        self.plot_indv_ACFs_label.grid(row = 6, column = 3, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting individual CCFs
-        self.plot_indv_CCFs_checkbox = ttk.Checkbutton(self, variable = self.plot_indv_CCFs)
-        self.plot_indv_CCFs_checkbox.grid(row = 7, column = 2, padx = 10, sticky = 'E')
-        self.plot_indv_CCFs_label = ttk.Label(self, text = 'Plot individual CCFs')
-        self.plot_indv_CCFs_label.grid(row = 7, column = 3, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting individual peaks
-        self.plot_indv_peaks_checkbox = ttk.Checkbutton(self, variable = self.plot_indv_peaks)
-        self.plot_indv_peaks_checkbox.grid(row = 8, column = 2, padx = 10, sticky = 'E')
-        self.plot_indv_peaks_label = ttk.Label(self, text = 'Plot individual peaks')
-        self.plot_indv_peaks_label.grid(row = 8, column = 3, padx = 10, sticky = 'W')
+        # ---- FILE SELECTION ----
+        self.file_path_entry = ttk.Entry(self, textvariable=self.vars["folder_path"])
+        self.file_path_entry.grid(row=1, column=0, padx=10, sticky="E")
+        self.file_path_button = ttk.Button(self, text="Select folder", command=self.get_folder_path)
+        self.file_path_button.grid(row=1, column=1, padx=10, sticky="W")
         
-        # create checkbox for small shift corrections
-        self.small_shifts_correction_checkbox = ttk.Checkbutton(self, variable = self.small_shifts_correction)
-        self.small_shifts_correction_checkbox.grid(row = 9, column = 0, padx = 10, sticky = 'E')
-        self.small_shifts_correction_label = ttk.Label(self, text = 'Small shifts correction')
-        self.small_shifts_correction_label.grid(row = 9, column = 1, padx = 10, sticky = 'W')
+        # ---- GROUP NAMES ----
+        self.group_names_label = ttk.Label(self, text="Group names")
+        self.group_names_label.grid(row=2, column=1, padx=10, sticky="W")
+        self.group_names_entry = ttk.Entry(self, textvariable=self.vars["group_names"])
+        self.group_names_entry.grid(row=2, column=0, padx=10, sticky="E")
+
+        # ---- BASIC ENTRIES ----
+        add_entry(3, 0, self.vars["box_size"], "Box size (pixels)")
+        add_entry(4, 0, self.vars["bin_shift"], "Box shift (pixels)")
+        add_entry(5, 0, self.vars["acf_peak_thresh"], "ACF peak threshold")
+        add_entry(6, 0, self.vars["ccf_peak_thresh"], "CCF peak threshold")
+        add_checkbutton(7, 0, self.vars["small_shifts_correction"], "Small shifts correction")
+
+        # ---- SEPARATORS ----
+        ttk.Separator(self, orient="horizontal").grid(row=8, column=0, columnspan=11, sticky="ew", pady=10)
+        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=9, sticky="ns", pady=10)
+
+        # ---- PLOT OPTIONS ----
+        plotting_label = ttk.Label(
+            self,
+            text="PLOT OPTIONS",
+            font=("TkDefaultFont", 16, "bold"),
+            anchor="center"
+        )
+        plotting_label.grid(row=9, column=1, columnspan=3, padx=10, pady=(0, 10), sticky="ew")
+
+        add_checkbutton(10, 0, self.vars["plot_summary_ACFs"], "Plot summary ACFs")
+        add_checkbutton(11, 0, self.vars["plot_summary_CCFs"], "Plot summary CCFs")
+        add_checkbutton(12, 0, self.vars["plot_summary_peaks"], "Plot summary peaks")
+        add_checkbutton(10, 2, self.vars["plot_indv_ACFs"], "Plot individual ACFs")
+        add_checkbutton(11, 2, self.vars["plot_indv_CCFs"], "Plot individual CCFs")
+        add_checkbutton(12, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
+
+        # ---- SMOOTHING OPTIONS ----
+        ttk.Label(self, text="SMOOTHING OPTIONS",
+                  font=("TkDefaultFont", 16, "bold")).grid(row=0, column=5, columnspan=6, padx=10, pady=10, sticky="EW")
+
+        self.smoothing_widgets = {
+            "Ch1": add_smoothing_channel(1, 3, "Ch1", "Ch1"),
+            "Ch2": add_smoothing_channel(3, 3, "Ch2", "Ch2"),
+            "Ch3": add_smoothing_channel(1, 7, "Ch3", "Ch3"),
+            "Ch4": add_smoothing_channel(3, 7, "Ch4", "Ch4"),
+            "CCF": add_smoothing_channel(5, 3, "CCF", "CCF"),
+        }
         
-        # create start button
-        self.start_button = ttk.Button(self, text = 'Start analysis')
-        self.start_button['command'] = self.start_analysis
-        self.start_button.grid(row = 12, column = 0, padx = 10, sticky = 'E')
+        ttk.Label(self, text="Enable smoothing").grid(row=5, column=8, padx=10, sticky="E")
+        ttk.Checkbutton(self, variable=self.vars["smoothing"]).grid(row=5, column=7, padx=10, sticky="E")
+        
+        # ---- BUTTONS ----
+        self.start_button = ttk.Button(self, text="Start analysis", command=self.start_analysis)
+        self.start_button.grid(row=10, column=8, columnspan=2, padx=10, sticky="E")
 
-        # create cancel button
-        self.cancel_button = ttk.Button(self, text = 'Cancel')
-        self.cancel_button['command'] = self.cancel_analysis
-        self.cancel_button.grid(row = 12, column = 1, padx = 10, sticky = 'W')
+        self.cancel_button = ttk.Button(self, text="Cancel", command=self.cancel_analysis)
+        self.cancel_button.grid(row=9, column=8, columnspan=2, padx=10, sticky="E")
 
-        # create button to launch rolling analysis gui
-        self.rolling_button = ttk.Button(self, text = 'Launch rolling analysis')
-        self.rolling_button['command'] = self.launch_rolling_analysis
-        self.rolling_button.grid(row = 12, column = 3, padx = 10, sticky = 'E')
+        self.rolling_button = ttk.Button(self, text="Launch rolling analysis", command=self.launch_rolling_analysis)
+        self.rolling_button.grid(row=11, column=8, columnspan=2, padx=10, sticky="E")
 
-        # create button to launch kymograph analysis gui
-        self.kymograph_button = ttk.Button(self, text = 'Launch kymograph analysis')
-        self.kymograph_button['command'] = self.launch_kymograph_analysis
-        self.kymograph_button.grid(row = 13, column = 3, padx = 10, sticky = 'E')
+        self.kymograph_button = ttk.Button(self, text="Launch kymograph analysis", command=self.launch_kymograph_analysis)
+        self.kymograph_button.grid(row=12, column=8, columnspan=2, padx=10, sticky="E")
 
+    # ---- METHODS ----
     def get_folder_path(self):
-        self.folder_path.set(askdirectory())
+        self.vars["folder_path"].set(askdirectory())
 
     def launch_rolling_analysis(self):
         self.rolling = True
-        self.kymograph = False
         self.destroy()
 
     def launch_kymograph_analysis(self):
         self.kymograph = True
-        self.rolling = False
         self.destroy()
 
     def cancel_analysis(self):
-        sys.exit('You have cancelled the analysis')
-    
-    def start_analysis(self):
-        # get the values stored in the widget
-        self.box_size = self.box_size.get()
-        self.bin_shift = self.bin_shift.get()
-        self.acf_peak_thresh = self.acf_peak_thresh.get()
-        self.small_shifts_correction = self.small_shifts_correction.get()
-        self.group_names = self.group_names.get()
-        self.plot_summary_ACFs = self.plot_summary_ACFs.get()
-        self.plot_summary_CCFs = self.plot_summary_CCFs.get()
-        self.plot_summary_peaks = self.plot_summary_peaks.get()
-        self.plot_indv_ACFs = self.plot_indv_ACFs.get()
-        self.plot_indv_CCFs = self.plot_indv_CCFs.get()
-        self.plot_indv_peaks = self.plot_indv_peaks.get()
-        self.folder_path = self.folder_path.get()
-        self.ccf_peak_thresh = self.ccf_peak_thresh.get()
-        
-        # convert group names to list of strings
-        self.group_names = [group_name.strip() for group_name in self.group_names.split(',')]
+        sys.exit("You have cancelled the analysis")
 
-        # destroy the widget
+    def start_analysis(self):
+        # Collect values
+        for k, v in self.vars.items():
+            self.vars[k] = v.get()
+
+        # Group names
+        self.vars["group_names"] = [g.strip() for g in self.vars["group_names"].split(",")]
+        
+        for ch in ["Ch1", "Ch2", "Ch3", "Ch4", "CCF"]:
+            if self.vars[f"{ch}_smoothing"]:
+                self.vars[f"{ch}_window"] = self.smoothing_widgets[ch][1].get()
+                self.vars[f"{ch}_poly_order"] = self.smoothing_widgets[ch][2].get()
+            else:
+                self.vars[f"{ch}_window"] = None
+                self.vars[f"{ch}_poly_order"] = None
+        
+        # Destroy widget
         self.destroy()
 
 class RollingGUI(tk.Tk):
@@ -193,139 +191,133 @@ class RollingGUI(tk.Tk):
         self.main_frame = ttk.Frame(self, padding="20")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
 
-        #sets number of columns in the main window
-        self.columnconfigure(0, weight = 1)
-        self.columnconfigure(1, weight = 1)
-        self.columnconfigure(2, weight = 1)
-
-        # define variable types for the different widget field
-        self.box_size = tk.IntVar()
-        self.box_size.set(20)
-        self.box_shift = tk.IntVar()
-        self.box_shift.set(20)
-        self.subframe_size = tk.IntVar()
-        self.subframe_size.set(50)
-        self.subframe_roll = tk.IntVar()
-        self.subframe_roll.set(5)
-        self.plot_sf_ACFs = tk.BooleanVar()
-        self.plot_sf_CCFs = tk.BooleanVar()
-        self.plot_sf_peaks = tk.BooleanVar()
-        self.acf_peak_thresh = tk.DoubleVar()
-        self.acf_peak_thresh.set(0.1)
-        self.folder_path = tk.StringVar()
-        self.small_shifts_correction = tk.BooleanVar()
-        self.small_shifts_correction.set(False)
-        self.ccf_peak_thresh = tk.DoubleVar()
-        self.ccf_peak_thresh.set(0.1)
-
-        # file path selection widget
-        self.file_path_entry = ttk.Entry(self, textvariable = self.folder_path)
-        self.file_path_entry.grid(row = 0, column = 0, padx = 10, sticky = 'E')
-        self.file_path_button = ttk.Button(self, text = 'Select folder')
-        # make a default path
-        # self.folder_path.set('/Users/domchom/Desktop/rolling')
-        self.file_path_button['command'] = self.get_folder_path
-        self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
-
-        # box size selection widget
-        self.box_size_entry = ttk.Entry(self, width = 3, textvariable = self.box_size)
-        self.box_size_entry.grid(row = 1, column = 0, padx = 10, sticky = 'E')
-        # create box size label text
-        self.box_size_label = ttk.Label(self, text = 'Box size (pixels)')
-        self.box_size_label.grid(row = 1, column = 1, padx = 10, sticky = 'W')
-
-        # box shift selection widget
-        self.box_shift_entry = ttk.Entry(self, width = 3, textvariable = self.box_shift)
-        self.box_shift_entry.grid(row = 2, column = 0, padx = 10, sticky = 'E')
-        # create box shift label text
-        self.box_shift_label = ttk.Label(self, text = 'Box shift (pixels)')
-        self.box_shift_label.grid(row = 2, column = 1, padx = 10, sticky = 'W')
-
-        # subframe size selection widget
-        self.subframe_size_entry = ttk.Entry(self, width = 3, textvariable = self.subframe_size)
-        self.subframe_size_entry.grid(row = 3, column = 0, padx = 10, sticky = 'E')
-        # create subframe size label text
-        self.subframe_size_label = ttk.Label(self, text = 'Num frames per sub-movie')
-        self.subframe_size_label.grid(row = 3, column = 1, padx = 10, sticky = 'W')
-
-        # subframe roll selection widget
-        self.subframe_roll_entry = ttk.Entry(self, width = 3, textvariable = self.subframe_roll)
-        self.subframe_roll_entry.grid(row = 4, column = 0, padx = 10, sticky = 'E')
-        # create subframe roll label text
-        self.subframe_roll_label = ttk.Label(self, text = 'Num frames to roll by')
-        self.subframe_roll_label.grid(row = 4, column = 1, padx = 10, sticky = 'W')
-
-        # create ACF peak threshold entry widget
-        self.acf_peak_thresh_entry = ttk.Entry(self, width = 3, textvariable = self.acf_peak_thresh)
-        self.acf_peak_thresh_entry.grid(row = 5, column = 0, padx = 10, sticky = 'E')
-        # create ACF peak threshold label text
-        self.acf_peak_thresh_label = ttk.Label(self, text = 'ACF peak threshold')
-        self.acf_peak_thresh_label.grid(row = 5, column = 1, padx = 10, sticky = 'W')
+        # ---- VARIABLES ----
+        self.vars = {
+            "analysis_type": tk.StringVar(value="rolling"),
+            "box_size": tk.IntVar(value=20),
+            "bin_shift": tk.IntVar(value=20),
+            "subframe_size": tk.IntVar(value=50),
+            "subframe_roll": tk.IntVar(value=5),
+            "small_shifts_correction": tk.BooleanVar(value=True),
+            "plot_subframe_ACFs": tk.BooleanVar(value=True), # mandatory for now
+            "plot_subframe_CCFs": tk.BooleanVar(value=True), # mandatory for now
+            "plot_subframe_peaks": tk.BooleanVar(value=True), # mandatory for now
+            "acf_peak_thresh": tk.DoubleVar(value=0.1),
+            "ccf_peak_thresh": tk.DoubleVar(value=0.1),
+            "smoothing": tk.BooleanVar(value=True),
+            "folder_path": tk.StringVar(value="/Users/domchom/Desktop/test"),
+            "Ch1_smoothing": tk.BooleanVar(value=True),
+            "Ch2_smoothing": tk.BooleanVar(value=True),
+            "Ch3_smoothing": tk.BooleanVar(value=True),
+            "Ch4_smoothing": tk.BooleanVar(value=True),
+            "CCF_smoothing": tk.BooleanVar(value=True),
+        }
         
-        # create ACF peak threshold entry widget
-        self.ccf_peak_thresh_entry = ttk.Entry(self, width = 3, textvariable = self.ccf_peak_thresh)
-        self.ccf_peak_thresh_entry.grid(row = 6, column = 0, padx = 10, sticky = 'E')
-        self.ccf_peak_thresh_label = ttk.Label(self, text = 'CCF peak threshold')
-        self.ccf_peak_thresh_label.grid(row = 6, column = 1, padx = 10, sticky = 'W')
+        self.kymograph = False
         
-        # create checkbox for small shift corrections
-        self.small_shifts_correction_checkbox = ttk.Checkbutton(self, variable = self.small_shifts_correction)
-        self.small_shifts_correction_checkbox.grid(row = 8, column = 0, padx = 10, sticky = 'E')
-        self.small_shifts_correction_label = ttk.Label(self, text = 'Small shifts correction')
-        self.small_shifts_correction_label.grid(row = 8, column = 1, padx = 10, sticky = 'W')
+        # ---- HELPERS ----
+        def add_entry(row, col, var, label_text, width=3):
+            entry = ttk.Entry(self, width=width, textvariable=var)
+            entry.grid(row=row, column=col, padx=10, sticky="E")
+            label = ttk.Label(self, text=label_text)
+            label.grid(row=row, column=col+1, padx=10, sticky="W")
+            return entry, label
 
-        ''' # making this mandatory for the moment
-        # create checkbox for plotting subframe ACFs
-        self.plot_sf_ACFs_checkbox = ttk.Checkbutton(self, variable = self.plot_sf_ACFs)
-        self.plot_sf_ACFs_checkbox.grid(row = 5, column = 0, padx = 10, sticky = 'E')
-        self.plot_sf_ACFs_label = ttk.Label(self, text = 'Plot sub-movie ACFs')
-        self.plot_sf_ACFs_label.grid(row = 5, column = 1, padx = 10, sticky = 'W')
+        def add_checkbutton(row, col, var, label_text):
+            checkbox = ttk.Checkbutton(self, variable=var)
+            checkbox.grid(row=row, column=col, padx=10, sticky="E")
+            label = ttk.Label(self, text=label_text)
+            label.grid(row=row, column=col+1, padx=10, sticky="W")
+            return checkbox, label
 
-        # create checkbox for plotting subframe CCFs
-        self.plot_sf_CCFs_checkbox = ttk.Checkbutton(self, variable = self.plot_sf_CCFs)
-        self.plot_sf_CCFs_checkbox.grid(row = 6, column = 0, padx = 10, sticky = 'E')
-        self.plot_sf_CCFs_label = ttk.Label(self, text = 'Plot sub-movie CCFs')
-        self.plot_sf_CCFs_label.grid(row = 6, column = 1, padx = 10, sticky = 'W')
+        def add_smoothing_channel(row, col, name, label_prefix):
+            cb = ttk.Checkbutton(self, variable=self.vars[f"{name}_smoothing"])
+            cb.grid(row=row, column=col, padx=10, sticky="E")
 
-        # create checkbox for plotting subframe peaks
-        self.plot_sf_peaks_checkbox = ttk.Checkbutton(self, variable = self.plot_sf_peaks)
-        self.plot_sf_peaks_checkbox.grid(row = 7, column = 0, padx = 10, sticky = 'E')
-        self.plot_sf_peaks_label = ttk.Label(self, text = 'Plot sub-movie peaks')
-        self.plot_sf_peaks_label.grid(row = 7, column = 1, padx = 10, sticky = 'W')
-        '''
+            win_label = ttk.Label(self, text=f"{label_prefix} window size")
+            win_label.grid(row=row, column=col+1, padx=10, sticky="W")
+            win_scale = tk.Scale(self, from_=3, to=101, orient="horizontal", resolution=2)
+            win_scale.set(11)
+            win_scale.grid(row=row, column=col+2, padx=10, pady=5, sticky="W")
+
+            poly_label = ttk.Label(self, text=f"{label_prefix} poly order")
+            poly_label.grid(row=row+1, column=col+1, padx=10, sticky="W")
+            poly_scale = tk.Scale(self, from_=1, to=10, orient="horizontal", resolution=1)
+            poly_scale.set(3)
+            poly_scale.grid(row=row+1, column=col+2, padx=10, sticky="W")
+
+            return cb, win_scale, poly_scale
         
-        # create start button
-        self.start_button = ttk.Button(self, text = 'Start analysis')
-        self.start_button['command'] = self.start_analysis
-        self.start_button.grid(row = 9, column = 0, padx = 10, sticky = 'E')
+        # ---- ANALYSIS OPTIONS ----
+        analysis_label = ttk.Label(
+            self,
+            text="ANALYSIS OPTIONS",
+            font=("TkDefaultFont", 16, "bold"),
+            anchor="center"
+        )
+        analysis_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="ew")
 
-        # create cancel button
-        self.cancel_button = ttk.Button(self, text = 'Cancel')
-        self.cancel_button['command'] = self.cancel_analysis
-        self.cancel_button.grid(row = 9, column = 1, padx = 10, sticky = 'W')
+        # ---- FILE SELECTION ----
+        self.file_path_entry = ttk.Entry(self, textvariable=self.vars["folder_path"])
+        self.file_path_entry.grid(row=1, column=0, padx=10, sticky="E")
+        self.file_path_button = ttk.Button(self, text="Select folder", command=self.get_folder_path)
+        self.file_path_button.grid(row=1, column=1, padx=10, sticky="W")
+        
+        # ---- BASIC ENTRIES ----
+        add_entry(3, 0, self.vars["box_size"], "Box size (pixels)")
+        add_entry(4, 0, self.vars["bin_shift"], "Box shift (pixels)")
+        add_entry(5, 0, self.vars["subframe_size"], "Subframe size (frames)")
+        add_entry(6, 0, self.vars["subframe_roll"], "Subframe roll (frames)")
+        add_entry(7, 0, self.vars["acf_peak_thresh"], "ACF peak threshold")
+        add_entry(8, 0, self.vars["ccf_peak_thresh"], "CCF peak threshold")
+        add_checkbutton(9, 0, self.vars["small_shifts_correction"], "Small shifts correction")  
 
+        # ---- SEPARATORS ----
+        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=9, sticky="ns", pady=10)
+        
+        # ---- SMOOTHING OPTIONS ----
+        ttk.Label(self, text="SMOOTHING OPTIONS",
+                  font=("TkDefaultFont", 16, "bold")).grid(row=0, column=5, columnspan=6, padx=10, pady=10, sticky="EW")
+
+        self.smoothing_widgets = {
+            "Ch1": add_smoothing_channel(1, 3, "Ch1", "Ch1"),
+            "Ch2": add_smoothing_channel(3, 3, "Ch2", "Ch2"),
+            "Ch3": add_smoothing_channel(1, 7, "Ch3", "Ch3"),
+            "Ch4": add_smoothing_channel(3, 7, "Ch4", "Ch4"),
+            "CCF": add_smoothing_channel(5, 3, "CCF", "CCF"),
+        }
+    
+        # ---- BUTTONS ----
+        self.start_button = ttk.Button(self, text="Start analysis", command=self.start_analysis)
+        self.start_button.grid(row=10, column=7, columnspan=2, padx=10, sticky="E")
+
+        self.cancel_button = ttk.Button(self, text="Cancel", command=self.cancel_analysis)
+        self.cancel_button.grid(row=10, column=8, columnspan=2, padx=10, sticky="E")
+
+    # ---- METHODS ----
     def get_folder_path(self):
-        self.folder_path.set(askdirectory())
+        self.vars["folder_path"].set(askdirectory())
 
     def cancel_analysis(self):
         sys.exit('You have cancelled the analysis')
     
-    def start_analysis(self):
-        # get the values stored in the widget
-        self.box_size = self.box_size.get()
-        self.box_shift = self.box_shift.get()
-        self.acf_peak_thresh = self.acf_peak_thresh.get()
-        self.plot_sf_ACFs = self.plot_sf_ACFs.get()
-        self.plot_sf_CCFs = self.plot_sf_CCFs.get()
-        self.plot_sf_peaks = self.plot_sf_peaks.get()
-        self.folder_path = self.folder_path.get()
-        self.subframe_size = self.subframe_size.get()
-        self.subframe_roll = self.subframe_roll.get()
-        self.small_shifts_correction = self.small_shifts_correction.get()
-        self.kymograph = False
-        self.ccf_peak_thresh = self.ccf_peak_thresh.get()
+    def cancel_analysis(self):
+        sys.exit("You have cancelled the analysis")
 
-        # destroy the widget
+    def start_analysis(self):
+        # Collect values
+        for k, v in self.vars.items():
+            self.vars[k] = v.get()
+        
+        for ch in ["Ch1", "Ch2", "Ch3", "Ch4", "CCF"]:
+            if self.vars[f"{ch}_smoothing"]:
+                self.vars[f"{ch}_window"] = self.smoothing_widgets[ch][1].get()
+                self.vars[f"{ch}_poly_order"] = self.smoothing_widgets[ch][2].get()
+            else:
+                self.vars[f"{ch}_window"] = None
+                self.vars[f"{ch}_poly_order"] = None
+        
+        # Destroy widget
         self.destroy()
 
 class KymographGUI(tk.Tk):
@@ -338,170 +330,157 @@ class KymographGUI(tk.Tk):
         self.main_frame = ttk.Frame(self, padding="20")
         self.main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
-        #sets number of columns in the main window
-        self.columnconfigure(0, weight = 1)
-        self.columnconfigure(1, weight = 1)
-        self.columnconfigure(2, weight = 1)
-
-        # define variable types for the different widget field
-        self.line_width = tk.IntVar()
-        self.line_width.set(5)
-        self.bin_shift = tk.IntVar()
-        self.bin_shift.set(5)
-        self.plot_summary_ACFs = tk.BooleanVar()
-        self.plot_summary_ACFs.set(True)
-        self.plot_summary_CCFs = tk.BooleanVar()
-        self.plot_summary_CCFs.set(True)
-        self.plot_summary_peaks = tk.BooleanVar()
-        self.plot_summary_peaks.set(True)
-        self.acf_peak_thresh = tk.DoubleVar()
-        self.acf_peak_thresh.set(0.1)
-        self.ccf_peak_thresh = tk.DoubleVar()
-        self.ccf_peak_thresh.set(0.1)
-        self.small_shifts_correction = tk.BooleanVar()
-        self.small_shifts_correction.set(False)
-
-        self.plot_indv_ACFs = tk.BooleanVar()
-        self.plot_indv_ACFs.set(False)
-        self.plot_indv_CCFs = tk.BooleanVar()
-        self.plot_indv_CCFs.set(False)
-        self.plot_indv_peaks = tk.BooleanVar()
-        self.plot_indv_peaks.set(False)
-        self.calc_wave_speeds = tk.BooleanVar()
-        self.calc_wave_speeds.set(False)
-        self.group_names = tk.StringVar()
-        # self.group_names.set("003,007")
-        self.folder_path = tk.StringVar()
-
-        # file path selection widget
-        self.file_path_entry = ttk.Entry(self, textvariable = self.folder_path)
-        self.file_path_entry.grid(row = 0, column = 0, padx = 10, sticky = 'E')
-        self.file_path_button = ttk.Button(self, text = 'Select folder')
-
-        # make a default path
-        # self.folder_path.set('/Users/domchom/Desktop/wave_analysis_testing/kymo')
-        self.file_path_button['command'] = self.get_folder_path
-        self.file_path_button.grid(row = 0, column = 1, padx = 10, sticky = 'W')        
-
-        # box size selection widget
-        self.line_width_entry = ttk.Entry(self, width = 3, textvariable = self.line_width)
-        self.line_width_entry.grid(row = 1, column = 0, padx = 10, sticky = 'E')
-        # create box size label text
-        self.line_width_label = ttk.Label(self, text = 'Line width (pixels)')
-        self.line_width_label.grid(row = 1, column = 1, padx = 10, sticky = 'W')
-
-        # box line selection widget
-        self.bin_shift_entry = ttk.Entry(self, width = 3, textvariable = self.bin_shift)
-        self.bin_shift_entry.grid(row = 2, column = 0, padx = 10, sticky = 'E')
-        # create line shift label text
-        self.bin_shift_label = ttk.Label(self, text = 'Line shift (pixels)')
-        self.bin_shift_label.grid(row = 2, column = 1, padx = 10, sticky = 'W')
-
-        # create group names entry widget
-        self.group_names_entry = ttk.Entry(self, textvariable = self.group_names)
-        self.group_names_entry.grid(row = 7, column = 0, padx = 10, sticky = 'E')
-        # create group names label text
-        self.group_names_label = ttk.Label(self, text = 'Group names')
-        self.group_names_label.grid(row = 7, column = 1, padx = 10, sticky = 'W')
-
-        # create ACF peak threshold entry widget
-        self.acf_peak_thresh_entry = ttk.Entry(self, width = 3, textvariable = self.acf_peak_thresh)
-        self.acf_peak_thresh_entry.grid(row = 5, column = 0, padx = 10, sticky = 'E')
-        self.acf_peak_thresh_label = ttk.Label(self, text = 'ACF peak threshold')
-        self.acf_peak_thresh_label.grid(row = 5, column = 1, padx = 10, sticky = 'W')
+       # ---- VARIABLES ----
+        self.vars = {
+            "analysis_type": tk.StringVar(value="kymograph"),
+            "line_width": tk.IntVar(value=5),
+            "bin_shift": tk.IntVar(value=5),
+            "small_shifts_correction": tk.BooleanVar(value=False),
+            "plot_summary_ACFs": tk.BooleanVar(value=True),
+            "plot_summary_CCFs": tk.BooleanVar(value=True),
+            "plot_summary_peaks": tk.BooleanVar(value=True),
+            "plot_indv_ACFs": tk.BooleanVar(value=True),
+            "plot_indv_CCFs": tk.BooleanVar(value=True),
+            "plot_indv_peaks": tk.BooleanVar(value=True),
+            "acf_peak_thresh": tk.DoubleVar(value=0.1),
+            "ccf_peak_thresh": tk.DoubleVar(value=0.1),
+            "group_names": tk.StringVar(value="DC50,DC104"),
+            "smoothing": tk.BooleanVar(value=True),
+            "folder_path": tk.StringVar(value="/Users/domchom/Desktop/test_kymo"),
+            "calculate_wave_speeds": tk.BooleanVar(value=False),
+            "Ch1_smoothing": tk.BooleanVar(value=True),
+            "Ch2_smoothing": tk.BooleanVar(value=True),
+            "Ch3_smoothing": tk.BooleanVar(value=True),
+            "Ch4_smoothing": tk.BooleanVar(value=True),
+            "CCF_smoothing": tk.BooleanVar(value=True),
+        }
         
-        # create ACF peak threshold entry widget
-        self.ccf_peak_thresh_entry = ttk.Entry(self, width = 3, textvariable = self.ccf_peak_thresh)
-        self.ccf_peak_thresh_entry.grid(row = 6, column = 0, padx = 10, sticky = 'E')
-        self.ccf_peak_thresh_label = ttk.Label(self, text = 'CCF peak threshold')
-        self.ccf_peak_thresh_label.grid(row = 6, column = 1, padx = 10, sticky = 'W')
+        self.rolling = False
+
+        # ---- HELPERS ----
+        def add_entry(row, col, var, label_text, width=3):
+            entry = ttk.Entry(self, width=width, textvariable=var)
+            entry.grid(row=row, column=col, padx=10, sticky="E")
+            label = ttk.Label(self, text=label_text)
+            label.grid(row=row, column=col+1, padx=10, sticky="W")
+            return entry, label
+
+        def add_checkbutton(row, col, var, label_text):
+            checkbox = ttk.Checkbutton(self, variable=var)
+            checkbox.grid(row=row, column=col, padx=10, sticky="E")
+            label = ttk.Label(self, text=label_text)
+            label.grid(row=row, column=col+1, padx=10, sticky="W")
+            return checkbox, label
+
+        def add_smoothing_channel(row, col, name, label_prefix):
+            cb = ttk.Checkbutton(self, variable=self.vars[f"{name}_smoothing"])
+            cb.grid(row=row, column=col, padx=10, sticky="E")
+
+            win_label = ttk.Label(self, text=f"{label_prefix} window size")
+            win_label.grid(row=row, column=col+1, padx=10, sticky="W")
+            win_scale = tk.Scale(self, from_=3, to=101, orient="horizontal", resolution=2)
+            win_scale.set(11)
+            win_scale.grid(row=row, column=col+2, padx=10, pady=5, sticky="W")
+
+            poly_label = ttk.Label(self, text=f"{label_prefix} poly order")
+            poly_label.grid(row=row+1, column=col+1, padx=10, sticky="W")
+            poly_scale = tk.Scale(self, from_=1, to=10, orient="horizontal", resolution=1)
+            poly_scale.set(3)
+            poly_scale.grid(row=row+1, column=col+2, padx=10, sticky="W")
+
+            return cb, win_scale, poly_scale
         
-        # create checkbox for small shift corrections
-        self.small_shifts_correction_checkbox = ttk.Checkbutton(self, variable = self.small_shifts_correction)
-        self.small_shifts_correction_checkbox.grid(row = 11, column = 0, padx = 10, sticky = 'E')
-        self.small_shifts_correction_label = ttk.Label(self, text = 'Small shifts correction')
-        self.small_shifts_correction_label.grid(row = 11, column = 1, padx = 10, sticky = 'W')
+        # ---- ANALYSIS OPTIONS ----
+        analysis_label = ttk.Label(
+            self,
+            text="ANALYSIS OPTIONS",
+            font=("TkDefaultFont", 16, "bold"),
+            anchor="center"
+        )
+        analysis_label.grid(row=0, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="ew")
 
-        # create checkbox for plotting summary ACFs
-        self.plot_summary_ACFs_checkbox = ttk.Checkbutton(self, variable = self.plot_summary_ACFs)
-        self.plot_summary_ACFs_checkbox.grid(row = 8, column = 0, padx = 10, sticky = 'E')
-        self.plot_summary_ACFs_label = ttk.Label(self, text = 'Plot summary ACFs')
-        self.plot_summary_ACFs_label.grid(row = 8, column = 1, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting summary CCFs
-        self.plot_summary_CCFs_checkbox = ttk.Checkbutton(self, variable = self.plot_summary_CCFs)
-        self.plot_summary_CCFs_checkbox.grid(row = 9, column = 0, padx = 10, sticky = 'E')
-        self.plot_summary_CCFs_label = ttk.Label(self, text = 'Plot summary CCFs')
-        self.plot_summary_CCFs_label.grid(row = 9, column = 1, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting summary peaks
-        self.plot_summary_peaks_checkbox = ttk.Checkbutton(self, variable = self.plot_summary_peaks)
-        self.plot_summary_peaks_checkbox.grid(row = 10, column = 0, padx = 10, sticky = 'E')
-        self.plot_summary_peaks_label = ttk.Label(self, text = 'Plot summary peaks')
-        self.plot_summary_peaks_label.grid(row = 10, column = 1, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting individual ACFs
-        self.plot_indv_ACFs_checkbox = ttk.Checkbutton(self, variable = self.plot_indv_ACFs)
-        self.plot_indv_ACFs_checkbox.grid(row = 8, column = 2, padx = 10, sticky = 'E')
-        self.plot_indv_ACFs_label = ttk.Label(self, text = 'Plot individual ACFs')
-        self.plot_indv_ACFs_label.grid(row = 8, column = 3, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting individual CCFs
-        self.plot_indv_CCFs_checkbox = ttk.Checkbutton(self, variable = self.plot_indv_CCFs)
-        self.plot_indv_CCFs_checkbox.grid(row = 9, column = 2, padx = 10, sticky = 'E')
-        self.plot_indv_CCFs_label = ttk.Label(self, text = 'Plot individual CCFs')
-        self.plot_indv_CCFs_label.grid(row = 9, column = 3, padx = 10, sticky = 'W')
-
-        # create checkbox for plotting individual peaks
-        self.plot_indv_peaks_checkbox = ttk.Checkbutton(self, variable = self.plot_indv_peaks)
-        self.plot_indv_peaks_checkbox.grid(row = 10, column = 2, padx = 10, sticky = 'E')
-        self.plot_indv_peaks_label = ttk.Label(self, text = 'Plot individual peaks')
-        self.plot_indv_peaks_label.grid(row = 10, column = 3, padx = 10, sticky = 'W')
-
-        ''' # Removing this for the moment as it is not fully implemented
-        # create checkbox for calculating wave speeds
-        self.calc_wave_speeds_checkbox = ttk.Checkbutton(self, variable = self.calc_wave_speeds)
-        self.calc_wave_speeds_checkbox.grid(row = 10, column = 0, padx = 10, sticky = 'E')
-        self.calc_wave_speeds_label = ttk.Label(self, text = 'Calculate wave speeds')
-        self.calc_wave_speeds_label.grid(row = 10, column = 1, padx = 10, sticky = 'W')'''
+        # ---- FILE SELECTION ----
+        self.file_path_entry = ttk.Entry(self, textvariable=self.vars["folder_path"])
+        self.file_path_entry.grid(row=1, column=0, padx=10, sticky="E")
+        self.file_path_button = ttk.Button(self, text="Select folder", command=self.get_folder_path)
+        self.file_path_button.grid(row=1, column=1, padx=10, sticky="W")
         
-        # create start button
-        self.start_button = ttk.Button(self, text = 'Start analysis')
-        self.start_button['command'] = self.start_analysis
-        self.start_button.grid(row = 16, column = 0, padx = 10, sticky = 'E')
+        # ---- GROUP NAMES ----
+        self.group_names_label = ttk.Label(self, text="Group names")
+        self.group_names_label.grid(row=2, column=1, padx=10, sticky="W")
+        self.group_names_entry = ttk.Entry(self, textvariable=self.vars["group_names"])
+        self.group_names_entry.grid(row=2, column=0, padx=10, sticky="E")
 
-        # create cancel button
-        self.cancel_button = ttk.Button(self, text = 'Cancel')
-        self.cancel_button['command'] = self.cancel_analysis
-        self.cancel_button.grid(row = 16, column = 1, padx = 10, sticky = 'W')
+        # ---- BASIC ENTRIES ----
+        add_entry(3, 0, self.vars["line_width"], "Line width (pixels)")
+        add_entry(4, 0, self.vars["bin_shift"], "Line shift (pixels)")
+        add_entry(5, 0, self.vars["acf_peak_thresh"], "ACF peak threshold")
+        add_entry(6, 0, self.vars["ccf_peak_thresh"], "CCF peak threshold")
+        add_checkbutton(7, 0, self.vars["small_shifts_correction"], "Small shifts correction")
 
+        # ---- SEPARATORS ----
+        ttk.Separator(self, orient="horizontal").grid(row=8, column=0, columnspan=11, sticky="ew", pady=10)
+        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=9, sticky="ns", pady=10)
+
+        # ---- PLOT OPTIONS ----
+        plotting_label = ttk.Label(
+            self,
+            text="PLOT OPTIONS",
+            font=("TkDefaultFont", 16, "bold"),
+            anchor="center"
+        )
+        plotting_label.grid(row=9, column=1, columnspan=3, padx=10, pady=(0, 10), sticky="ew")
+
+        add_checkbutton(10, 0, self.vars["plot_summary_ACFs"], "Plot summary ACFs")
+        add_checkbutton(11, 0, self.vars["plot_summary_CCFs"], "Plot summary CCFs")
+        add_checkbutton(12, 0, self.vars["plot_summary_peaks"], "Plot summary peaks")
+        add_checkbutton(10, 2, self.vars["plot_indv_ACFs"], "Plot individual ACFs")
+        add_checkbutton(11, 2, self.vars["plot_indv_CCFs"], "Plot individual CCFs")
+        add_checkbutton(12, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
+
+        # ---- SMOOTHING OPTIONS ----
+        ttk.Label(self, text="SMOOTHING OPTIONS",
+                  font=("TkDefaultFont", 16, "bold")).grid(row=0, column=5, columnspan=6, padx=10, pady=10, sticky="EW")
+
+        self.smoothing_widgets = {
+            "Ch1": add_smoothing_channel(1, 3, "Ch1", "Ch1"),
+            "Ch2": add_smoothing_channel(3, 3, "Ch2", "Ch2"),
+            "Ch3": add_smoothing_channel(1, 7, "Ch3", "Ch3"),
+            "Ch4": add_smoothing_channel(3, 7, "Ch4", "Ch4"),
+            "CCF": add_smoothing_channel(5, 3, "CCF", "CCF"),
+        }
+        
+        ttk.Label(self, text="Enable smoothing").grid(row=5, column=8, padx=10, sticky="E")
+        ttk.Checkbutton(self, variable=self.vars["smoothing"]).grid(row=5, column=7, padx=10, sticky="E")
+        
+        # ---- BUTTONS ----
+        self.start_button = ttk.Button(self, text="Start analysis", command=self.start_analysis)
+        self.start_button.grid(row=10, column=8, columnspan=2, padx=10, sticky="E")
+
+        self.cancel_button = ttk.Button(self, text="Cancel", command=self.cancel_analysis)
+        self.cancel_button.grid(row=9, column=8, columnspan=2, padx=10, sticky="E")
+
+    # ---- METHODS ----
     def get_folder_path(self):
-        self.folder_path.set(askdirectory())
+        self.vars["folder_path"].set(askdirectory())
 
     def cancel_analysis(self):
-        sys.exit('You have cancelled the analysis')
-    
+        sys.exit("You have cancelled the analysis")
+
     def start_analysis(self):
-        # get the values stored in the widget
-        self.line_width = self.line_width.get()
-        self.group_names = self.group_names.get()
-        self.plot_summary_ACFs = self.plot_summary_ACFs.get()
-        self.plot_summary_CCFs = self.plot_summary_CCFs.get()
-        self.plot_summary_peaks = self.plot_summary_peaks.get()
-        self.plot_indv_ACFs = self.plot_indv_ACFs.get()
-        self.plot_indv_CCFs = self.plot_indv_CCFs.get()
-        self.plot_indv_peaks = self.plot_indv_peaks.get()
-        self.folder_path = self.folder_path.get()
-        self.acf_peak_thresh = self.acf_peak_thresh.get()
-        self.bin_shift = self.bin_shift.get()
-        self.calc_wave_speeds = self.calc_wave_speeds.get()
-        self.small_shifts_correction = self.small_shifts_correction.get()
-        self.ccf_peak_thresh = self.ccf_peak_thresh.get()
+        # Collect values
+        for k, v in self.vars.items():
+            self.vars[k] = v.get()
 
-        self.rolling = False
+        # Group names
+        self.vars["group_names"] = [g.strip() for g in self.vars["group_names"].split(",")]
         
-        # convert group names to list of strings
-        self.group_names = [group_name.strip() for group_name in self.group_names.split(',')]
-
-        # destroy the widget
+        for ch in ["Ch1", "Ch2", "Ch3", "Ch4", "CCF"]:
+            if self.vars[f"{ch}_smoothing"]:
+                self.vars[f"{ch}_window"] = self.smoothing_widgets[ch][1].get()
+                self.vars[f"{ch}_poly_order"] = self.smoothing_widgets[ch][2].get()
+            else:
+                self.vars[f"{ch}_window"] = None
+                self.vars[f"{ch}_poly_order"] = None
+        # Destroy widget
         self.destroy()

@@ -10,7 +10,7 @@ import waveanalysis.plotting as pt
 import waveanalysis.signal_processing as sp
 import waveanalysis.housekeeping.housekeeping_functions as hf
 
-from waveanalysis.image_props.image_bin_calc import create_multi_frame_bin_array
+from waveanalysis.image_props.image_bin_calc import create_multi_frame_bin_array, smooth_signal
 from waveanalysis.image_props.image_to_np_arrays import tiff_to_np_array_multi_frame
 from waveanalysis.image_props.image_properties import get_multi_frame_properties
 from waveanalysis.summarize_save.summarize_images import summarize_image, combine_stats_rolling
@@ -25,7 +25,18 @@ def rolling_workflow(
     acf_peak_thresh: float,
     ccf_peak_thresh: float,
     small_shifts_correction: bool,
-    test: bool = False # for testing purposes
+    test: bool = False, # for testing purposes
+    Ch1_window: int = None,
+    Ch1_poly_order: int = None,
+    Ch2_window: int = None,
+    Ch2_poly_order: int = None,
+    Ch3_window: int = None,
+    Ch3_poly_order: int = None,
+    Ch4_window: int = None,
+    Ch4_poly_order: int = None,
+    CCF_window: int = None,
+    CCF_poly_order: int = None,
+    smoothing: bool = False
 ) -> pd.DataFrame:      
     '''
     This is the workflow for rolling analysis. It processes the image files in the specified folder 
@@ -117,6 +128,24 @@ def rolling_workflow(
                                                                     img_props = img_props_dict
                                                                 )
                 
+                if smoothing:
+                    raw_bin_values = bin_values.copy() # keep a copy of the raw bin values before smoothing
+                else:
+                    raw_bin_values = None
+
+                # smooth the bin values if specified
+                for channel in range(img_props_dict['num_channels']):
+                    for bin in range(num_bins):
+                        signal = bin_values[:, channel, bin]
+                        if channel == 0 and Ch1_window is not None and Ch1_poly_order is not None:
+                            bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch1_window, poly_order=Ch1_poly_order)
+                        elif channel == 1 and Ch2_window is not None and Ch2_poly_order is not None:
+                            bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch2_window, poly_order=Ch2_poly_order)
+                        elif channel == 2 and Ch3_window is not None and Ch3_poly_order is not None:
+                            bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch3_window, poly_order=Ch3_poly_order)
+                        elif channel == 3 and Ch4_window is not None and Ch4_poly_order is not None:
+                            bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch4_window, poly_order=Ch4_poly_order)
+            
                 img_props_dict['num_bins'] = num_bins
                 img_props_dict['num_x_bins'] = num_x_bins
                 img_props_dict['num_y_bins'] = num_y_bins
@@ -186,7 +215,7 @@ def rolling_workflow(
                                     pbar.update(1)
                                     signal1 = bin_values[roll_by*submovie : roll_size + roll_by*submovie, combo[0], bin]
                                     signal2 = bin_values[roll_by*submovie : roll_size + roll_by*submovie, combo[1], bin]
-                                    ccf = sp.calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=roll_size)
+                                    ccf = sp.calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=roll_size, CCF_window=CCF_window, CCF_poly_order=CCF_poly_order)
                                     indv_ccfs[submovie, combo_number, bin] = ccf
                                     
                                     shift = sp.calc_indv_shift(cc_curve=ccf, ccf_peak_thresh=ccf_peak_thresh)

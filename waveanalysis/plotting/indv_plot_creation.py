@@ -4,7 +4,7 @@ import scipy.signal as sig
 import matplotlib.pyplot as plt
 
 def plot_indv_peak_workflow(
-	bin_values: np.ndarray,
+	raw_bin_values: np.ndarray,
 	img_prop_dict: dict,
 	indv_peak_props: dict,
 	num_frames: int
@@ -38,7 +38,7 @@ def plot_indv_peak_workflow(
 			for bin in range(num_bins):
 				pbar.update(1)
 				# Extract the bin values for the current channel and bin
-				to_plot = bin_values[:,channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
+				to_plot = raw_bin_values[:,channel, bin] if analysis_type == 'standard' else raw_bin_values[channel, bin]
 				# Generate and store the figure for the current channel and bin
 				indv_peak_figs[f'Ch{channel + 1} Bin {bin + 1} Peak Props'] = return_indv_peak_prop_figure(
 					bin_signal=to_plot,
@@ -61,7 +61,7 @@ def return_indv_peak_prop_figure(
 	Space saving function to return individual peak property figures
 	'''
 	# Extract peak properties from the dictionary
-	smoothed_signal = prop_dict['smoothed']
+	signal = prop_dict['signal']
 	peaks = prop_dict['peaks']
 	proms = prop_dict['proms']
 	heights = prop_dict['heights']
@@ -73,7 +73,7 @@ def return_indv_peak_prop_figure(
 	fig, ax = plt.subplots()
 	x_axis = np.arange(0, num_frames) * frame_interval
 	ax.plot(x_axis, bin_signal, color = 'tab:gray', label = 'raw signal')
-	ax.plot(x_axis, smoothed_signal, color = 'tab:cyan', label = 'smoothed signal')
+	ax.plot(x_axis, signal, color = 'tab:cyan', label = 'smoothed signal')
 
 	# Plot each peak width and amplitude
 	if not np.isnan(peaks).any():
@@ -86,8 +86,8 @@ def return_indv_peak_prop_figure(
 					linestyle = '-')
 			# Plot the peak amplitude
 			ax.vlines(peaks[i] * frame_interval, 
-					smoothed_signal[peaks[i]]-proms[i],
-					smoothed_signal[peaks[i]], 
+					bin_signal[peaks[i]]-proms[i],
+					bin_signal[peaks[i]], 
 					color='tab:purple', 
 					linestyle = '-')
 			# Plot the peak offset
@@ -105,8 +105,8 @@ def return_indv_peak_prop_figure(
 				linestyle = '-',
 				label='FWHM')
 		ax.vlines(peaks[0] * frame_interval, 
-				smoothed_signal[peaks[0]]-proms[0],
-				smoothed_signal[peaks[0]], 
+				bin_signal[peaks[0]]-proms[0],
+				bin_signal[peaks[0]], 
 				color='tab:purple', 
 				linestyle = '-',
 				label = 'Peak amplitude')
@@ -127,6 +127,7 @@ def return_indv_peak_prop_figure(
 	return fig
 
 def plot_indv_acf_workflow(
+    raw_bin_values: np.ndarray,
 	bin_values: np.ndarray,
 	indv_acfs: np.ndarray,
 	img_parameters_dict: dict,
@@ -163,10 +164,13 @@ def plot_indv_acf_workflow(
 			for bin in range(num_bins):
 				pbar.update(1) 
 				# Extract the bin values for the current channel and bin
+				if raw_bin_values is not None:
+					raw_to_plot = raw_bin_values[:,channel, bin] if analysis_type == 'standard' else raw_bin_values[channel, bin]
 				to_plot = bin_values[:,channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
 				# Generate and store the figure for the current channel and bin
 				indv_acf_plots[f'Ch{channel + 1} Bin {bin + 1} ACF'] = return_indv_acf_figure(
-					raw_signal=to_plot, 
+					raw_to_plot = raw_to_plot if raw_bin_values is not None else None,
+					signal=to_plot, 
 					acf_curve=indv_acfs[channel, bin], 
 					Ch_name=f'Ch{channel + 1}', 
 					period=indv_periods[channel, bin],
@@ -177,7 +181,8 @@ def plot_indv_acf_workflow(
 	return indv_acf_plots
 
 def return_indv_acf_figure(
-	raw_signal: np.ndarray, 
+    raw_to_plot: np.ndarray,
+	signal: np.ndarray, 
 	acf_curve: np.ndarray, 
 	Ch_name: str, 
 	period: int,
@@ -190,9 +195,11 @@ def return_indv_acf_figure(
 	# Create subplots for raw signal and autocorrelation curve
 	fig, (ax1, ax2) = plt.subplots(2, 1)
 	x_axis = np.arange(0, num_frames) * frame_interval
-	# Plot the raw signal and autocorrelation curve
-	ax1.plot(x_axis, raw_signal)
-	ax1.set_xlabel(f'{Ch_name} Raw Signal')
+	# Plot the signal and autocorrelation curve
+	ax1.plot(x_axis, signal) 
+	if raw_to_plot is not None:
+		ax1.plot(x_axis, raw_to_plot)
+	ax1.set_xlabel(f'{Ch_name} Signal')
 	ax1.set_ylabel('Mean bin px value')
 	# Plot the autocorrelation curve
 	ax2.plot(np.arange(-num_frames + 1, num_frames) * frame_interval, acf_curve)

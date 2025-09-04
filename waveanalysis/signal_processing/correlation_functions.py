@@ -3,7 +3,7 @@ from scipy import signal as sig
 
 def calc_indv_ACF_workflow(
     bin_values: np.ndarray,
-    img_props: dict
+    img_props: dict,
 ) -> np.ndarray: 
     '''
     Calculate individual Auto-Correlation Function (ACF) workflow.
@@ -29,7 +29,7 @@ def calc_indv_ACF_workflow(
     for channel in range(num_channels):
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
-            signal = bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
+            signal = bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin] 
             # Calculate and store the individual ACF for the current channel and bin
             acf_curve = calc_indv_ACF(signal=signal, num_frames=num_frames, peak_thresh=acf_peak_thresh)
             indv_acfs[channel, bin] = acf_curve
@@ -105,7 +105,9 @@ def calc_indv_period(
 
 def calc_indv_CCF_workflow(
     bin_values: np.ndarray,
-    img_props: dict
+    img_props: dict,
+    CCF_window: int,
+    CCF_poly_order: int
 ) -> np.ndarray:
     '''
     Calculate individual cross-correlation functions (CCFs) for each combination of channels and bins.
@@ -132,13 +134,13 @@ def calc_indv_CCF_workflow(
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
             if analysis_type == 'standard':
-                signal1 = sig.savgol_filter(bin_values[:, combo[0], bin], window_length=11, polyorder=3)
-                signal2 = sig.savgol_filter(bin_values[:, combo[1], bin], window_length=11, polyorder=3)
+                signal1 = bin_values[:, combo[0], bin] #sig.savgol_filter(bin_values[:, combo[0], bin], window_length=11, polyorder=3)
+                signal2 = bin_values[:, combo[1], bin] #sig.savgol_filter(bin_values[:, combo[1], bin], window_length=11, polyorder=3)
             else:
                 signal1 = sig.savgol_filter(bin_values[combo[0], bin], window_length=11, polyorder=3)
                 signal2 = sig.savgol_filter(bin_values[combo[1], bin], window_length=11, polyorder=3)
             # Calculate and store the individual CCF for the current combination of channels and bin
-            ccf = calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=num_frames)
+            ccf = calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=num_frames, CCF_window=CCF_window, CCF_poly_order=CCF_poly_order)
             indv_ccfs[combo_number, bin] = ccf
 
     return indv_ccfs
@@ -147,6 +149,8 @@ def calc_indv_CCF(
     signal1: np.ndarray,
     signal2: np.ndarray,
     num_frames: int,
+    CCF_window: int,
+    CCF_poly_order: int
 ) -> np.ndarray:
     '''
     Space saving function to calculate individual cross-correlation functions (CCFs) for each combination of channels and bins.
@@ -164,7 +168,8 @@ def calc_indv_CCF(
         cc_curve = np.correlate(corr_signal1, corr_signal2, mode='full')
 
         # Normalize the cross-correlation curve
-        cc_curve = sig.savgol_filter(cc_curve, window_length=11, polyorder=3)
+        if CCF_window != None and CCF_poly_order != None:
+            cc_curve = sig.savgol_filter(cc_curve, window_length=CCF_window, polyorder=CCF_poly_order)
         cc_curve = cc_curve / (num_frames * signal1.std() * signal2.std())
         # Find peaks in the cross-correlation curve
         peaks, _ = sig.find_peaks(cc_curve, prominence=0.1)
