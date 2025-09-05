@@ -184,11 +184,33 @@ def calc_indv_peak_props_rolling(signal: np.ndarray) -> tuple:
         valid_offsets = peak_offsets[valid_indices]
         # Calculate the mean of valid peak offsets
         mean_offset = np.nanmean(valid_offsets)
+        
+        # --- Calculate peak areas relative to local baseline (trough) ---
+        peak_areas = []
+        for i in range(len(peaks)):
+            left = left_bases[i]
+            right = right_bases[i]
+            if np.isnan(left) or np.isnan(right):
+                peak_areas.append(np.nan)
+                continue
+            left = int(np.floor(left))
+            right = int(np.ceil(right))
+            
+            # Determine local baseline (trough) under the peak
+            baseline = np.min(signal[left:right+1])
+            
+            # Subtract baseline from signal to get area relative to it
+            auc_peak = np.trapz(signal[left:right+1] - baseline)
+            peak_areas.append(auc_peak)
+
+        mean_area = np.nanmean(peak_areas)
+        
     else:
         # If no peaks detected, return NaNs
         mean_width = np.nan
         mean_max = np.nan
         mean_min = np.nan
         mean_offset = np.nan
+        mean_area = np.nan
 
-    return mean_width, mean_max, mean_min, mean_offset
+    return mean_width, mean_max, mean_min, mean_offset, mean_area

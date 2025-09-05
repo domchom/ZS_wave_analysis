@@ -177,6 +177,7 @@ def rolling_workflow(
                 indv_peak_maxs = np.zeros(shape=(num_submovies, num_channels, num_bins))
                 indv_peak_mins = np.zeros(shape=(num_submovies, num_channels, num_bins))
                 indv_peak_offsets = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_peak_areas = np.zeros(shape=(num_submovies, num_channels, num_bins))
 
                 its = num_submovies*num_channels*num_x_bins*num_y_bins
                 with tqdm(total = its, miniters=its/100) as pbar:
@@ -187,7 +188,7 @@ def rolling_workflow(
                                 pbar.update(1)
                                 signal = sig.savgol_filter(bin_values[roll_by*submovie : roll_size + roll_by*submovie, channel, bin], window_length=11, polyorder=2)
 
-                                mean_width, mean_max, mean_min, mean_offset = sp.calc_indv_peak_props_rolling(signal=signal)
+                                mean_width, mean_max, mean_min, mean_offset, mean_area = sp.calc_indv_peak_props_rolling(signal=signal)
 
                                 # Store peak measurements for each bin in each channel
                                 indv_peak_widths[submovie, channel, bin] = mean_width
@@ -196,6 +197,7 @@ def rolling_workflow(
                                 indv_peak_offsets[submovie, channel, bin] = mean_offset
                                 indv_peak_amps = indv_peak_maxs - indv_peak_mins
                                 indv_peak_rel_amps = indv_peak_amps / indv_peak_mins
+                                indv_peak_areas[submovie, channel, bin] = mean_area
 
                 channel_combos = hf.get_channel_combos(num_channels=num_channels)
                 num_combos = len(channel_combos)
@@ -240,7 +242,8 @@ def rolling_workflow(
                                 'Peak Width': indv_peak_widths,
                                 'Peak Max': indv_peak_maxs,
                                 'Peak Min': indv_peak_mins,
-                                'Peak Offset': indv_peak_offsets
+                                'Peak Offset': indv_peak_offsets,
+                                'Peak Area': indv_peak_areas
                 }
 
                 # add shifts to the dictionary if there are multiple channels
