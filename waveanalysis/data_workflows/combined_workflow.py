@@ -231,7 +231,7 @@ def combined_workflow(
                 indv_periods = sp.calc_indv_period_workflow(acf_curve=indv_acfs, img_props=img_props_dict)
 
                 # Calculate the peak properties
-                indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props_dict)
+                indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props_dict)
                 indv_peak_amps = indv_peak_maxs - indv_peak_mins
                 indv_peak_rel_amps = indv_peak_amps / indv_peak_mins
                 
@@ -254,6 +254,7 @@ def combined_workflow(
                                 'Peak Max': indv_peak_maxs,
                                 'Peak Min': indv_peak_mins,
                                 'Peak Offset': indv_peak_offsets,
+                                'Peak Area': indv_peak_areas
                                 }    
                 
                 # add shifts to the dictionary if there are multiple channels

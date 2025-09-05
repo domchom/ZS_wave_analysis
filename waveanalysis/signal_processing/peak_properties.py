@@ -33,6 +33,7 @@ def calc_indv_peak_props_workflow(
     indv_peak_maxs = np.zeros(shape=(num_channels, num_bins))
     indv_peak_mins = np.zeros(shape=(num_channels, num_bins))
     indv_peak_offsets = np.zeros(shape=(num_channels, num_bins))
+    indv_peak_areas = np.zeros(shape=(num_channels, num_bins))
     indv_peak_props = {}
 
     # Loop through each channel and bin
@@ -45,7 +46,7 @@ def calc_indv_peak_props_workflow(
             # If peaks detected, calculate properties, otherwise return NaNs
             if len(peaks) > 0:
                 # Calculate the peak properties
-                widths, heights, leftIndex, rightIndex = sig.peak_widths(signal, peaks, rel_height=0.5)
+                widths, heights, leftWidthIndex, rightWidthIndex = sig.peak_widths(signal, peaks, rel_height=0.5)
                 proms, _, _ = sig.peak_prominences(signal, peaks)
 
                 # Calculate the mean of the peak widths, maximums, and minimums
@@ -55,7 +56,7 @@ def calc_indv_peak_props_workflow(
 
                 # calculate the left and right bases of the peaks, then midpoints and peak offsets
                 _, _, left_bases, right_bases = sig.peak_widths(signal, peaks, rel_height=.99)
-                midpoints = (leftIndex + rightIndex) / 2
+                midpoints = (leftWidthIndex + rightWidthIndex) / 2
                 peak_offsets = peaks - midpoints
 
                 # Check if one peak entirely encompasses another
@@ -75,6 +76,27 @@ def calc_indv_peak_props_workflow(
 
                 # Calculate the mean of valid peak offsets
                 mean_offset = np.nanmean(valid_offsets)
+                
+                # --- Calculate peak areas relative to local baseline (trough) ---
+                peak_areas = []
+                for i in range(len(peaks)):
+                    left = left_bases[i]
+                    right = right_bases[i]
+                    if np.isnan(left) or np.isnan(right):
+                        peak_areas.append(np.nan)
+                        continue
+                    left = int(np.floor(left))
+                    right = int(np.ceil(right))
+                    
+                    # Determine local baseline (trough) under the peak
+                    baseline = np.min(signal[left:right+1])
+                    
+                    # Subtract baseline from signal to get area relative to it
+                    auc_peak = np.trapz(signal[left:right+1] - baseline)
+                    peak_areas.append(auc_peak)
+
+                mean_area = np.nanmean(peak_areas)
+                
             else:
                 # If no peaks detected, return NaNs
                 mean_width = np.nan
@@ -84,34 +106,39 @@ def calc_indv_peak_props_workflow(
                 peaks = np.nan
                 proms = np.nan 
                 heights = np.nan
-                leftIndex = np.nan
-                rightIndex = np.nan
+                leftWidthIndex = np.nan
+                rightWidthIndex = np.nan
                 midpoints = np.nan
                 peak_offsets = np.nan
                 left_bases = np.nan
                 right_bases = np.nan
+                peak_areas = np.nan
+                mean_area = np.nan
 
             # Store the mean peak properties in the arrays
             indv_peak_widths[channel, bin] = mean_width
             indv_peak_maxs[channel, bin] = mean_max
             indv_peak_mins[channel, bin] = mean_min
             indv_peak_offsets[channel, bin] = mean_offset
+            indv_peak_areas[channel, bin] = mean_area  
 
             # Store the individual peak properties in the dictionary
             indv_peak_props[f'Ch {channel} Bin {bin}'] = {'signal': signal, 
                                                                 'peaks': peaks,
                                                                 'proms': proms, 
                                                                 'heights': heights, 
-                                                                'leftIndex': leftIndex, 
-                                                                'rightIndex': rightIndex,
+                                                                'leftWidthIndex': leftWidthIndex, 
+                                                                'rightWidthIndex': rightWidthIndex,
                                                                 'midpoints': midpoints,
                                                                 'peak_offsets': peak_offsets,
                                                                 'left_base': left_bases,
-                                                                'right_base': right_bases}
+                                                                'right_base': right_bases,
+                                                                'peak_areas': peak_areas
+                                                                }
                         
                         # TODO: rename the keys to be more descriptive
     
-    return indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props
+    return indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas
 
 def calc_indv_peak_props_rolling(signal: np.ndarray) -> tuple:
     '''
@@ -130,7 +157,7 @@ def calc_indv_peak_props_rolling(signal: np.ndarray) -> tuple:
     # If peaks detected, calculate properties, otherwise return NaNs
     if len(peaks) > 0:
         # Calculate the peak properties
-        widths, heights, leftIndex, rightIndex = sig.peak_widths(signal, peaks, rel_height=0.5)
+        widths, heights, leftWidthIndex, rightWidthIndex = sig.peak_widths(signal, peaks, rel_height=0.5)
         proms, _, _ = sig.peak_prominences(signal, peaks)
         # Calculate the mean of the peak widths, maximums, and minimums
         mean_width = np.mean(widths, axis=0)
@@ -139,7 +166,7 @@ def calc_indv_peak_props_rolling(signal: np.ndarray) -> tuple:
 
         # calculate the left and right bases of the peaks, then midpoints and peak offsets
         _, _, left_bases, right_bases = sig.peak_widths(signal, peaks, rel_height=.99)
-        midpoints = (leftIndex + rightIndex) / 2
+        midpoints = (leftWidthIndex + rightWidthIndex) / 2
         peak_offsets = peaks - midpoints
         # Check if one peak entirely encompasses another
         for i in range(len(peaks)):

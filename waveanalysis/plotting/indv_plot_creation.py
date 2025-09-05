@@ -65,23 +65,43 @@ def return_indv_peak_prop_figure(
 	peaks = prop_dict['peaks']
 	proms = prop_dict['proms']
 	heights = prop_dict['heights']
-	leftIndex = prop_dict['leftIndex']
-	rightIndex = prop_dict['rightIndex']
+	leftWidthIndex = prop_dict['leftWidthIndex']
+	rightWidthIndex = prop_dict['rightWidthIndex']
 	midpoints = prop_dict['midpoints']
+	left_bases = prop_dict['left_base']
+	right_bases = prop_dict['right_base']
 
 	# Create the figure and plot raw and smoothed signals
 	fig, ax = plt.subplots()
 	x_axis = np.arange(0, num_frames) * frame_interval
 	ax.plot(x_axis, bin_signal, color = 'tab:gray', label = 'raw signal')
 	ax.plot(x_axis, signal, color = 'tab:cyan', label = 'smoothed signal')
-
+ 
 	# Plot each peak width and amplitude
 	if not np.isnan(peaks).any():
 		for i in range(peaks.shape[0]):
-			# Plot the peal width
+
+			left = left_bases[i]
+			right = right_bases[i]
+			if not np.isnan(left) and not np.isnan(right):
+				left = int(np.floor(left))
+				right = int(np.ceil(right))
+
+				# Local baseline (trough) for the peak
+				baseline = np.min(signal[left:right+1])
+
+				# Shade area under the peak relative to baseline
+				ax.fill_between(
+				x_axis[left:right+1], 
+				baseline, 
+				signal[left:right+1], 
+				color='tab:yellow', alpha=0.3
+				)
+
+			# Plot the peak width
 			ax.hlines(heights[i], 
-					leftIndex[i] * frame_interval, 
-					rightIndex[i] * frame_interval, 
+					leftWidthIndex[i] * frame_interval, 
+					rightWidthIndex[i] * frame_interval, 
 					color='tab:olive', 
 					linestyle = '-')
 			# Plot the peak amplitude
@@ -99,8 +119,8 @@ def return_indv_peak_prop_figure(
 
 		# Plot the legend for the first peak
 		ax.hlines(heights[0], 
-				leftIndex[0] * frame_interval, 
-				rightIndex[0] * frame_interval, 
+				leftWidthIndex[0] * frame_interval, 
+				rightWidthIndex[0] * frame_interval, 
 				color='tab:olive', 
 				linestyle = '-',
 				label='FWHM')
