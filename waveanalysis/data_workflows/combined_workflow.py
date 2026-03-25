@@ -14,6 +14,8 @@ from waveanalysis.image_props.image_to_np_arrays import tiff_to_np_array_multi_f
 from waveanalysis.image_props.image_properties import get_multi_frame_properties, get_single_frame_properties
 from waveanalysis.summarize_save.save_stats import save_parameter_means_to_csv, get_mean_CCF_values, get_indv_CCF_values, save_ccf_values_to_csv
 from waveanalysis.summarize_save.summarize_images import summarize_image, combine_stats_for_image_kymo_standard
+import pickle
+import json
 
 def combined_workflow(
     folder_path: str,
@@ -181,7 +183,7 @@ def combined_workflow(
                             elif channel == 3 and Ch4_window is not None and Ch4_poly_order is not None:
                                 bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch4_window, poly_order=Ch4_poly_order)
 
-                    # np.save(f'/Users/domchom/Desktop/{file_name}_bin_values.npy', bin_values)
+                    np.save(f'/Users/domchom/Desktop/{file_name}_bin_values.npy', bin_values)
                                     
                 else: # analysis_type == 'kymograph'
                     image_array = tiff_to_np_array_single_frame(image_path)
@@ -215,6 +217,9 @@ def combined_workflow(
                 # store the number of bins and the bin values in the image properties dictionary
                 img_props_dict['num_bins'] = num_bins
                 img_props_dict['bin_values'] = bin_values
+                
+                with open(f'/Users/domchom/Desktop/{file_name}_img_props_dict.json', 'w') as f:
+                    json.dump(img_props_dict, f, default=str)
 
                 # if user entered group name(s) into GUI, match the group for this file. If no match, keep set to None
                 name_wo_ext = file_name.rsplit(".",1)[0]
@@ -232,6 +237,10 @@ def combined_workflow(
 
                 # Calculate the peak properties
                 indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props_dict)
+                
+                #with open(f'/Users/domchom/Desktop/{file_name}peak_props.pkl', 'wb') as f:
+                #    pickle.dump(indv_peak_props, f)
+                
                 indv_peak_amps = indv_peak_maxs - indv_peak_mins
                 indv_peak_rel_amps = indv_peak_amps / indv_peak_mins
                 
@@ -239,6 +248,10 @@ def combined_workflow(
                 if img_props_dict['num_channels'] > 1:
                     indv_ccfs = sp.calc_indv_CCF_workflow(bin_values=bin_values, img_props=img_props_dict, CCF_window=CCF_window, CCF_poly_order=CCF_poly_order)
                     indv_shifts = sp.calc_indv_shift_workflow(indv_ccfs=indv_ccfs, indv_periods=indv_periods, img_props=img_props_dict, small_shifts_correction=small_shifts_correction, ccf_peak_thresh=ccf_peak_thresh)
+                    
+                    # Save individual CCFs to pickle file
+                    # with open(f'/Users/domchom/Desktop/{file_name}_indv_ccfs.pkl', 'wb') as f:
+                    #    pickle.dump(indv_ccfs, f)
 
                 # adjust the different waves properties to be the use the frame interval rather than the number of frames
                 indv_periods = indv_periods * img_props_dict['frame_interval']

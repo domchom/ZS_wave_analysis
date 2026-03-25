@@ -26,7 +26,18 @@ def default_log_params():
         'Frame Interval': [],
         'Pixel Size': [],
         'Small Shifts Correction': True,
-        'CCF Peak Prominence': 0.1
+        'CCF Peak Prominence': 0.1,
+        "Ch1 Window": 11,
+        "Ch1 Poly Order": 3,
+        "Ch2 Window": 11,
+        "Ch2 Poly Order": 3,
+        "Ch3 Window": 11,
+        "Ch3 Poly Order": 3,
+        "Ch4 Window": 11,
+        "Ch4 Poly Order": 3,
+        "CCF Window": 11,
+        "CCF Poly Order": 3,
+        "Smoothing": True,
     }
 
 def test_kymo_workflow(default_log_params):
@@ -52,6 +63,17 @@ def test_kymo_workflow(default_log_params):
         plot_indv_peaks=default_log_params['Plot Individual Peaks'],
         calc_wave_speeds=default_log_params['Calc Wave Speeds'],
         plot_wave_speeds=default_log_params['Plot Wave Speeds'],
+        Ch1_window = default_log_params['Ch1 Window'],
+        Ch1_poly_order = default_log_params['Ch1 Poly Order'],
+        Ch2_window = default_log_params['Ch2 Window'],
+        Ch2_poly_order = default_log_params['Ch2 Poly Order'],
+        Ch3_window = default_log_params['Ch3 Window'],
+        Ch3_poly_order = default_log_params['Ch3 Poly Order'],
+        Ch4_window = default_log_params['Ch4 Window'],
+        Ch4_poly_order = default_log_params['Ch4 Poly Order'],
+        CCF_window = default_log_params['CCF Window'],
+        CCF_poly_order = default_log_params['CCF Poly Order'],
+        smoothing = default_log_params['Smoothing'],
         test=True
     )
     pd.testing.assert_frame_equal(

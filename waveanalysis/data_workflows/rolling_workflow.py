@@ -275,7 +275,8 @@ def rolling_workflow(
                     img_parameters_dict=img_parameters_dict,
                     indv_ccfs=indv_ccfs if num_channels > 1 else None
                 )
-                summary_df.to_csv(f'{im_save_path}/{name_wo_ext}_summary.csv', index = False)
+                if not test:
+                    summary_df.to_csv(f'{im_save_path}/{name_wo_ext}_summary.csv', index = False)
 
                 # make and save the summary plot for rolling data
                 summary_plots = pt.plot_rolling_summary(

@@ -14,13 +14,13 @@ def default_CCFs():
      
 def test_CCF_calc(default_CCFs):
     default_bin_values = [
-        np.load('tests/assets/standard/numpy_arrays/standard_1_Group1.tif_bin_values.npy'),
-        np.load('tests/assets/standard/numpy_arrays/standard_1_Group2.tif_bin_values.npy')
+        np.load('tests/assets/standard/numpy_arrays/1_Group1.tif_bin_values.npy'),
+        np.load('tests/assets/standard/numpy_arrays/1_Group2.tif_bin_values.npy')
         ]
 
     default_dicts = [
-        'tests/assets/standard/dicts_lists/1_Group1_img_props.json',
-        'tests/assets/standard/dicts_lists/1_Group2_img_props.json'
+        'tests/assets/standard/dicts_lists/1_Group1.tif_img_props_dict.json',
+        'tests/assets/standard/dicts_lists/1_Group2.tif_img_props_dict.json'
     ]
 
     for bin_values, ccf_file, img_props_file in zip(default_bin_values, default_CCFs, default_dicts):
@@ -29,7 +29,7 @@ def test_CCF_calc(default_CCFs):
             known_results = pickle.load(f)
         with open(img_props_file, 'r') as file:
             img_props_dict = json.load(file)
-        exp_results = calc_indv_CCF_workflow(bin_values, img_props_dict)
+        exp_results = calc_indv_CCF_workflow(bin_values, img_props_dict, CCF_window=11, CCF_poly_order=3)
 
         np.testing.assert_allclose(
             known_results,
