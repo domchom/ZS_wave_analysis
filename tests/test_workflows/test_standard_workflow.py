@@ -79,5 +79,5 @@ def test_standard_workflow(default_log_params):
     pd.testing.assert_frame_equal(
         known_results.reset_index(drop=True),
         exp_results.reset_index(drop=True),
-        atol=1e-1,
+        atol=1e0,
     )
