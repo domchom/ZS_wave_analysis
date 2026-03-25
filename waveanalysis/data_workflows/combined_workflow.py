@@ -181,7 +181,7 @@ def combined_workflow(
                             elif channel == 3 and Ch4_window is not None and Ch4_poly_order is not None:
                                 bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch4_window, poly_order=Ch4_poly_order)
 
-                    np.save(f'/Users/domchom/Desktop/{file_name}_bin_values.npy', bin_values)
+                    # np.save(f'/Users/domchom/Desktop/{file_name}_bin_values.npy', bin_values)
                                     
                 else: # analysis_type == 'kymograph'
                     image_array = tiff_to_np_array_single_frame(image_path)
