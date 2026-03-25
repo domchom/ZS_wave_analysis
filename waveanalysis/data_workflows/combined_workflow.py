@@ -216,8 +216,8 @@ def combined_workflow(
                 img_props_dict['num_bins'] = num_bins
                 img_props_dict['bin_values'] = bin_values
                 
-                with open(f'/Users/domchom/Desktop/{file_name}_img_props_dict.json', 'w') as f:
-                    json.dump(img_props_dict, f, default=str)
+                # with open(f'/Users/domchom/Desktop/{file_name}_img_props_dict.json', 'w') as f:
+                #    json.dump(img_props_dict, f, default=str)
 
                 # if user entered group name(s) into GUI, match the group for this file. If no match, keep set to None
                 name_wo_ext = file_name.rsplit(".",1)[0]
