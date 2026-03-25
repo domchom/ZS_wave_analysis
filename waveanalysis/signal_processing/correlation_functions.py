@@ -137,8 +137,8 @@ def calc_indv_CCF_workflow(
                 signal1 = bin_values[:, combo[0], bin] #sig.savgol_filter(bin_values[:, combo[0], bin], window_length=11, polyorder=3)
                 signal2 = bin_values[:, combo[1], bin] #sig.savgol_filter(bin_values[:, combo[1], bin], window_length=11, polyorder=3)
             else:
-                signal1 = sig.savgol_filter(bin_values[combo[0], bin], window_length=11, polyorder=3)
-                signal2 = sig.savgol_filter(bin_values[combo[1], bin], window_length=11, polyorder=3)
+                signal1 = bin_values[combo[0], bin] #signal1 = sig.savgol_filter(bin_values[combo[0], bin], window_length=11, polyorder=3)
+                signal2 = bin_values[combo[1], bin] #signal2 = sig.savgol_filter(bin_values[combo[1], bin], window_length=11, polyorder=3)
             # Calculate and store the individual CCF for the current combination of channels and bin
             ccf = calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=num_frames, CCF_window=CCF_window, CCF_poly_order=CCF_poly_order)
             indv_ccfs[combo_number, bin] = ccf
