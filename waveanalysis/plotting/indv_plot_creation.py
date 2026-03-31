@@ -216,9 +216,9 @@ def return_indv_acf_figure(
 	fig, (ax1, ax2) = plt.subplots(2, 1)
 	x_axis = np.arange(0, num_frames) * frame_interval
 	# Plot the signal and autocorrelation curve
-	ax1.plot(x_axis, signal) 
 	if raw_to_plot is not None:
 		ax1.plot(x_axis, raw_to_plot)
+	ax1.plot(x_axis, signal) 
 	ax1.set_xlabel(f'{Ch_name} Signal')
 	ax1.set_ylabel('Mean bin px value')
 	# Plot the autocorrelation curve
