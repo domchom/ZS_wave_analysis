@@ -4,7 +4,8 @@ import matplotlib.pyplot as plt
 def plot_rolling_summary(
     num_channels: int,
     fullmovie_summary: pd.DataFrame,
-    channel_combos: list[tuple[int, int]]
+    channel_combos: list[tuple[int, int]],
+    dark_plots: bool = False
 ):
     '''
     Generate rolling summary plots for wave analysis.
@@ -25,12 +26,13 @@ def plot_rolling_summary(
 
     # Generate the rolling mean plots for the mean period
     for channel in range(num_channels):
-        rolling_mean_periods[f'Ch {channel + 1} Period'] = return_mean_periods_shifts_props_plots(
+        rolling_mean_periods[f'Ch{channel + 1} Period'] = return_mean_periods_shifts_props_plots(
             independent_variable='Submovie',
             dependent_variable=f'Ch {channel + 1} Mean Period',
             dependent_error=f'Ch {channel + 1} StdDev Period',
             y_label=f'Ch {channel + 1} Mean ± StdDev Period (seconds)',
-            fullmovie_summary=fullmovie_summary
+            fullmovie_summary=fullmovie_summary,
+            dark_plots=dark_plots
             )
             
     # Update the dictionary with the rolling mean plots for the mean period
@@ -44,7 +46,8 @@ def plot_rolling_summary(
                 dependent_variable=f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift',
                 dependent_error=f'Ch{combo[0]+1}-Ch{combo[1]+1} StdDev Shift',
                 y_label=f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean ± StdDev Shift (seconds)',
-                fullmovie_summary=fullmovie_summary
+                fullmovie_summary=fullmovie_summary,
+                dark_plots=dark_plots
                 )
             
     # Update the dictionary with the rolling mean plots for the mean shifts
@@ -52,13 +55,14 @@ def plot_rolling_summary(
 
     # Generate the rolling mean plots for the peak properties
     for channel in range(num_channels):
-        for prop_name in ['Width', 'Max', 'Min', 'Amp']:
+        for prop_name in ['Width', 'Max', 'Min', 'Amp', 'Rel Amp', 'Offset', 'Area']:
             rolling_mean_peak_props[f'Ch{channel+1} {prop_name}'] = return_mean_periods_shifts_props_plots(
                 independent_variable='Submovie',
                 dependent_variable=f'Ch {channel+1} Mean Peak {prop_name}',
                 dependent_error=f'Ch {channel+1} StdDev Peak {prop_name}',
                 y_label=f'Ch {channel+1} Mean ± StdDev Peak {prop_name}',
-                fullmovie_summary=fullmovie_summary
+                fullmovie_summary=fullmovie_summary,
+                dark_plots=dark_plots
                 )
                     
     # Update the dictionary with the rolling mean plots for the peak properties
@@ -71,28 +75,31 @@ def return_mean_periods_shifts_props_plots(
     dependent_variable: str, 
     dependent_error: str, 
     y_label: str,
-    fullmovie_summary: pd.DataFrame
+    fullmovie_summary: pd.DataFrame,
+    dark_plots: bool = False
 ) -> plt.Figure:    
     '''
     Space saving function to generate the rolling summary plots
     '''      
-    fig, ax = plt.subplots()
+    style = 'dark_background' if dark_plots else 'default'
+    with plt.style.context(style):
+        fig, ax = plt.subplots()
 
-    # plot the dataframe
-    ax.plot(fullmovie_summary[independent_variable], 
-            fullmovie_summary[dependent_variable])
-    
-    # fill between the ± standard deviation of the dependent variable
-    ax.fill_between(x = fullmovie_summary[independent_variable],
-                    y1 = fullmovie_summary[dependent_variable] - fullmovie_summary[dependent_error],
-                    y2 = fullmovie_summary[dependent_variable] + fullmovie_summary[dependent_error],
-                    color = 'blue',
-                    alpha = 0.25)
+        # plot the dataframe
+        ax.plot(fullmovie_summary[independent_variable], 
+                fullmovie_summary[dependent_variable])
+        
+        # fill between the ± standard deviation of the dependent variable
+        ax.fill_between(x = fullmovie_summary[independent_variable],
+                        y1 = fullmovie_summary[dependent_variable] - fullmovie_summary[dependent_error],
+                        y2 = fullmovie_summary[dependent_variable] + fullmovie_summary[dependent_error],
+                        color = 'blue' if not dark_plots else 'orange',
+                        alpha = 0.25)
 
-    # set axis labels
-    ax.set_xlabel('Frame Number')
-    ax.set_ylabel(y_label)
-    ax.set_title(f'{y_label} over time')
-    plt.close(fig)
+        # set axis labels
+        ax.set_xlabel('Frame Number')
+        ax.set_ylabel(y_label)
+        ax.set_title(f'{y_label} over time')
+        plt.close(fig)
 
     return fig

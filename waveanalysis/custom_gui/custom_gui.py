@@ -24,6 +24,7 @@ class BaseGUI(tk.Tk):
             "plot_indv_ACFs": tk.BooleanVar(value=False),
             "plot_indv_CCFs": tk.BooleanVar(value=False),
             "plot_indv_peaks": tk.BooleanVar(value=True),
+            "dark_plots": tk.BooleanVar(value=False),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
             "group_names": tk.StringVar(value="DC50,DC104"),
@@ -119,6 +120,7 @@ class BaseGUI(tk.Tk):
         add_checkbutton(10, 2, self.vars["plot_indv_ACFs"], "Plot individual ACFs")
         add_checkbutton(11, 2, self.vars["plot_indv_CCFs"], "Plot individual CCFs")
         add_checkbutton(12, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
+        add_checkbutton(10, 4, self.vars["dark_plots"], "Dark plots")
 
         # ---- SMOOTHING OPTIONS ----
         ttk.Label(self, text="SMOOTHING OPTIONS",
@@ -202,6 +204,7 @@ class RollingGUI(tk.Tk):
             "plot_subframe_ACFs": tk.BooleanVar(value=True), # mandatory for now
             "plot_subframe_CCFs": tk.BooleanVar(value=True), # mandatory for now
             "plot_subframe_peaks": tk.BooleanVar(value=True), # mandatory for now
+            "dark_plots": tk.BooleanVar(value=False),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
             "smoothing": tk.BooleanVar(value=True),
@@ -271,9 +274,10 @@ class RollingGUI(tk.Tk):
         add_entry(7, 0, self.vars["acf_peak_thresh"], "ACF peak threshold")
         add_entry(8, 0, self.vars["ccf_peak_thresh"], "CCF peak threshold")
         add_checkbutton(9, 0, self.vars["small_shifts_correction"], "Small shifts correction")  
+        add_checkbutton(10,0, self.vars["dark_plots"], "Dark plots")
 
         # ---- SEPARATORS ----
-        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=9, sticky="ns", pady=10)
+        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=11, sticky="ns", pady=10)
         
         # ---- SMOOTHING OPTIONS ----
         ttk.Label(self, text="SMOOTHING OPTIONS",
@@ -342,6 +346,7 @@ class KymographGUI(tk.Tk):
             "plot_indv_ACFs": tk.BooleanVar(value=True),
             "plot_indv_CCFs": tk.BooleanVar(value=True),
             "plot_indv_peaks": tk.BooleanVar(value=True),
+            "dark_plots": tk.BooleanVar(value=False),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
             "group_names": tk.StringVar(value="DC50,DC104"),
@@ -437,6 +442,7 @@ class KymographGUI(tk.Tk):
         add_checkbutton(10, 2, self.vars["plot_indv_ACFs"], "Plot individual ACFs")
         add_checkbutton(11, 2, self.vars["plot_indv_CCFs"], "Plot individual CCFs")
         add_checkbutton(12, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
+        add_checkbutton(10, 4, self.vars["dark_plots"], "Dark plots")
 
         # ---- SMOOTHING OPTIONS ----
         ttk.Label(self, text="SMOOTHING OPTIONS",

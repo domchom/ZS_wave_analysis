@@ -36,7 +36,8 @@ def rolling_workflow(
     Ch4_poly_order: int = None,
     CCF_window: int = None,
     CCF_poly_order: int = None,
-    smoothing: bool = False
+    smoothing: bool = False,
+    dark_plots: bool = False
 ) -> pd.DataFrame:      
     '''
     This is the workflow for rolling analysis. It processes the image files in the specified folder 
@@ -282,7 +283,8 @@ def rolling_workflow(
                 summary_plots = pt.plot_rolling_summary(
                     num_channels=num_channels,
                     fullmovie_summary=summary_df,
-                    channel_combos=channel_combos
+                    channel_combos=channel_combos,
+                    dark_plots=dark_plots
                 )
                 plot_save_path = os.path.join(im_save_path, 'summary_plots')
                 os.makedirs(plot_save_path, exist_ok=True) if not test else None

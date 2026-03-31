@@ -46,6 +46,7 @@ def combined_workflow(
     CCF_window: int = None,
     CCF_poly_order: int = None,
     smoothing: bool = False,
+    dark_plots: bool = False
 ) -> pd.DataFrame:
     '''
     This is the combined workflow for kymographs and standard analysis. It processes the image files in the 
@@ -288,7 +289,8 @@ def combined_workflow(
                     mean_acf_figs = pt.plot_mean_ACF_workflow(
                         img_parameters_dict=img_parameters_dict,
                         img_props=img_props_dict,
-                        indv_acfs=indv_acfs
+                        indv_acfs=indv_acfs,
+                        dark_plots=dark_plots
                     )
                     hf.save_plots(mean_acf_figs, im_save_path)
 
@@ -296,7 +298,8 @@ def combined_workflow(
                 if plot_summary_peaks:
                     mean_peak_figs = pt.plot_mean_peak_props_workflow(
                         img_parameters_dict=img_parameters_dict,
-                        img_props=img_props_dict
+                        img_props=img_props_dict,
+                        dark_plots=dark_plots
                     )
                     hf.save_plots(mean_peak_figs, im_save_path)
 
@@ -305,7 +308,8 @@ def combined_workflow(
                     mean_ccf_figs = pt.plot_mean_CCF_workflow(
                         img_parameters_dict=img_parameters_dict,
                         img_props=img_props_dict,
-                        indv_ccfs=indv_ccfs
+                        indv_ccfs=indv_ccfs,
+                        dark_plots=dark_plots
                     )
                     hf.save_plots(mean_ccf_figs, im_save_path)
                     # save the mean CCF values for the file
@@ -323,7 +327,8 @@ def combined_workflow(
                         bin_values=bin_values,
                         indv_acfs=indv_acfs,
                         img_parameters_dict=img_parameters_dict,
-                        img_props=img_props_dict
+                        img_props=img_props_dict,
+                        dark_plots=dark_plots
                     )
                     indv_acf_path = os.path.join(im_save_path, 'Individual_ACF_plots')
                     os.makedirs(indv_acf_path, exist_ok=True)
@@ -420,7 +425,7 @@ def combined_workflow(
 
         if group_names != ['']:
             # generate comparisons between each group
-            mean_parameter_figs = pt.generate_group_comparison(summary_df = summary_df, log_params = log_params)
+            mean_parameter_figs = pt.generate_group_comparison(summary_df = summary_df, log_params = log_params, dark_plots = dark_plots)
             group_plots_save_path = os.path.join(main_save_path, "group_comparison_graphs")
             os.makedirs(group_plots_save_path, exist_ok=True) if not test else None
             hf.save_plots(mean_parameter_figs, group_plots_save_path) if not test else None

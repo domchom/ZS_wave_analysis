@@ -27,6 +27,7 @@ def main():
     plot_indv_CCFs = params["plot_indv_CCFs"]
     plot_indv_peaks = params["plot_indv_peaks"]
     ccf_peak_thresh = params["ccf_peak_thresh"]
+    dark_plots = params["dark_plots"]
 
     smoothing = params["smoothing"]
     Ch1_window = params.get("Ch1_window")
@@ -60,6 +61,7 @@ def main():
         plot_sf_peaks = params["plot_subframe_peaks"]
         subframe_size = params["subframe_size"]
         subframe_roll = params["subframe_roll"]
+        dark_plots = params["dark_plots"]
         
         smoothing = params["smoothing"]
         Ch1_window = params.get("Ch1_window")
@@ -96,7 +98,8 @@ def main():
         plot_indv_peaks = params["plot_indv_peaks"]
         ccf_peak_thresh = params["ccf_peak_thresh"]
         calc_wave_speeds = params["calculate_wave_speeds"]
-
+        dark_plots = params["dark_plots"]
+        
         smoothing = params["smoothing"]
         Ch1_window = params.get("Ch1_window")
         Ch1_poly_order = params.get("Ch1_poly_order")
@@ -140,6 +143,7 @@ def main():
         "Errors": [],
         'Frame Interval': [],
         'Pixel Size': [],
+        'Dark Plots': dark_plots
     }
         
     if analysis_type == 'rolling':
@@ -163,13 +167,15 @@ def main():
                         "CCF Window": CCF_window,
                         "CCF Poly Order": CCF_poly_order,
                         "Smoothing": smoothing,
+                        'Dark Plots': dark_plots,
                         'Files Processed': [],
                         'Files Not Processed': [],
                         'Plotting errors': [],
                         'Submovies Used' : [],
                         'Errors': [],
                         'Frame Interval': [],
-                        'Pixel Size': []
+                        'Pixel Size': [],
+                        
                 } 
     if analysis_type == 'kymograph':
         log_params = {  "Line width": line_width,
@@ -197,6 +203,7 @@ def main():
                         "Ch4 Poly Order": Ch4_poly_order,
                         "CCF Window": CCF_window,
                         "CCF Poly Order": CCF_poly_order,
+                        "Dark Plots": dark_plots,
                         "Smoothing": smoothing,
                         "Files Processed": [],
                         "Files Not Processed": [],
@@ -244,7 +251,8 @@ def main():
             Ch4_poly_order=Ch4_poly_order,
             CCF_window=CCF_window,
             CCF_poly_order=CCF_poly_order,
-            smoothing=smoothing
+            smoothing=smoothing,
+            dark_plots=dark_plots
         )
     
     if analysis_type == "rolling":
@@ -269,7 +277,8 @@ def main():
             Ch4_poly_order=Ch4_poly_order,
             CCF_window=CCF_window,
             CCF_poly_order=CCF_poly_order,
-            smoothing=smoothing
+            smoothing=smoothing,
+            dark_plots=dark_plots
         )
 
     if analysis_type == "kymograph":                         
@@ -303,7 +312,8 @@ def main():
             Ch4_poly_order=Ch4_poly_order,
             CCF_window=CCF_window,
             CCF_poly_order=CCF_poly_order,
-            smoothing=smoothing
+            smoothing=smoothing,
+            dark_plots=dark_plots
         )
 
 if __name__ == "__main__":

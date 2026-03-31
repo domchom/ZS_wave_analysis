@@ -5,6 +5,7 @@ def plot_mean_ACF_workflow(
     img_parameters_dict: dict,
     img_props: dict,
     indv_acfs: np.ndarray,
+    dark_plots: bool = False
 ) -> dict:
     '''
     Plot the mean autocorrelation function (ACF) for each channel.
@@ -33,7 +34,8 @@ def plot_mean_ACF_workflow(
             periods=indv_periods[channel], 
             channel=f'Ch{channel + 1}',
             num_frames= num_frames,
-            frame_interval=img_props['frame_interval'])    
+            frame_interval=img_props['frame_interval'],
+            dark_plots=dark_plots)    
 
     return mean_acf_figs
 
@@ -42,7 +44,8 @@ def return_mean_ACF_figure(
     periods: np.ndarray, 
     channel: str,
     num_frames: int,
-    frame_interval: float
+    frame_interval: float,
+    dark_plots: bool = False 
 ) -> plt.Figure:
     '''
     Space saving function to return mean ACF figures
@@ -52,40 +55,44 @@ def return_mean_ACF_figure(
     signal_std = np.nanstd(signal, axis = 0)
     x_axis = np.arange(-num_frames + 1, num_frames) * frame_interval
 
-    # Create the figure with subplots
-    fig, ax = plt.subplot_mosaic(mosaic = '''
-                                            AA
-                                            BC
-                                            ''')
-    
-    # Plot mean autocorrelation curve with shaded area representing standard deviation
-    ax['A'].plot(x_axis, signal_mean, color='blue')
-    ax['A'].fill_between(x_axis, 
-                            signal_mean - signal_std, 
-                            signal_mean + signal_std, 
-                            color='blue', 
-                            alpha=0.2)
-    ax['A'].set_title(f'{channel} Mean Autocorrelation Curve ± Standard Deviation') 
+    style = 'dark_background' if dark_plots else 'default'
+    with plt.style.context(style):
+        # Create the figure with subplots
+        fig, ax = plt.subplot_mosaic(mosaic = '''
+                                                AA
+                                                BC
+                                                ''')
+        
+        # Plot mean autocorrelation curve with shaded area representing standard deviation
+        ax['A'].plot(x_axis, signal_mean, color='blue' if not dark_plots else 'orange')
+        ax['A'].fill_between(x_axis, 
+                                signal_mean - signal_std, 
+                                signal_mean + signal_std, 
+                                color='blue' if not dark_plots else 'orange', 
+                                alpha=0.2)
+        ax['A'].set_title(f'{channel} Mean Autocorrelation Curve ± Standard Deviation') 
 
-    # Plot histogram of period values
-    periods = periods[~np.isnan(periods)]
-    ax['B'].hist(periods)
-    ax['B'].set_xlabel(f'Histogram of period values (seconds)')
-    ax['B'].set_ylabel('Occurrences')
+        # Plot histogram of period values
+        periods = periods[~np.isnan(periods)]
+        ax['B'].hist(periods, color='gray')
+        ax['B'].set_xlabel(f'Histogram of period values (seconds)')
+        ax['B'].set_ylabel('Occurrences')
+        
 
-    # Plot boxplot of period values
-    ax['C'].boxplot(periods)
-    ax['C'].set_xlabel(f'Boxplot of period values')
-    ax['C'].set_ylabel(f'Measured period (seconds)')
+        # Plot boxplot of period values
+        ax['C'].boxplot(periods)
+        ax['C'].set_xlabel(f'Boxplot of period values')
+        ax['C'].set_ylabel(f'Measured period (seconds)')
 
-    fig.subplots_adjust(hspace=0.25, wspace=0.5)  
-    plt.close(fig)
+        fig.subplots_adjust(hspace=0.25, wspace=0.5)  
+        plt.close(fig)
 
     return fig
 
 def plot_mean_peak_props_workflow(
     img_parameters_dict: dict,
-    img_props: dict
+    img_props: dict,
+    dark_plots: bool = False
 ) -> dict:
     '''
     Plot Mean Peak Properties Workflow.
@@ -120,7 +127,9 @@ def plot_mean_peak_props_workflow(
             amp_array=indv_peak_amps[channel], 
             width_array=indv_peak_widths[channel], 
             offsets_array=indv_peak_offsets[channel],
-            Ch_name=f'Ch{channel + 1}')
+            Ch_name=f'Ch{channel + 1}',
+            dark_plots=dark_plots
+            )
 
     return mean_peak_figs
 
@@ -130,75 +139,89 @@ def return_mean_prop_peaks_figure(
     amp_array: np.ndarray, 
     width_array: np.ndarray,
     offsets_array: np.ndarray,
-    Ch_name: str
+    Ch_name: str,
+    dark_plots: bool = False
 ) -> plt.Figure:
-    '''
+    """
     Space saving function to return mean peak property figures
-    '''
-    # Create subplots for histograms and boxplots
-    fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2)
+    """
+    style = 'dark_background' if dark_plots else 'default'
+    with plt.style.context(style):
+        # Create subplots for histograms and boxplots INSIDE the style context
+        fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2)
 
-    # Filter out NaN values from arrays
-    min_array = [val for val in min_array if not np.isnan(val)]
-    max_array = [val for val in max_array if not np.isnan(val)]
-    amp_array = [val for val in amp_array if not np.isnan(val)]
-    width_array = [val for val in width_array if not np.isnan(val)]
-    offsets_array = [val for val in offsets_array if not np.isnan(val)]
+        # Optionally force all backgrounds to black
+        if dark_plots:
+            fig.patch.set_facecolor('black')
+            for ax in (ax1, ax2, ax3, ax4, ax5, ax6):
+                ax.set_facecolor('black')
 
-    # Define plot parameters for histograms and boxplots
-    plot_params = { 'amp' : (amp_array, 'tab:blue'),
-                    'min' : (min_array, 'tab:purple'),
-                    'max' : (max_array, 'tab:orange')
-                }
-    
-    # Plot histograms for peak properties
-    for labels, (arr, arr_color) in plot_params.items():
-        ax1.hist(arr, color = arr_color, label = labels, alpha = 0.75)
+        # Filter out NaN values from arrays
+        min_array = [val for val in min_array if not np.isnan(val)]
+        max_array = [val for val in max_array if not np.isnan(val)]
+        amp_array = [val for val in amp_array if not np.isnan(val)]
+        width_array = [val for val in width_array if not np.isnan(val)]
+        offsets_array = [val for val in offsets_array if not np.isnan(val)]
 
-    # Plot boxplots for peak properties
-    boxes = ax2.boxplot([val[0] for val in plot_params.values()], patch_artist = True)
-    ax2.set_xticklabels(plot_params.keys())
-    for box, box_color in zip(boxes['boxes'], [val[1] for val in plot_params.values()]):
-        box.set_color(box_color)
+        # Define plot parameters for histograms and boxplots
+        plot_params = {
+            'amp': (amp_array, 'blue'),
+            'min': (min_array, 'purple'),
+            'max': (max_array, 'orange')
+        }
 
-    # Set labels and legends for histograms and boxplots
-    ax1.legend(loc='upper right', fontsize = 'small', ncol = 1)
-    ax1.set_xlabel(f'{Ch_name} histogram of peak values')
-    ax1.set_ylabel('Occurrences')
-    ax2.set_xlabel(f'{Ch_name} boxplot of peak values')
-    ax2.set_ylabel('Value (AU)')
-    
-    # Plot histogram for peak widths
-    ax3.hist(width_array, color = 'dimgray', alpha = 0.75)
-    ax3.set_xlabel(f'{Ch_name} histogram of peak widths')
-    ax3.set_ylabel('Occurrences')
+        # Plot histograms for peak properties
+        for label, (arr, arr_color) in plot_params.items():
+            ax1.hist(arr, color=arr_color, label=label, alpha=0.75)
 
-    # Plot boxplot for peak widths
-    bp = ax4.boxplot(width_array, vert=True, patch_artist=True)
-    bp['boxes'][0].set_facecolor('dimgray')
-    ax4.set_xlabel(f'{Ch_name} boxplot of peak widths')
-    ax4.set_ylabel('Peak width (seconds)')
+        # Plot boxplots for peak properties
+        boxes = ax2.boxplot(
+            [val[0] for val in plot_params.values()],
+            patch_artist=True
+        )
+        ax2.set_xticklabels(plot_params.keys())
+        for box, box_color in zip(boxes['boxes'], [val[1] for val in plot_params.values()]):
+            box.set_edgecolor(box_color)
+            box.set_facecolor('none')  # or same color if you want filled boxes
 
-    # Plot histogram for peak widths
-    ax5.hist(offsets_array, color = 'dimgray', alpha = 0.75)
-    ax5.set_xlabel(f'{Ch_name} histogram of peak offsets')
-    ax5.set_ylabel('Occurrences')
+        # Set labels and legends for histograms and boxplots
+        ax1.legend(loc='upper right', fontsize='small', ncol=1)
+        ax1.set_xlabel(f'{Ch_name} histogram of peak values')
+        ax1.set_ylabel('Occurrences')
+        ax2.set_xlabel(f'{Ch_name} boxplot of peak values')
+        ax2.set_ylabel('Value (AU)')
 
-    # Plot boxplot for peak widths
-    bp1 = ax6.boxplot(offsets_array, vert=True, patch_artist=True)
-    bp1['boxes'][0].set_facecolor('dimgray')
-    ax6.set_xlabel(f'{Ch_name} boxplot of peak offsets')
-    ax6.set_ylabel('Peak offset (seconds)')
+        # Peak widths
+        ax3.hist(width_array, color='dimgray', alpha=0.75)
+        ax3.set_xlabel(f'{Ch_name} histogram of peak widths')
+        ax3.set_ylabel('Occurrences')
 
-    fig.subplots_adjust(hspace=0.6, wspace=0.6)
-    plt.close(fig)
+        bp = ax4.boxplot(width_array, vert=True, patch_artist=True)
+        bp['boxes'][0].set_facecolor('dimgray')
+        ax4.set_xlabel(f'{Ch_name} boxplot of peak widths')
+        ax4.set_ylabel('Peak width (seconds)')
+
+        # Peak offsets
+        ax5.hist(offsets_array, color='dimgray', alpha=0.75)
+        ax5.set_xlabel(f'{Ch_name} histogram of peak offsets')
+        ax5.set_ylabel('Occurrences')
+
+        bp1 = ax6.boxplot(offsets_array, vert=True, patch_artist=True)
+        bp1['boxes'][0].set_facecolor('dimgray')
+        ax6.set_xlabel(f'{Ch_name} boxplot of peak offsets')
+        ax6.set_ylabel('Peak offset (seconds)')
+
+        fig.subplots_adjust(hspace=0.6, wspace=0.6)
+        plt.close(fig)
 
     return fig
+
 
 def plot_mean_CCF_workflow(
     img_parameters_dict: dict,
     img_props: dict,
-    indv_ccfs: np.ndarray
+    indv_ccfs: np.ndarray,
+    dark_plots: bool = False
 ) -> dict:
     '''
     Plot the mean cross-correlation function (CCF) for each channel combination.
@@ -227,7 +250,8 @@ def plot_mean_CCF_workflow(
         shifts=indv_shifts[combo_number], 
         channel_combo=f'Ch{combo[0] + 1}-Ch{combo[1] + 1}',
         num_frames= num_frames,
-        frame_interval=img_props['frame_interval'])
+        frame_interval=img_props['frame_interval'],
+        dark_plots=dark_plots)
 
     return mean_ccf_figs
 
@@ -236,7 +260,8 @@ def return_mean_CCF_figure(
     shifts: np.ndarray, 
     channel_combo: str, 
     num_frames: int,
-    frame_interval: float
+    frame_interval: float,
+    dark_plots: bool = False
 ) -> plt.Figure:
     '''
     Space saving function to return mean CCF figures
@@ -246,41 +271,44 @@ def return_mean_CCF_figure(
     arr_std = np.nanstd(signal, axis = 0)
     x_axis = np.arange(-num_frames + 1, num_frames) * frame_interval
 
-    # Calculate mean and standard deviation of cross-correlation curves
-    fig, ax = plt.subplot_mosaic(mosaic = '''
-                                            AA
-                                            BC
-                                            ''')
-    
-    # Plot mean cross-correlation curve with shaded area representing standard deviation
-    ax['A'].plot(x_axis, arr_mean, color='blue')
-    ax['A'].fill_between(x_axis, 
-                            arr_mean - arr_std, 
-                            arr_mean + arr_std, 
-                            color='blue', 
-                            alpha=0.2)
-    ax['A'].set_title(f'{channel_combo} Mean Crosscorrelation Curve ± Standard Deviation') 
+    style = 'dark_background' if dark_plots else 'default'
+    with plt.style.context(style):
+        # Calculate mean and standard deviation of cross-correlation curves
+        fig, ax = plt.subplot_mosaic(mosaic = '''
+                                                AA
+                                                BC
+                                                ''')
+        
+        # Plot mean cross-correlation curve with shaded area representing standard deviation
+        ax['A'].plot(x_axis, arr_mean, color='blue' if not dark_plots else 'orange')
+        ax['A'].fill_between(x_axis, 
+                                arr_mean - arr_std, 
+                                arr_mean + arr_std, 
+                                color='blue' if not dark_plots else 'orange', 
+                                alpha=0.2)
+        ax['A'].set_title(f'{channel_combo} Mean Crosscorrelation Curve ± Standard Deviation') 
 
-    # Plot histogram of period values
-    ax['B'].hist(shifts)
-    shifts = [val for val in shifts if not np.isnan(val)]
-    ax['B'].set_xlabel(f'Histogram of shift values (seconds)')
-    ax['B'].set_ylabel('Occurrences')
+        # Plot histogram of period values
+        ax['B'].hist(shifts, color='gray')
+        shifts = [val for val in shifts if not np.isnan(val)]
+        ax['B'].set_xlabel(f'Histogram of shift values (seconds)')
+        ax['B'].set_ylabel('Occurrences')
 
-    # Plot boxplot of period values
-    ax['C'].boxplot(shifts)
-    ax['C'].set_xlabel(f'Boxplot of shift values')
-    ax['C'].set_ylabel(f'Measured shift (seconds)')
+        # Plot boxplot of period values
+        ax['C'].boxplot(shifts)
+        ax['C'].set_xlabel(f'Boxplot of shift values')
+        ax['C'].set_ylabel(f'Measured shift (seconds)')
 
-    fig.subplots_adjust(hspace=0.25, wspace=0.5)   
-    plt.close(fig)
-    
+        fig.subplots_adjust(hspace=0.25, wspace=0.5)   
+        plt.close(fig)
+        
     return fig
 
 def return_mean_wave_speeds_figure(
-    wave_speeds: list[float]
+    wave_speeds: list[float],
+    dark_plots: bool = False
 ) -> plt.Figure:
-    '''
+    """
     Returns a matplotlib Figure object that contains a histogram and boxplot of wave speeds.
 
     Parameters:
@@ -288,19 +316,36 @@ def return_mean_wave_speeds_figure(
 
     Returns:
         plt.Figure: A matplotlib Figure object containing the histogram and boxplot.
+    """
+    style = 'dark_background' if dark_plots else 'default'
 
-    '''
-    fig, (ax1, ax2) = plt.subplots(1, 2)
+    with plt.style.context(style):
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
 
-    # Plot histogram of wave speeds
-    ax1.hist(wave_speeds, bins = 10, color = 'tab:blue', alpha = 0.75)
-    ax1.set_xlabel('Histogram of wave speeds (µm/s)')
-    ax1.set_ylabel('Occurrences')
-    ax1.set_title('Wave Speeds Histogram')
+        # Force backgrounds to black in dark mode
+        if dark_plots:
+            fig.patch.set_facecolor('black')
+            ax1.set_facecolor('black')
+            ax2.set_facecolor('black')
 
-    # Plot boxplots for peak properties
-    boxes = ax2.boxplot(wave_speeds)
-    ax2.set_xlabel('Boxplot of wave speeds (µm/s)')
-    plt.close(fig)
+        # Histogram of wave speeds
+        ax1.hist(wave_speeds, bins=10, color='tab:blue', alpha=0.75)
+        ax1.set_xlabel('Wave speed (µm/s)')
+        ax1.set_ylabel('Occurrences')
+        ax1.set_title('Wave speeds histogram')
+
+        # Boxplot of wave speeds
+        boxes = ax2.boxplot(wave_speeds, vert=True, patch_artist=True)
+        # Optional: color the box to show up on dark background
+        for box in boxes['boxes']:
+            box.set_facecolor('dimgray')
+            box.set_edgecolor('white' if dark_plots else 'black')
+
+        ax2.set_xlabel('Wave speeds')
+        ax2.set_ylabel('Wave speed (µm/s)')
+        ax2.set_title('Wave speeds boxplot')
+
+        fig.tight_layout()
+        plt.close(fig)
 
     return fig
