@@ -49,11 +49,6 @@ def calc_indv_peak_props_workflow(
                 widths, heights, leftWidthIndex, rightWidthIndex = sig.peak_widths(signal, peaks, rel_height=0.5)
                 proms, _, _ = sig.peak_prominences(signal, peaks)
 
-                # Calculate the mean of the peak widths, maximums, and minimums
-                mean_width = np.mean(widths, axis=0)
-                mean_max = np.mean(signal[peaks], axis = 0)
-                mean_min = np.mean(signal[peaks]-proms, axis = 0)
-
                 # calculate the left and right bases of the peaks, then midpoints and peak offsets
                 _, _, left_bases, right_bases = sig.peak_widths(signal, peaks, rel_height=.99)
                 midpoints = (leftWidthIndex + rightWidthIndex) / 2
@@ -69,7 +64,38 @@ def calc_indv_peak_props_workflow(
                                 right_bases[i] = np.nan
                                 peak_offsets[i] = np.nan
                                 midpoints[i] = np.nan
-                
+
+                # Exclude clipped peaks: if the signal is decreasing at the start or
+                # increasing at the end, the nearest peak is not fully resolved
+                if np.mean(signal[:2]) < np.mean(signal[2:3]):  # decreasing at start
+                    leftmost = np.argmin(peaks)
+                    left_bases[leftmost] = np.nan
+                    right_bases[leftmost] = np.nan
+                    peak_offsets[leftmost] = np.nan
+                    midpoints[leftmost] = np.nan
+                    widths[leftmost] = np.nan
+                    heights[leftmost] = np.nan
+                    leftWidthIndex[leftmost] = np.nan
+                    rightWidthIndex[leftmost] = np.nan
+                    proms[leftmost] = np.nan
+
+                if np.mean(signal[-2:]) < np.mean(signal[-3:-2]):  # increasing at end
+                    rightmost = np.argmax(peaks)
+                    left_bases[rightmost] = np.nan
+                    right_bases[rightmost] = np.nan
+                    peak_offsets[rightmost] = np.nan
+                    midpoints[rightmost] = np.nan
+                    widths[rightmost] = np.nan
+                    heights[rightmost] = np.nan
+                    leftWidthIndex[rightmost] = np.nan
+                    rightWidthIndex[rightmost] = np.nan
+                    proms[rightmost] = np.nan
+
+                # Calculate the mean of the peak widths, maximums, and minimums
+                mean_width = np.nanmean(widths, axis=0 )
+                mean_max = np.nanmean(signal[peaks], axis = 0)
+                mean_min = np.nanmean(signal[peaks] - proms, axis = 0)
+
                 # Drop NaN values because it will mess up the mean calculation
                 valid_indices = ~np.isnan(peak_offsets)
                 valid_offsets = peak_offsets[valid_indices]
