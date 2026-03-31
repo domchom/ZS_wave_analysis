@@ -7,7 +7,8 @@ def plot_indv_peak_workflow(
 	raw_bin_values: np.ndarray,
 	img_prop_dict: dict,
 	indv_peak_props: dict,
-	num_frames: int
+	num_frames: int,
+ 	dark_plots: bool = False
 ) -> dict:
 	"""
 	Generates individual peak plots for each channel and bin.
@@ -45,113 +46,138 @@ def plot_indv_peak_workflow(
 					prop_dict=indv_peak_props[f'Ch {channel} Bin {bin}'],
 					Ch_name=f'Ch{channel + 1} Bin {bin + 1}',
 					frame_interval=frame_interval,
-					num_frames=num_frames
+					num_frames=num_frames,
+					dark_plots=dark_plots
 					)
 	
 	return indv_peak_figs
 
 def return_indv_peak_prop_figure(
-	bin_signal: np.ndarray, 
-	prop_dict: dict, 
-	Ch_name: str,
-	frame_interval: float,
-	num_frames: int
+    bin_signal: np.ndarray, 
+    prop_dict: dict, 
+    Ch_name: str,
+    frame_interval: float,
+    num_frames: int,
+    dark_plots: bool = False
 ) -> plt.Figure:
-	'''
-	Space saving function to return individual peak property figures
-	'''
-	# Extract peak properties from the dictionary
-	signal = prop_dict['signal']
-	peaks = prop_dict['peaks']
-	proms = prop_dict['proms']
-	heights = prop_dict['heights']
-	leftWidthIndex = prop_dict['leftWidthIndex']
-	rightWidthIndex = prop_dict['rightWidthIndex']
-	midpoints = prop_dict['midpoints']
-	left_bases = prop_dict['left_base']
-	right_bases = prop_dict['right_base']
+    """
+    Space saving function to return individual peak property figures
+    """
+    # Extract peak properties from the dictionary
+    signal = prop_dict['signal']
+    peaks = prop_dict['peaks']
+    proms = prop_dict['proms']
+    heights = prop_dict['heights']
+    leftWidthIndex = prop_dict['leftWidthIndex']
+    rightWidthIndex = prop_dict['rightWidthIndex']
+    midpoints = prop_dict['midpoints']
+    left_bases = prop_dict['left_base']
+    right_bases = prop_dict['right_base']
 
-	# Create the figure and plot raw and smoothed signals
-	fig, ax = plt.subplots()
-	x_axis = np.arange(0, num_frames) * frame_interval
-	ax.plot(x_axis, bin_signal, color = 'gray', label = 'raw signal')
-	ax.plot(x_axis, signal, color = 'cyan', label = 'smoothed signal')
- 
-	# Plot each peak width and amplitude
-	if not np.isnan(peaks).any():
-		for i in range(peaks.shape[0]):
+    style = 'dark_background' if dark_plots else 'default'
 
-			left = left_bases[i]
-			right = right_bases[i]
-			if not np.isnan(left) and not np.isnan(right):
-				left = int(np.floor(left))
-				right = int(np.ceil(right))
+    with plt.style.context(style):
+        # Create the figure and plot raw and smoothed signals
+        fig, ax = plt.subplots()
 
-				# Local baseline (trough) for the peak
-				baseline = np.min(signal[left:right+1])
+        # Force black backgrounds in dark mode for consistency
+        if dark_plots:
+            fig.patch.set_facecolor('black')
+            ax.set_facecolor('black')
 
-				# Shade area under the peak relative to baseline
-				ax.fill_between(
-				x_axis[left:right+1], 
-				baseline, 
-				signal[left:right+1], 
-				color='yellow', alpha=0.3
-				)
+        x_axis = np.arange(0, num_frames) * frame_interval
+        ax.plot(x_axis, bin_signal, color='gray', label='raw signal')
+        ax.plot(x_axis, signal, color='blue' if not dark_plots else 'lightblue', label='smoothed signal')
+    
+        # Plot each peak width and amplitude
+        if not np.isnan(peaks).any():
+            for i in range(peaks.shape[0]):
 
-			# Plot the peak width
-			ax.hlines(heights[i], 
-					leftWidthIndex[i] * frame_interval, 
-					rightWidthIndex[i] * frame_interval, 
-					color='olive', 
-					linestyle = '-')
-			# Plot the peak amplitude
-			ax.vlines(peaks[i] * frame_interval, 
-					bin_signal[peaks[i]]-proms[i],
-					bin_signal[peaks[i]], 
-					color='purple', 
-					linestyle = '-')
-			# Plot the peak offset
-			ax.hlines(heights[i]-5, 
-					peaks[i] * frame_interval, 
-					midpoints[i] * frame_interval, 
-					color='orange', 
-					linestyle = '-')
+                left = left_bases[i]
+                right = right_bases[i]
+                if not np.isnan(left) and not np.isnan(right):
+                    left = int(np.floor(left))
+                    right = int(np.ceil(right))
 
-		# Plot the legend for the first peak
-		ax.hlines(heights[0], 
-				leftWidthIndex[0] * frame_interval, 
-				rightWidthIndex[0] * frame_interval, 
-				color='olive', 
-				linestyle = '-',
-				label='FWHM')
-		ax.vlines(peaks[0] * frame_interval, 
-				bin_signal[peaks[0]]-proms[0],
-				bin_signal[peaks[0]], 
-				color='purple', 
-				linestyle = '-',
-				label = 'Peak amplitude')
-		ax.hlines(heights[0] - 5, 
-					peaks[0] * frame_interval, 
-					midpoints[0] * frame_interval, 
-					color='orange', 
-					linestyle = '-',
-					label='Peak offset')
-		
-		# Plot the legend for the rest of the peaks
-		ax.legend(loc='upper right', fontsize='small', ncol=1)
-		ax.set_xlabel('Time (seconds)')
-		ax.set_ylabel('Signal (AU)')
-		ax.set_title(f'{Ch_name} peak properties')
-	plt.close(fig)
+                    # Local baseline (trough) for the peak
+                    baseline = np.min(signal[left:right+1])
 
-	return fig
+                    # Shade area under the peak relative to baseline
+                    ax.fill_between(
+                        x_axis[left:right+1], 
+                        baseline, 
+                        signal[left:right+1], 
+                        color='yellow', alpha=0.3
+                    )
+
+                # Plot the peak width
+                ax.hlines(
+                    heights[i], 
+                    leftWidthIndex[i] * frame_interval, 
+                    rightWidthIndex[i] * frame_interval, 
+                    color='olive' if not dark_plots else 'lightgreen', 
+                    linestyle='-'
+                )
+                # Plot the peak amplitude
+                ax.vlines(
+                    peaks[i] * frame_interval, 
+                    bin_signal[peaks[i]] - proms[i],
+                    bin_signal[peaks[i]], 
+                    color='purple' if not dark_plots else 'magenta', 
+                    linestyle='-'
+                )
+                # Plot the peak offset
+                ax.hlines(
+                    heights[i] - 5, 
+                    peaks[i] * frame_interval, 
+                    midpoints[i] * frame_interval, 
+                    color='orange' if not dark_plots else 'lightcoral', 
+                    linestyle='-'
+                )
+
+            # Legend entries from the first peak
+            ax.hlines(
+                heights[0], 
+                leftWidthIndex[0] * frame_interval, 
+                rightWidthIndex[0] * frame_interval, 
+                color='olive' if not dark_plots else 'lightgreen', 
+                linestyle='-',
+                label='FWHM'
+            )
+            ax.vlines(
+                peaks[0] * frame_interval, 
+                bin_signal[peaks[0]] - proms[0],
+                bin_signal[peaks[0]], 
+                color='purple' if not dark_plots else 'magenta', 
+                linestyle='-',
+                label='Peak amplitude'
+            )
+            ax.hlines(
+                heights[0] - 5, 
+                peaks[0] * frame_interval, 
+                midpoints[0] * frame_interval, 
+                color='orange' if not dark_plots else 'lightcoral', 
+                linestyle='-',
+                label='Peak offset'
+            )
+        
+            ax.legend(loc='upper right', fontsize='small', ncol=1)
+
+        ax.set_xlabel('Time (seconds)')
+        ax.set_ylabel('Signal (AU)')
+        ax.set_title(f'{Ch_name} peak properties')
+
+        plt.close(fig)
+
+    return fig
 
 def plot_indv_acf_workflow(
     raw_bin_values: np.ndarray,
 	bin_values: np.ndarray,
 	indv_acfs: np.ndarray,
 	img_parameters_dict: dict,
-	img_props: dict
+	img_props: dict,
+ 	dark_plots: bool = False
 ) -> dict:
 	"""
 	Generates individual ACF plots for each channel and bin.
@@ -195,55 +221,75 @@ def plot_indv_acf_workflow(
 					Ch_name=f'Ch{channel + 1}', 
 					period=indv_periods[channel, bin],
 					num_frames=num_frames,
-					frame_interval=frame_interval
+					frame_interval=frame_interval,
+					dark_plots=dark_plots
 					)
 				
 	return indv_acf_plots
 
 def return_indv_acf_figure(
     raw_to_plot: np.ndarray,
-	signal: np.ndarray, 
-	acf_curve: np.ndarray, 
-	Ch_name: str, 
-	period: int,
-	num_frames: int,
-	frame_interval: float
+    signal: np.ndarray, 
+    acf_curve: np.ndarray, 
+    Ch_name: str, 
+    period: float,
+    num_frames: int,
+    frame_interval: float,
+    dark_plots: bool = False
 ) -> plt.Figure:
-	'''
-	Space saving function to return individual ACF figures
-	'''
-	# Create subplots for raw signal and autocorrelation curve
-	fig, (ax1, ax2) = plt.subplots(2, 1)
-	x_axis = np.arange(0, num_frames) * frame_interval
-	# Plot the signal and autocorrelation curve
-	if raw_to_plot is not None:
-		ax1.plot(x_axis, raw_to_plot)
-	ax1.plot(x_axis, signal) 
-	ax1.set_xlabel(f'{Ch_name} Signal')
-	ax1.set_ylabel('Mean bin px value')
-	# Plot the autocorrelation curve
-	ax2.plot(np.arange(-num_frames + 1, num_frames) * frame_interval, acf_curve)
-	ax2.set_ylabel('Autocorrelation')
+    """
+    Space saving function to return individual ACF figures
+    """
+    style = 'dark_background' if dark_plots else 'default'
 
-	# Annotate the first peak identified as the period if available
-	if not period == np.nan:
-			color = 'red'
-			ax2.axvline(x = period, alpha = 0.5, c = color, linestyle = '--')
-			ax2.axvline(x = -period, alpha = 0.5, c = color, linestyle = '--')
-			ax2.set_xlabel(f'Period is {abs(round(period, 2))} seconds')
-	else:
-			ax2.set_xlabel(f'No period identified')
+    with plt.style.context(style):
+        # Create subplots for raw signal and autocorrelation curve
+        fig, (ax1, ax2) = plt.subplots(2, 1)
 
-	fig.subplots_adjust(hspace=0.75)
-	plt.close(fig)
+        # Force black backgrounds in dark mode
+        if dark_plots:
+            fig.patch.set_facecolor('black')
+            ax1.set_facecolor('black')
+            ax2.set_facecolor('black')
 
-	return(fig)
+        x_axis = np.arange(0, num_frames) * frame_interval
+
+        # Plot the signal(s)
+        if raw_to_plot is not None:
+            ax1.plot(x_axis, raw_to_plot, color='gray', label='raw signal')
+
+        ax1.plot(x_axis, signal, color='blue' if not dark_plots else 'lightblue', label='smoothed signal')
+        ax1.set_xlabel('Time (seconds)')
+        ax1.set_ylabel('Mean bin px value')
+        ax1.set_title(f'{Ch_name} signal and ACF')
+        ax1.legend(loc='upper right', fontsize='small', ncol=1)
+
+        # Plot the autocorrelation curve
+        lags = np.arange(-num_frames + 1, num_frames) * frame_interval
+        ax2.plot(lags, acf_curve, color='lightcoral' if dark_plots else 'blue')
+        ax2.set_ylabel('Autocorrelation')
+
+        # Annotate the first peak identified as the period if available
+        if not np.isnan(period):
+            color = 'red'
+            ax2.axvline(x=period, alpha=0.5, c=color, linestyle='--')
+            ax2.axvline(x=-period, alpha=0.5, c=color, linestyle='--')
+            ax2.set_xlabel(f'Period is {abs(round(period, 2))} seconds')
+        else:
+            ax2.set_xlabel('No period identified')
+
+        fig.subplots_adjust(hspace=0.75)
+        plt.close(fig)
+
+    return fig
+
 
 def plot_indv_ccf_workflow(
 	bin_values: np.ndarray,
 	indv_ccfs: np.ndarray,
 	img_parameters_dict: dict,
-	img_props: dict
+	img_props: dict,
+	dark_plots: bool = False
 ) -> dict:
 	"""
 	Plot individual cross-correlation function (CCF) workflow.
@@ -291,52 +337,71 @@ def plot_indv_ccf_workflow(
 					ch2_name = f'Ch{combo[1] + 1}',
 					shift = indv_shifts[combo_number, bin],
 					num_frames = num_frames,
-					frame_interval = frame_interval)
+					frame_interval = frame_interval,
+					dark_plots = dark_plots
+     			)
 				
 	return indv_ccf_plots
 
 def return_indv_ccf_figure(
-	ch1: np.ndarray, 
-	ch2: np.ndarray, 
-	ccf_curve: np.ndarray, 
-	ch1_name: str, 
-	ch2_name: str, 
-	shift: int,
-	num_frames: int,
-	frame_interval: float
+    ch1: np.ndarray, 
+    ch2: np.ndarray, 
+    ccf_curve: np.ndarray, 
+    ch1_name: str, 
+    ch2_name: str, 
+    shift: float,
+    num_frames: int,
+    frame_interval: float,
+    dark_plots: bool = False
 ) -> plt.Figure:
-	'''
-	Space saving function to return individual CCF figures
-	'''
-	fig, (ax1, ax2) = plt.subplots(2, 1)
-	x_axis = np.arange(0, num_frames) * frame_interval 
-	# Plot the raw signal
-	ax1.plot(x_axis, ch1, color = 'blue', label = ch1_name)
-	ax1.plot(x_axis, ch2, color = 'orange', label = ch2_name)
-	ax1.set_xlabel('time (seconds)')
-	ax1.set_ylabel('Mean bin px value')
-	# Plot the autocorrelation curve
-	ax1.legend(loc='upper right', fontsize = 'small', ncol = 1)
-	ax2.plot(np.arange(-num_frames + 1, num_frames) * frame_interval, ccf_curve)
-	ax2.set_ylabel('Crosscorrelation')
-	
-	# Annotate the first peak identified as the shift if available
-	if not shift == np.nan:
-		color = 'red'
-		ax2.axvline(x = shift, alpha = 0.5, c = color, linestyle = '--')
-		if shift < 1:
-			ax2.set_xlabel(f'{ch1_name} leads by {abs(round(shift, 2))} seconds')
-		elif shift > 1:
-			ax2.set_xlabel(f'{ch2_name} leads by {abs(round(shift, 2))} seconds')
-		else:
-			ax2.set_xlabel('no shift detected')
-	else:
-		ax2.set_xlabel(f'No peaks identified')
-	
-	fig.subplots_adjust(hspace=0.5)
-	plt.close(fig)
+    """
+    Space saving function to return individual CCF figures
+    """
+    style = 'dark_background' if dark_plots else 'default'
 
-	return(fig)
+    with plt.style.context(style):
+        fig, (ax1, ax2) = plt.subplots(2, 1)
+
+        # Force black backgrounds for dark mode
+        if dark_plots:
+            fig.patch.set_facecolor('black')
+            ax1.set_facecolor('black')
+            ax2.set_facecolor('black')
+
+        x_axis = np.arange(0, num_frames) * frame_interval 
+
+        # Plot the raw signals
+        ax1.plot(x_axis, ch1, color='blue' if not dark_plots else 'lightblue', label=ch1_name)
+        ax1.plot(x_axis, ch2, color='orange' if not dark_plots else 'lightcoral', label=ch2_name)
+        ax1.set_xlabel('time (seconds)')
+        ax1.set_ylabel('Mean bin px value')
+        ax1.legend(loc='upper right', fontsize='small', ncol=1)
+
+        # Plot the cross-correlation curve
+        lags = np.arange(-num_frames + 1, num_frames) * frame_interval
+        ax2.plot(lags, ccf_curve, color='lightcoral' if dark_plots else 'blue')
+        ax2.set_ylabel('Crosscorrelation')
+
+        # Annotate the first peak identified as the shift if available
+        if not np.isnan(shift):
+            color = 'red'
+            ax2.axvline(x=shift, alpha=0.5, c=color, linestyle='--')
+
+            # Interpret shift in seconds (already scaled)
+            if shift < -frame_interval:
+                ax2.set_xlabel(f'{ch1_name} leads by {abs(round(shift, 2))} seconds')
+            elif shift > frame_interval:
+                ax2.set_xlabel(f'{ch2_name} leads by {abs(round(shift, 2))} seconds')
+            else:
+                ax2.set_xlabel('no shift detected')
+        else:
+            ax2.set_xlabel('No peaks identified')
+
+        fig.subplots_adjust(hspace=0.5)
+        plt.close(fig)
+
+    return fig
+
 
 def normalize_signal(signal: np.ndarray) -> np.ndarray:
     '''

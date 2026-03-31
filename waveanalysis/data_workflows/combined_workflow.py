@@ -340,7 +340,8 @@ def combined_workflow(
                         raw_bin_values=raw_bin_values if raw_bin_values is not None else bin_values,
                         img_prop_dict=img_props_dict,
                         indv_peak_props=indv_peak_props,
-                        num_frames=img_props_dict['num_frames']
+                        num_frames=img_props_dict['num_frames'],
+                        dark_plots=dark_plots
                     )
                     indv_peak_path = os.path.join(im_save_path, 'Individual_peak_plots')
                     os.makedirs(indv_peak_path, exist_ok=True)
@@ -354,7 +355,8 @@ def combined_workflow(
                         bin_values=bin_values,
                         indv_ccfs=indv_ccfs,
                         img_parameters_dict=img_parameters_dict,
-                        img_props=img_props_dict
+                        img_props=img_props_dict,
+                        dark_plots=dark_plots
                     )
                     indv_ccf_plots_path = os.path.join(im_save_path, 'Individual_CCF_plots')
                     os.makedirs(indv_ccf_plots_path, exist_ok=True)

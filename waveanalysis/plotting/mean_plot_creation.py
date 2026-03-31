@@ -64,11 +64,11 @@ def return_mean_ACF_figure(
                                                 ''')
         
         # Plot mean autocorrelation curve with shaded area representing standard deviation
-        ax['A'].plot(x_axis, signal_mean, color='blue' if not dark_plots else 'orange')
+        ax['A'].plot(x_axis, signal_mean, color='blue' if not dark_plots else 'lightblue')
         ax['A'].fill_between(x_axis, 
                                 signal_mean - signal_std, 
                                 signal_mean + signal_std, 
-                                color='blue' if not dark_plots else 'orange', 
+                                color='blue' if not dark_plots else 'lightblue', 
                                 alpha=0.2)
         ax['A'].set_title(f'{channel} Mean Autocorrelation Curve ± Standard Deviation') 
 
@@ -165,9 +165,9 @@ def return_mean_prop_peaks_figure(
 
         # Define plot parameters for histograms and boxplots
         plot_params = {
-            'amp': (amp_array, 'blue'),
-            'min': (min_array, 'purple'),
-            'max': (max_array, 'orange')
+            'amp': (amp_array, 'blue' if not dark_plots else 'lightblue'),
+            'min': (min_array, 'purple' if not dark_plots else 'plum'),
+            'max': (max_array, 'orange' if not dark_plots else 'lightcoral')
         }
 
         # Plot histograms for peak properties
@@ -280,11 +280,11 @@ def return_mean_CCF_figure(
                                                 ''')
         
         # Plot mean cross-correlation curve with shaded area representing standard deviation
-        ax['A'].plot(x_axis, arr_mean, color='blue' if not dark_plots else 'orange')
+        ax['A'].plot(x_axis, arr_mean, color='blue' if not dark_plots else 'lightblue')
         ax['A'].fill_between(x_axis, 
                                 arr_mean - arr_std, 
                                 arr_mean + arr_std, 
-                                color='blue' if not dark_plots else 'orange', 
+                                color='blue' if not dark_plots else 'lightblue', 
                                 alpha=0.2)
         ax['A'].set_title(f'{channel_combo} Mean Crosscorrelation Curve ± Standard Deviation') 
 
@@ -329,7 +329,7 @@ def return_mean_wave_speeds_figure(
             ax2.set_facecolor('black')
 
         # Histogram of wave speeds
-        ax1.hist(wave_speeds, bins=10, color='tab:blue', alpha=0.75)
+        ax1.hist(wave_speeds, bins=10, color='blue' if not dark_plots else 'lightblue', alpha=0.75)
         ax1.set_xlabel('Wave speed (µm/s)')
         ax1.set_ylabel('Occurrences')
         ax1.set_title('Wave speeds histogram')

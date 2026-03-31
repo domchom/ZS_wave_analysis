@@ -87,13 +87,14 @@ def return_mean_periods_shifts_props_plots(
 
         # plot the dataframe
         ax.plot(fullmovie_summary[independent_variable], 
-                fullmovie_summary[dependent_variable])
+                fullmovie_summary[dependent_variable],
+                color = 'blue' if not dark_plots else 'lightblue')
         
         # fill between the ± standard deviation of the dependent variable
         ax.fill_between(x = fullmovie_summary[independent_variable],
                         y1 = fullmovie_summary[dependent_variable] - fullmovie_summary[dependent_error],
                         y2 = fullmovie_summary[dependent_variable] + fullmovie_summary[dependent_error],
-                        color = 'blue' if not dark_plots else 'orange',
+                        color = 'blue' if not dark_plots else 'lightblue',
                         alpha = 0.25)
 
         # set axis labels
