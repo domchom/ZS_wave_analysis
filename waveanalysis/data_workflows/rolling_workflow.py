@@ -36,7 +36,7 @@ def rolling_workflow(
     Ch4_poly_order: int = None,
     CCF_window: int = None,
     CCF_poly_order: int = None,
-    smoothing: bool = False,
+    smoothing: bool = True,
     dark_plots: bool = False
 ) -> pd.DataFrame:      
     '''
