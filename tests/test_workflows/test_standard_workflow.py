@@ -26,6 +26,7 @@ def default_log_params():
         'Pixel Size': [],
         'Small Shifts Correction': True,
         'CCF Peak Prominence': 0.1,
+        'Dark Plots': False,
         "Ch1 Window": 11,
         "Ch1 Poly Order": 3,
         "Ch2 Window": 11,
@@ -73,6 +74,7 @@ def test_standard_workflow(default_log_params):
         CCF_window = default_log_params['CCF Window'],
         CCF_poly_order = default_log_params['CCF Poly Order'],
         smoothing = default_log_params['Smoothing'],
+        dark_plots=default_log_params['Dark Plots'],
         test=True
     )
     # assert pd.testing.assert_frame_equal(known_results, exp_results) is None

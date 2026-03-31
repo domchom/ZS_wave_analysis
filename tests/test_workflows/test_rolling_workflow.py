@@ -30,6 +30,7 @@ def default_log_params():
         "CCF Window": 11,
         "CCF Poly Order": 3,
         "Smoothing": True,
+        "Dark Plots": False,
         }
 
 
@@ -58,7 +59,8 @@ def test_rolling_workflow(default_log_params):
         CCF_window = default_log_params['CCF Window'],
         CCF_poly_order = default_log_params['CCF Poly Order'],
         smoothing = default_log_params['Smoothing'],
-        test=True
+        test=True,
+        dark_plots=default_log_params['Dark Plots'],
     )
         
     pd.testing.assert_frame_equal(
