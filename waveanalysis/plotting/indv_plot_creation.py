@@ -74,8 +74,8 @@ def return_indv_peak_prop_figure(
 	# Create the figure and plot raw and smoothed signals
 	fig, ax = plt.subplots()
 	x_axis = np.arange(0, num_frames) * frame_interval
-	ax.plot(x_axis, bin_signal, color = 'tab:gray', label = 'raw signal')
-	ax.plot(x_axis, signal, color = 'tab:cyan', label = 'smoothed signal')
+	ax.plot(x_axis, bin_signal, color = 'gray', label = 'raw signal')
+	ax.plot(x_axis, signal, color = 'cyan', label = 'smoothed signal')
  
 	# Plot each peak width and amplitude
 	if not np.isnan(peaks).any():
@@ -95,45 +95,45 @@ def return_indv_peak_prop_figure(
 				x_axis[left:right+1], 
 				baseline, 
 				signal[left:right+1], 
-				color='tab:yellow', alpha=0.3
+				color='yellow', alpha=0.3
 				)
 
 			# Plot the peak width
 			ax.hlines(heights[i], 
 					leftWidthIndex[i] * frame_interval, 
 					rightWidthIndex[i] * frame_interval, 
-					color='tab:olive', 
+					color='olive', 
 					linestyle = '-')
 			# Plot the peak amplitude
 			ax.vlines(peaks[i] * frame_interval, 
 					bin_signal[peaks[i]]-proms[i],
 					bin_signal[peaks[i]], 
-					color='tab:purple', 
+					color='purple', 
 					linestyle = '-')
 			# Plot the peak offset
 			ax.hlines(heights[i]-5, 
 					peaks[i] * frame_interval, 
 					midpoints[i] * frame_interval, 
-					color='tab:orange', 
+					color='orange', 
 					linestyle = '-')
 
 		# Plot the legend for the first peak
 		ax.hlines(heights[0], 
 				leftWidthIndex[0] * frame_interval, 
 				rightWidthIndex[0] * frame_interval, 
-				color='tab:olive', 
+				color='olive', 
 				linestyle = '-',
 				label='FWHM')
 		ax.vlines(peaks[0] * frame_interval, 
 				bin_signal[peaks[0]]-proms[0],
 				bin_signal[peaks[0]], 
-				color='tab:purple', 
+				color='purple', 
 				linestyle = '-',
 				label = 'Peak amplitude')
 		ax.hlines(heights[0] - 5, 
 					peaks[0] * frame_interval, 
 					midpoints[0] * frame_interval, 
-					color='tab:orange', 
+					color='orange', 
 					linestyle = '-',
 					label='Peak offset')
 		
@@ -313,8 +313,8 @@ def return_indv_ccf_figure(
 	fig, (ax1, ax2) = plt.subplots(2, 1)
 	x_axis = np.arange(0, num_frames) * frame_interval 
 	# Plot the raw signal
-	ax1.plot(x_axis, ch1, color = 'tab:blue', label = ch1_name)
-	ax1.plot(x_axis, ch2, color = 'tab:orange', label = ch2_name)
+	ax1.plot(x_axis, ch1, color = 'blue', label = ch1_name)
+	ax1.plot(x_axis, ch2, color = 'orange', label = ch2_name)
 	ax1.set_xlabel('time (seconds)')
 	ax1.set_ylabel('Mean bin px value')
 	# Plot the autocorrelation curve
