@@ -121,8 +121,8 @@ def return_indv_peak_prop_figure(
                 # Plot the peak amplitude
                 ax.vlines(
                     peaks[i] * frame_interval, 
-                    bin_signal[peaks[i]] - proms[i],
-                    bin_signal[peaks[i]], 
+                    signal[peaks[i]] - proms[i],
+                    signal[peaks[i]], 
                     color='purple' if not dark_plots else 'magenta', 
                     linestyle='-'
                 )
@@ -146,8 +146,8 @@ def return_indv_peak_prop_figure(
             )
             ax.vlines(
                 peaks[0] * frame_interval, 
-                bin_signal[peaks[0]] - proms[0],
-                bin_signal[peaks[0]], 
+                signal[peaks[0]] - proms[0],
+                signal[peaks[0]], 
                 color='purple' if not dark_plots else 'magenta', 
                 linestyle='-',
                 label='Peak amplitude'
