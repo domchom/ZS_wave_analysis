@@ -28,28 +28,30 @@ class _GUIBase(tk.Tk):
 
     def _add_smoothing_channel(self, row, col, name, label_prefix, default_window=11, default_poly=2):
         cb = ttk.Checkbutton(self, variable=self.vars[f"{name}_smoothing"])
-        cb.grid(row=row, column=col, padx=10, sticky="E")
+        cb.grid(row=row, column=col, padx=(10, 4), sticky="E")
 
-        ttk.Label(self, text=f"{label_prefix} window size").grid(row=row, column=col+1, padx=10, sticky="W")
-        win_scale = tk.Scale(self, from_=3, to=101, orient="horizontal", resolution=2)
-        win_scale.set(default_window)
-        win_scale.grid(row=row, column=col+2, padx=10, pady=5, sticky="W")
+        ttk.Label(self, text=label_prefix, width=4).grid(row=row, column=col+1, sticky="W")
 
-        ttk.Label(self, text=f"{label_prefix} poly order").grid(row=row+1, column=col+1, padx=10, sticky="W")
-        poly_scale = tk.Scale(self, from_=1, to=10, orient="horizontal", resolution=1)
-        poly_scale.set(default_poly)
-        poly_scale.grid(row=row+1, column=col+2, padx=10, sticky="W")
+        ttk.Label(self, text="win").grid(row=row, column=col+2, padx=(8, 2), sticky="E")
+        win_spinbox = ttk.Spinbox(self, from_=3, to=101, increment=2, width=4)
+        win_spinbox.set(default_window)
+        win_spinbox.grid(row=row, column=col+3, padx=(0, 8), sticky="W")
 
-        return cb, win_scale, poly_scale
+        ttk.Label(self, text="poly").grid(row=row, column=col+4, padx=(4, 2), sticky="E")
+        poly_spinbox = ttk.Spinbox(self, from_=1, to=10, increment=1, width=3)
+        poly_spinbox.set(default_poly)
+        poly_spinbox.grid(row=row, column=col+5, padx=(0, 10), sticky="W")
+
+        return cb, win_spinbox, poly_spinbox
 
     def _build_smoothing_section(self, default_poly=2):
         ttk.Label(self, text="SMOOTHING OPTIONS",
-                  font=("TkDefaultFont", 16, "bold")).grid(row=0, column=5, columnspan=6, padx=10, pady=10, sticky="EW")
+                  font=("TkDefaultFont", 16, "bold")).grid(row=0, column=3, columnspan=7, padx=10, pady=10, sticky="EW")
         self.smoothing_widgets = {
             "Ch1": self._add_smoothing_channel(1, 3, "Ch1", "Ch1", default_poly=default_poly),
-            "Ch2": self._add_smoothing_channel(3, 3, "Ch2", "Ch2", default_poly=default_poly),
-            "Ch3": self._add_smoothing_channel(1, 7, "Ch3", "Ch3", default_poly=default_poly),
-            "Ch4": self._add_smoothing_channel(3, 7, "Ch4", "Ch4", default_poly=default_poly),
+            "Ch2": self._add_smoothing_channel(2, 3, "Ch2", "Ch2", default_poly=default_poly),
+            "Ch3": self._add_smoothing_channel(3, 3, "Ch3", "Ch3", default_poly=default_poly),
+            "Ch4": self._add_smoothing_channel(4, 3, "Ch4", "Ch4", default_poly=default_poly),
             "CCF": self._add_smoothing_channel(5, 3, "CCF", "CCF", default_poly=default_poly),
         }
 
@@ -70,8 +72,8 @@ class _GUIBase(tk.Tk):
         for ch in ["Ch1", "Ch2", "Ch3", "Ch4", "CCF"]:
             if self.vars[f"{ch}_smoothing"]:
                 smoothing_params[ch] = {
-                    "window": self.smoothing_widgets[ch][1].get(),
-                    "poly_order": self.smoothing_widgets[ch][2].get(),
+                    "window": int(self.smoothing_widgets[ch][1].get()),
+                    "poly_order": int(self.smoothing_widgets[ch][2].get()),
                 }
             else:
                 smoothing_params[ch] = None
@@ -166,8 +168,8 @@ class BaseGUI(_GUIBase):
 
         # ---- SMOOTHING OPTIONS ----
         self._build_smoothing_section(default_poly=2)
-        ttk.Label(self, text="Enable smoothing").grid(row=5, column=8, padx=10, sticky="E")
-        ttk.Checkbutton(self, variable=self.vars["smoothing"]).grid(row=5, column=7, padx=10, sticky="E")
+        ttk.Checkbutton(self, variable=self.vars["smoothing"]).grid(row=6, column=3, padx=(10, 4), sticky="E")
+        ttk.Label(self, text="Enable smoothing").grid(row=6, column=4, sticky="W")
 
         # ---- BUTTONS ----
         ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=10, column=8, columnspan=2, padx=10, sticky="E")
@@ -244,8 +246,8 @@ class RollingGUI(_GUIBase):
         self._build_smoothing_section(default_poly=3)
 
         # ---- BUTTONS ----
-        ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=10, column=7, columnspan=2, padx=10, sticky="E")
-        ttk.Button(self, text="Cancel", command=self.cancel_analysis).grid(row=10, column=8, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=11, column=7, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Cancel", command=self.cancel_analysis).grid(row=10, column=7, columnspan=2, padx=10, sticky="E")
 
 
 class KymographGUI(_GUIBase):
@@ -325,8 +327,8 @@ class KymographGUI(_GUIBase):
 
         # ---- SMOOTHING OPTIONS ----
         self._build_smoothing_section(default_poly=3)
-        ttk.Label(self, text="Enable smoothing").grid(row=5, column=8, padx=10, sticky="E")
-        ttk.Checkbutton(self, variable=self.vars["smoothing"]).grid(row=5, column=7, padx=10, sticky="E")
+        ttk.Checkbutton(self, variable=self.vars["smoothing"]).grid(row=6, column=3, padx=(10, 4), sticky="E")
+        ttk.Label(self, text="Enable smoothing").grid(row=6, column=4, sticky="W")
 
         # ---- BUTTONS ----
         ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=10, column=8, columnspan=2, padx=10, sticky="E")
