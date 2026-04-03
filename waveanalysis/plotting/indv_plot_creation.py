@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 def plot_indv_peak_workflow(
 	raw_bin_values: np.ndarray,
-	img_prop_dict: dict,
+	img_props: dict,
 	indv_peak_props: dict,
 	num_frames: int,
  	dark_plots: bool = False
@@ -15,7 +15,7 @@ def plot_indv_peak_workflow(
 
 	Args:
 		bin_values (np.ndarray): Array of bin values.
-		img_prop_dict (dict): Dictionary containing image properties.
+		img_props (dict): Dictionary containing image properties.
 		indv_peak_props (dict): Dictionary containing individual peak properties.
 		num_frames (int): Number of frames.
 
@@ -23,10 +23,10 @@ def plot_indv_peak_workflow(
 		dict: Dictionary containing the generated individual peak plots.
 	"""
 	# Extract image properties from the dictionary
-	num_channels = img_prop_dict['num_channels']
-	num_bins = img_prop_dict['num_bins']
-	analysis_type = img_prop_dict['analysis_type']
-	frame_interval = img_prop_dict['frame_interval']
+	num_channels = img_props['num_channels']
+	num_bins = img_props['num_bins']
+	analysis_type = img_props['analysis_type']
+	frame_interval = img_props['frame_interval']
 
 	# Initialize dictionary to store the individual peak plots
 	indv_peak_figs = {}
@@ -44,7 +44,7 @@ def plot_indv_peak_workflow(
 				indv_peak_figs[f'Ch{channel + 1} Bin {bin + 1} Peak Props'] = return_indv_peak_prop_figure(
 					bin_signal=to_plot,
 					prop_dict=indv_peak_props[f'Ch {channel} Bin {bin}'],
-					Ch_name=f'Ch{channel + 1} Bin {bin + 1}',
+					channel_name=f'Ch{channel + 1} Bin {bin + 1}',
 					frame_interval=frame_interval,
 					num_frames=num_frames,
 					dark_plots=dark_plots
@@ -55,7 +55,7 @@ def plot_indv_peak_workflow(
 def return_indv_peak_prop_figure(
     bin_signal: np.ndarray, 
     prop_dict: dict, 
-    Ch_name: str,
+    channel_name: str,
     frame_interval: float,
     num_frames: int,
     dark_plots: bool = False
@@ -165,7 +165,7 @@ def return_indv_peak_prop_figure(
 
         ax.set_xlabel('Time (seconds)')
         ax.set_ylabel('Signal (AU)')
-        ax.set_title(f'{Ch_name} peak properties')
+        ax.set_title(f'{channel_name} peak properties')
 
         plt.close(fig)
 
@@ -175,7 +175,7 @@ def plot_indv_acf_workflow(
     raw_bin_values: np.ndarray,
 	bin_values: np.ndarray,
 	indv_acfs: np.ndarray,
-	img_parameters_dict: dict,
+	img_metrics: dict,
 	img_props: dict,
  	dark_plots: bool = False
 ) -> dict:
@@ -185,7 +185,7 @@ def plot_indv_acf_workflow(
 	Args:
 		bin_values (np.ndarray): Array of bin values.
 		indv_acfs (np.ndarray): Array of individual ACF values.
-		img_parameters_dict (dict): Dictionary of image parameters.
+		img_metrics (dict): Dictionary of image parameters.
 		img_props (dict): Dictionary of image properties.
 
 	Returns:
@@ -195,7 +195,7 @@ def plot_indv_acf_workflow(
 	num_channels = img_props['num_channels']
 	num_bins = img_props['num_bins']
 	num_frames = img_props['num_frames']
-	indv_periods = img_parameters_dict['Period']
+	indv_periods = img_metrics['Period']
 	analysis_type = img_props['analysis_type']
 	frame_interval = img_props['frame_interval']
 
@@ -218,7 +218,7 @@ def plot_indv_acf_workflow(
 					raw_to_plot = raw_to_plot if raw_bin_values is not None else None,
 					signal=to_plot, 
 					acf_curve=indv_acfs[channel, bin], 
-					Ch_name=f'Ch{channel + 1}', 
+					channel_name=f'Ch{channel + 1}', 
 					period=indv_periods[channel, bin],
 					num_frames=num_frames,
 					frame_interval=frame_interval,
@@ -231,7 +231,7 @@ def return_indv_acf_figure(
     raw_to_plot: np.ndarray,
     signal: np.ndarray, 
     acf_curve: np.ndarray, 
-    Ch_name: str, 
+    channel_name: str, 
     period: float,
     num_frames: int,
     frame_interval: float,
@@ -261,7 +261,7 @@ def return_indv_acf_figure(
         ax1.plot(x_axis, signal, color='blue' if not dark_plots else 'lightblue', label='smoothed signal')
         ax1.set_xlabel('Time (seconds)')
         ax1.set_ylabel('Mean bin px value')
-        ax1.set_title(f'{Ch_name} signal and ACF')
+        ax1.set_title(f'{channel_name} signal and ACF')
         ax1.legend(loc='upper right', fontsize='small', ncol=1)
 
         # Plot the autocorrelation curve
@@ -287,7 +287,7 @@ def return_indv_acf_figure(
 def plot_indv_ccf_workflow(
 	bin_values: np.ndarray,
 	indv_ccfs: np.ndarray,
-	img_parameters_dict: dict,
+	img_metrics: dict,
 	img_props: dict,
 	dark_plots: bool = False
 ) -> dict:
@@ -297,7 +297,7 @@ def plot_indv_ccf_workflow(
 	Parameters:
 	- bin_values (np.ndarray): Array of bin values.
 	- indv_ccfs (np.ndarray): Array of individual CCFs.
-	- img_parameters_dict (dict): Dictionary of image parameters.
+	- img_metrics (dict): Dictionary of image parameters.
 	- img_props (dict): Dictionary of image properties.
 
 	Returns:
@@ -307,7 +307,7 @@ def plot_indv_ccf_workflow(
 	channel_combos = img_props['channel_combos']
 	num_bins = img_props['num_bins']
 	num_frames = img_props['num_frames']
-	indv_shifts = img_parameters_dict['Shift']
+	indv_shifts = img_metrics['Shift']
 	analysis_type = img_props['analysis_type']
 	frame_interval = img_props['frame_interval']
 

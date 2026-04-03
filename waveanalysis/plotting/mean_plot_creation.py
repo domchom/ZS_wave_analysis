@@ -2,7 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def plot_mean_ACF_workflow(
-    img_parameters_dict: dict,
+    img_metrics: dict,
     img_props: dict,
     indv_acfs: np.ndarray,
     dark_plots: bool = False
@@ -11,7 +11,7 @@ def plot_mean_ACF_workflow(
     Plot the mean autocorrelation function (ACF) for each channel.
 
     Args:
-        img_parameters_dict (dict): A dictionary containing image parameters.
+        img_metrics (dict): A dictionary containing image parameters.
         img_props (dict): A dictionary containing image properties.
         indv_acfs (np.ndarray): An array of individual autocorrelation functions.
 
@@ -21,7 +21,7 @@ def plot_mean_ACF_workflow(
     # Extract image properties from the dictionary
     num_channels = img_props['num_channels']
     num_frames = img_props['num_frames']
-    indv_periods = img_parameters_dict['Period']
+    indv_periods = img_metrics['Period']
 
     # Initialize dictionary to store the mean ACF figures
     mean_acf_figs = {}
@@ -90,7 +90,7 @@ def return_mean_ACF_figure(
     return fig
 
 def plot_mean_peak_props_workflow(
-    img_parameters_dict: dict,
+    img_metrics: dict,
     img_props: dict,
     dark_plots: bool = False
 ) -> dict:
@@ -101,18 +101,18 @@ def plot_mean_peak_props_workflow(
     and returns a dictionary of mean peak property figures for each channel.
 
     Parameters:
-    - img_parameters_dict (dict): A dictionary containing the image parameters for each channel.
+    - img_metrics (dict): A dictionary containing the image parameters for each channel.
     - img_props (dict): A dictionary containing the image properties.
 
     Returns:
     - mean_peak_figs (dict): A dictionary of mean peak property figures for each channel.
     '''
     # Extract peak properties from the image parameters dictionary
-    indv_peak_mins = img_parameters_dict['Peak Min']
-    indv_peak_maxs = img_parameters_dict['Peak Max']
-    indv_peak_amps = img_parameters_dict['Peak Amp']
-    indv_peak_widths = img_parameters_dict['Peak Width']
-    indv_peak_offsets = img_parameters_dict['Peak Offset']
+    indv_peak_mins = img_metrics['Peak Min']
+    indv_peak_maxs = img_metrics['Peak Max']
+    indv_peak_amps = img_metrics['Peak Amp']
+    indv_peak_widths = img_metrics['Peak Width']
+    indv_peak_offsets = img_metrics['Peak Offset']
     num_channels = img_props['num_channels']
 
     # Initialize dictionary to store the mean peak property figures
@@ -127,7 +127,7 @@ def plot_mean_peak_props_workflow(
             amp_array=indv_peak_amps[channel], 
             width_array=indv_peak_widths[channel], 
             offsets_array=indv_peak_offsets[channel],
-            Ch_name=f'Ch{channel + 1}',
+            channel_name=f'Ch{channel + 1}',
             dark_plots=dark_plots
             )
 
@@ -139,7 +139,7 @@ def return_mean_prop_peaks_figure(
     amp_array: np.ndarray, 
     width_array: np.ndarray,
     offsets_array: np.ndarray,
-    Ch_name: str,
+    channel_name: str,
     dark_plots: bool = False
 ) -> plt.Figure:
     """
@@ -186,29 +186,29 @@ def return_mean_prop_peaks_figure(
 
         # Set labels and legends for histograms and boxplots
         ax1.legend(loc='upper right', fontsize='small', ncol=1)
-        ax1.set_xlabel(f'{Ch_name} histogram of peak values')
+        ax1.set_xlabel(f'{channel_name} histogram of peak values')
         ax1.set_ylabel('Occurrences')
-        ax2.set_xlabel(f'{Ch_name} boxplot of peak values')
+        ax2.set_xlabel(f'{channel_name} boxplot of peak values')
         ax2.set_ylabel('Value (AU)')
 
         # Peak widths
         ax3.hist(width_array, color='dimgray', alpha=0.75)
-        ax3.set_xlabel(f'{Ch_name} histogram of peak widths')
+        ax3.set_xlabel(f'{channel_name} histogram of peak widths')
         ax3.set_ylabel('Occurrences')
 
         bp = ax4.boxplot(width_array, vert=True, patch_artist=True)
         bp['boxes'][0].set_facecolor('dimgray')
-        ax4.set_xlabel(f'{Ch_name} boxplot of peak widths')
+        ax4.set_xlabel(f'{channel_name} boxplot of peak widths')
         ax4.set_ylabel('Peak width (seconds)')
 
         # Peak offsets
         ax5.hist(offsets_array, color='dimgray', alpha=0.75)
-        ax5.set_xlabel(f'{Ch_name} histogram of peak offsets')
+        ax5.set_xlabel(f'{channel_name} histogram of peak offsets')
         ax5.set_ylabel('Occurrences')
 
         bp1 = ax6.boxplot(offsets_array, vert=True, patch_artist=True)
         bp1['boxes'][0].set_facecolor('dimgray')
-        ax6.set_xlabel(f'{Ch_name} boxplot of peak offsets')
+        ax6.set_xlabel(f'{channel_name} boxplot of peak offsets')
         ax6.set_ylabel('Peak offset (seconds)')
 
         fig.subplots_adjust(hspace=0.6, wspace=0.6)
@@ -218,7 +218,7 @@ def return_mean_prop_peaks_figure(
 
 
 def plot_mean_CCF_workflow(
-    img_parameters_dict: dict,
+    img_metrics: dict,
     img_props: dict,
     indv_ccfs: np.ndarray,
     dark_plots: bool = False
@@ -227,7 +227,7 @@ def plot_mean_CCF_workflow(
     Plot the mean cross-correlation function (CCF) for each channel combination.
 
     Args:
-        img_parameters_dict (dict): A dictionary containing image parameters.
+        img_metrics (dict): A dictionary containing image parameters.
         img_props (dict): A dictionary containing image properties.
         indv_ccfs (np.ndarray): An array of individual cross-correlation functions.
 
@@ -235,7 +235,7 @@ def plot_mean_CCF_workflow(
         dict: A dictionary containing the mean CCF figures for each channel combination.
     '''
     # Extract cross-correlation functions and shifts from the image parameters dictionary
-    indv_shifts = img_parameters_dict['Shift']
+    indv_shifts = img_metrics['Shift']
     channel_combos = img_props['channel_combos']
     num_frames = img_props['num_frames']
 

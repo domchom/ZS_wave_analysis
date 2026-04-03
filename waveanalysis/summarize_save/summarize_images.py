@@ -2,24 +2,24 @@ import numpy as np
 import pandas as pd
 
 def summarize_image(
-    img_parameters: dict,
-    img_props_dict: dict
+    img_metrics: dict,
+    img_props: dict
 ) -> pd.DataFrame:
     '''
     Summarizes the image parameters and properties of a standard kymograph.
 
     Args:
-        img_parameters (dict): A dictionary containing the image parameters.
-        img_props_dict (dict): A dictionary containing the image properties.
+        img_metrics (dict): A dictionary containing the image parameters.
+        img_props (dict): A dictionary containing the image properties.
 
     Returns:
         pd.DataFrame: A dataframe summarizing the bin results.
 
     '''
     # Extract image properties from the dictionary
-    num_bins = img_props_dict['num_bins']
-    num_channels = img_props_dict['num_channels']
-    channel_combos = img_props_dict['channel_combos']
+    num_bins = img_props['num_bins']
+    num_channels = img_props['num_channels']
+    channel_combos = img_props['channel_combos']
 
     # column names for the dataframe summarizing the bin results
     col_names = ["Parameter", "Mean", "Median", "StdDev", "SEM"]
@@ -27,34 +27,34 @@ def summarize_image(
 
     # combine all the statified measurements into a single list
     im_measurements = []
-    parameter_with_stats_dict = {}
+    stats_by_parameter = {}
 
-    if 'num_submovies' in img_props_dict:
-        num_submovies = img_props_dict['num_submovies']
+    if 'num_submovies' in img_props:
+        num_submovies = img_props['num_submovies']
 
         # insert Mean, Median, StdDev, and SEM into the beginning of each list
         for submovie in range(num_submovies):
-            statified_measurements = []
-            for parameter, parameter_measurements in img_parameters.items():
+            stats_rows = []
+            for parameter, parameter_measurements in img_metrics.items():
                 parameter_with_stats = add_stats_for_parameter(parameter_measurements[submovie], parameter, num_channels, channel_combos)
                 for channel_combo_stat in parameter_with_stats:
-                    statified_measurements.append(channel_combo_stat)
+                    stats_rows.append(channel_combo_stat)
 
             # create a dataframe from the statified measurements
-            submovie_meas_df = pd.DataFrame(statified_measurements, columns = col_names)
+            submovie_meas_df = pd.DataFrame(stats_rows, columns = col_names)
             im_measurements.append(submovie_meas_df)
     else:
         # insert Mean, Median, StdDev, and SEM into the beginning of each list
-        for parameter, parameter_measurements in img_parameters.items():
+        for parameter, parameter_measurements in img_metrics.items():
             parameter_with_stats = add_stats_for_parameter(parameter_measurements, parameter, num_channels, channel_combos)
-            parameter_with_stats_dict[parameter] = parameter_with_stats
+            stats_by_parameter[parameter] = parameter_with_stats
             for channel_combo_stat in parameter_with_stats:
                 im_measurements.append(channel_combo_stat)
 
         # create a dataframe from the statified measurements
         im_measurements = pd.DataFrame(im_measurements, columns = col_names)
 
-    return im_measurements, parameter_with_stats_dict
+    return im_measurements, stats_by_parameter
 
 def add_stats_for_parameter(
     measurements: np.ndarray,
@@ -74,7 +74,7 @@ def add_stats_for_parameter(
     Returns:
         list: List of statistics for the measurement parameter.
     '''
-    statified = []
+    stats_rows = []
 
     def calculate_statistics(measurements_subset, channel_label):
         meas_mean = np.nanmean(measurements_subset)
@@ -94,20 +94,20 @@ def add_stats_for_parameter(
                 measurements_subset = measurements[item]
                 channel_label = f'Ch {item + 1} {measurement_name}'
             
-            statified.append(calculate_statistics(measurements_subset, channel_label))
+            stats_rows.append(calculate_statistics(measurements_subset, channel_label))
 
     else:
         measurements = calculate_statistics(measurements, measurement_name)
-        statified.append(measurements)
+        stats_rows.append(measurements)
         
-    return statified
+    return stats_rows
 
 def combine_stats_for_image_kymo_standard(
     file_name: str, 
     group_name: str,
     img_props: dict,
-    img_parameters_dict: dict,
-    parameters_with_stats_dict: dict
+    img_metrics: dict,
+    stats_by_parameter: dict
 ) -> dict:
     '''
     Combine the statistics for an image in a kymograph or standard analysis.
@@ -116,8 +116,8 @@ def combine_stats_for_image_kymo_standard(
         file_name (str): The name of the file.
         group_name (str): The name of the group.
         img_props (dict): A dictionary containing image properties.
-        img_parameters_dict (dict): A dictionary containing image parameters.
-        parameters_with_stats_dict (dict): A dictionary containing parameters with statistics.
+        img_metrics (dict): A dictionary containing image parameters.
+        stats_by_parameter (dict): A dictionary containing per-parameter statistics.
 
     Returns:
         dict: A dictionary containing the summarized measurements for each image.
@@ -139,17 +139,17 @@ def combine_stats_for_image_kymo_standard(
     # Add stats for each Shifts
     if num_channels > 1:
         for combo_number, combo in enumerate(channel_combos):
-            shift_data = img_parameters_dict['Shift'][combo_number]
+            shift_data = img_metrics['Shift'][combo_number]
             pcnt_no_shift = np.count_nonzero(np.isnan(shift_data)) / shift_data.shape[0] * 100
             file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Pcnt No Shifts'] = pcnt_no_shift
             for ind, stat in enumerate(stats_location):
-                file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} Shift'] = parameters_with_stats_dict['Shift'][combo_number][ind + 1]
+                file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} Shift'] = stats_by_parameter['Shift'][combo_number][ind + 1]
             # Unnecessary for loop to add stats for % Phase Shift after the Shifts
             for ind, stat in enumerate(stats_location):
-                file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} % Phase Shift'] = parameters_with_stats_dict['% Phase Shift'][combo_number][ind + 1]
+                file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} % Phase Shift'] = stats_by_parameter['% Phase Shift'][combo_number][ind + 1]
            
     # Add stats for each parameter
-    for name, measurement in img_parameters_dict.items():
+    for name, measurement in img_metrics.items():
         # Skip the Shift name since it is handled separately
         if name in ['Shift', '% Phase Shift']:
             continue
@@ -160,31 +160,31 @@ def combine_stats_for_image_kymo_standard(
                 param = 'Peaks' if name == 'Peak Amp' else 'Periods'
                 file_data_summary[f'Ch {channel + 1} Pcnt No {param}'] = pcnt_no_parameter
                 for ind, stat in enumerate(stats_location):
-                    file_data_summary[f'Ch {channel + 1} {stat} {name}'] = parameters_with_stats_dict[name][channel][ind + 1]
+                    file_data_summary[f'Ch {channel + 1} {stat} {name}'] = stats_by_parameter[name][channel][ind + 1]
         # All parameters that are not wave speed
         elif name not in ['Wave Speed']:
             for channel in range(num_channels):        
                 for ind, stat in enumerate(stats_location):
-                    file_data_summary[f'Ch {channel + 1} {stat} {name}'] = parameters_with_stats_dict[name][channel][ind + 1]
+                    file_data_summary[f'Ch {channel + 1} {stat} {name}'] = stats_by_parameter[name][channel][ind + 1]
         # Wave Speed is a single value, so it doesn't need to be separated by channel
         elif name in ['Wave Speed']:
             for ind, stat in enumerate(stats_location):
-                print(parameters_with_stats_dict[name])
-                file_data_summary[f'{stat} {name}'] = parameters_with_stats_dict[name][0][ind + 1]
+                print(stats_by_parameter[name])
+                file_data_summary[f'{stat} {name}'] = stats_by_parameter[name][0][ind + 1]
 
     return file_data_summary
 
 def combine_stats_rolling(
-    img_props_dict: dict,
-    img_parameters_dict: dict,
+    img_props: dict,
+    img_metrics: dict,
     indv_ccfs: np.ndarray = None,
 ) -> pd.DataFrame:
     '''
     Combine statistics for rolling analysis.
 
     Args:
-        img_props_dict (dict): A dictionary containing image properties.
-        img_parameters_dict (dict): A dictionary containing image parameters.
+        img_props (dict): A dictionary containing image properties.
+        img_metrics (dict): A dictionary containing image parameters.
         indv_ccfs (np.ndarray): An array containing individual cross-correlation functions.
 
     Returns:
@@ -192,14 +192,14 @@ def combine_stats_rolling(
 
     '''
     # Extract image properties from the dictionary
-    num_channels = img_props_dict['num_channels']
-    num_bins = img_props_dict['num_bins']
-    num_submovies = img_props_dict['num_submovies']
-    channel_combos = img_props_dict['channel_combos']
+    num_channels = img_props['num_channels']
+    num_bins = img_props['num_bins']
+    num_submovies = img_props['num_submovies']
+    channel_combos = img_props['channel_combos']
 
     # Extract image parameters from the dictionary
-    indv_periods = img_parameters_dict['Period']
-    indv_peak_widths = img_parameters_dict['Peak Width']
+    indv_periods = img_metrics['Period']
+    indv_peak_widths = img_metrics['Peak Width']
 
     # Define the statistics to calculate
     stat_name_and_func = {'Mean' : np.nanmean,
@@ -217,8 +217,8 @@ def combine_stats_rolling(
 
         # Calculate percentage of no shifts for each channel combination
         if num_channels > 1:
-            indv_shifts = img_parameters_dict['Shift']
-            indv_phase_shifts = img_parameters_dict['% Phase Shift']
+            indv_shifts = img_metrics['Shift']
+            indv_phase_shifts = img_metrics['% Phase Shift']
             for combo_number, combo in enumerate(channel_combos):
                 pcnt_no_shift = np.count_nonzero(np.isnan(indv_ccfs[submovie, combo_number])) / num_bins * 100
                 submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Pcnt No Shifts'] = pcnt_no_shift
@@ -239,7 +239,7 @@ def combine_stats_rolling(
             submovie_summary[f'Ch {channel + 1} Pcnt No Peaks'] = pcnt_no_peaks
             
             # Calculate statistics for other parameters excluding Shift and Period
-            for name, measurements in img_parameters_dict.items():
+            for name, measurements in img_metrics.items():
                 if name != 'Shift':
                     for stat_name, func in stat_name_and_func.items():
                         submovie_summary[f'Ch {channel + 1} {stat_name} {name}'] = func(measurements[submovie, channel])

@@ -91,7 +91,7 @@ def get_mean_CCF_values(
 def get_indv_CCF_values(
     indv_ccfs:np.ndarray,
     bin_values:np.ndarray,
-    img_props_dict: dict
+    img_props: dict
 ) -> dict:
     '''
     Calculate and return the individual cross-correlation function (CCF) values for each channel combination and bin.
@@ -99,16 +99,16 @@ def get_indv_CCF_values(
     Parameters:
     - indv_ccfs (np.ndarray): Array of individual CCF curves for each channel combination and bin.
     - bin_values (np.ndarray): Array of bin values for each channel combination and bin.
-    - img_props_dict (dict): Dictionary containing image properties such as frame interval, number of bins, analysis type, and channel combinations.
+    - img_props (dict): Dictionary containing image properties such as frame interval, number of bins, analysis type, and channel combinations.
 
     Returns:
     - indv_ccf_values (dict): Dictionary containing the individual CCF values for each channel combination and bin.
     '''
     # Extract image properties from the dictionary
-    frame_interval = img_props_dict['frame_interval']
-    num_bins = img_props_dict['num_bins']
-    analysis_type = img_props_dict['analysis_type']
-    channel_combos = img_props_dict['channel_combos']
+    frame_interval = img_props['frame_interval']
+    num_bins = img_props['num_bins']
+    analysis_type = img_props['analysis_type']
+    channel_combos = img_props['channel_combos']
     
     # Initialize dictionary to store the individual CCF values
     indv_ccf_values = {}

@@ -84,29 +84,29 @@ def rolling_workflow(
 
                 # Get image properties
                 image_path = f'{folder_path}/{file_name}'
-                img_props_dict = get_multi_frame_properties(image_path=image_path)
+                img_props = get_multi_frame_properties(image_path=image_path)
 
                 # check if frame interval is not 1 or None and log it
-                frame_interval = hf.check_frame_interval(frame_interval=img_props_dict['frame_interval'], log_params=log_params, file_name=file_name)
-                img_props_dict['frame_interval'] = frame_interval
+                frame_interval = hf.check_frame_interval(frame_interval=img_props['frame_interval'], log_params=log_params, file_name=file_name)
+                img_props['frame_interval'] = frame_interval
 
                 # add other image properties to the dictionary for later use
-                img_props_dict['step'] = box_shift
-                img_props_dict['box_size'] = box_size
-                img_props_dict['peak_thresh'] = acf_peak_thresh
-                num_frames = img_props_dict['num_frames']
-                num_channels = img_props_dict['num_channels']
+                img_props['step'] = box_shift
+                img_props['box_size'] = box_size
+                img_props['peak_thresh'] = acf_peak_thresh
+                num_frames = img_props['num_frames']
+                num_channels = img_props['num_channels']
 
                 # log image properties
-                log_params['Pixel Size'].append(f"{file_name}: {img_props_dict['pixel_size']} {img_props_dict['pixel_unit']}s")
-                log_params['Frame Interval'].append(f"{file_name}: {img_props_dict['frame_interval']} seconds")
+                log_params['Pixel Size'].append(f"{file_name}: {img_props['pixel_size']} {img_props['pixel_unit']}s")
+                log_params['Frame Interval'].append(f"{file_name}: {img_props['frame_interval']} seconds")
 
                 assert isinstance(roll_size, int) and isinstance(roll_by, int), 'Roll size and roll by must be integers'
                 num_submovies = (num_frames - roll_size) // roll_by
-                img_props_dict['num_submovies'] = num_submovies
+                img_props['num_submovies'] = num_submovies
 
                 # log error and skip image if frames < 2; otherwise
-                if img_props_dict['num_frames'] < 11:
+                if img_props['num_frames'] < 11:
                     print(f"****** ERROR ******",
                         f"\n{file_name} has less than 11 frames. Movies must have more than 10 frames",
                         "\n****** ERROR ******")
@@ -117,7 +117,7 @@ def rolling_workflow(
                 image_array = tiff_to_np_array_multi_frame(image_path)
                 bin_values, num_bins, num_x_bins, num_y_bins = create_multi_frame_bin_array(
                                                                     image = image_array,
-                                                                    img_props = img_props_dict
+                                                                    img_props = img_props
                                                                 )
                 
                 if smoothing:
@@ -126,19 +126,19 @@ def rolling_workflow(
                     raw_bin_values = None
 
                 # smooth the bin values if specified
-                for channel in range(img_props_dict['num_channels']):
+                for channel in range(img_props['num_channels']):
                     ch_params = (smoothing_params or {}).get(f"Ch{channel + 1}")
                     for bin in range(num_bins):
                         if ch_params is not None:
                             signal = bin_values[:, channel, bin]
                             bin_values[:, channel, bin] = smooth_signal(signal=signal, window=ch_params["window"], poly_order=ch_params["poly_order"])
             
-                img_props_dict['num_bins'] = num_bins
-                img_props_dict['num_x_bins'] = num_x_bins
-                img_props_dict['num_y_bins'] = num_y_bins
+                img_props['num_bins'] = num_bins
+                img_props['num_x_bins'] = num_x_bins
+                img_props['num_y_bins'] = num_y_bins
 
                 # name without the extension
-                name_wo_ext = file_name.rsplit(".",1)[0]
+                file_stem = file_name.rsplit(".",1)[0]
 
                 ############################################
                 ############## Signal Processing ###########
@@ -188,8 +188,8 @@ def rolling_workflow(
 
                 channel_combos = hf.get_channel_combos(num_channels=num_channels)
                 num_combos = len(channel_combos)
-                img_props_dict['channel_combos'] = channel_combos
-                img_props_dict['num_combos'] = num_combos
+                img_props['channel_combos'] = channel_combos
+                img_props['num_combos'] = num_combos
 
                 # Calculate the individual CCFs and shifts for each channel
                 ccf_smoothing = (smoothing_params or {}).get("CCF")
@@ -215,15 +215,15 @@ def rolling_workflow(
                                     indv_shifts[submovie, combo_number, bin] = shift
 
                 # create a subfolder within the main save path with the same name as the image file
-                im_save_path = os.path.join(main_save_path, name_wo_ext)
+                im_save_path = os.path.join(main_save_path, file_stem)
                 os.makedirs(im_save_path, exist_ok=True) if not test else None
 
                 # adjust the different waves properties to be the use the frame interval rather than the number of frames
-                indv_periods = indv_periods * img_props_dict['frame_interval']
-                indv_peak_offsets = indv_peak_offsets * img_props_dict['frame_interval']
-                indv_peak_widths = indv_peak_widths * img_props_dict['frame_interval']
+                indv_periods = indv_periods * img_props['frame_interval']
+                indv_peak_offsets = indv_peak_offsets * img_props['frame_interval']
+                indv_peak_widths = indv_peak_widths * img_props['frame_interval']
 
-                img_parameters_dict = {
+                img_metrics = {
                                 'Period': indv_periods,
                                 'Peak Amp': indv_peak_amps,
                                 'Peak Rel Amp': indv_peak_rel_amps,
@@ -235,10 +235,10 @@ def rolling_workflow(
                 }
 
                 # add shifts to the dictionary if there are multiple channels
-                if img_props_dict['num_channels'] > 1:
-                    indv_shifts = indv_shifts * img_props_dict['frame_interval']
-                    img_parameters_dict['Shift'] = indv_shifts
-                    img_parameters_dict['% Phase Shift'] = indv_shifts / indv_periods
+                if img_props['num_channels'] > 1:
+                    indv_shifts = indv_shifts * img_props['frame_interval']
+                    img_metrics['Shift'] = indv_shifts
+                    img_metrics['% Phase Shift'] = indv_shifts / indv_periods
 
                 # calculate the number of subframes used
                 log_params['Submovies Used'].append(num_submovies)
@@ -249,22 +249,22 @@ def rolling_workflow(
 
                 # summarize the data for each subframe as individual dataframes, and save as .csv
                 submovie_meas_list, _ = summarize_image(
-                    img_props_dict=img_props_dict,
-                    img_parameters=img_parameters_dict
+                    img_props=img_props,
+                    img_metrics=img_metrics
                 )
                 csv_save_path = os.path.join(im_save_path, 'rolling_measurements')
                 os.makedirs(csv_save_path, exist_ok=True) if not test else None
                 for measurement_index, submovie_meas_df in enumerate(submovie_meas_list):  # type: ignore
-                    submovie_meas_df.to_csv(f'{csv_save_path}/{name_wo_ext}_subframe{measurement_index}_measurements.csv', index = False) if not test else None
+                    submovie_meas_df.to_csv(f'{csv_save_path}/{file_stem}_subframe{measurement_index}_measurements.csv', index = False) if not test else None
                 
                 # summarize the data for each subframe as a single dataframe, and save as .csv
                 summary_df = combine_stats_rolling(
-                    img_props_dict=img_props_dict,
-                    img_parameters_dict=img_parameters_dict,
+                    img_props=img_props,
+                    img_metrics=img_metrics,
                     indv_ccfs=indv_ccfs if num_channels > 1 else None
                 )
                 if not test:
-                    summary_df.to_csv(f'{im_save_path}/{name_wo_ext}_summary.csv', index = False)
+                    summary_df.to_csv(f'{im_save_path}/{file_stem}_summary.csv', index = False)
 
                 # make and save the summary plot for rolling data
                 summary_plots = pt.plot_rolling_summary(
@@ -293,5 +293,5 @@ def rolling_workflow(
 
             pbar.update(1)
 
-            if name_wo_ext == '1_Group2':
+            if file_stem == '1_Group2':
                 return summary_df # only return this now for testing purposes. Will remove later
