@@ -106,8 +106,7 @@ def calc_indv_period(
 def calc_indv_CCF_workflow(
     bin_values: np.ndarray,
     img_props: dict,
-    CCF_window: int,
-    CCF_poly_order: int
+    ccf_smoothing: dict = None,
 ) -> np.ndarray:
     '''
     Calculate individual cross-correlation functions (CCFs) for each combination of channels and bins.
@@ -140,7 +139,7 @@ def calc_indv_CCF_workflow(
                 signal1 = bin_values[combo[0], bin] #signal1 = sig.savgol_filter(bin_values[combo[0], bin], window_length=11, polyorder=3)
                 signal2 = bin_values[combo[1], bin] #signal2 = sig.savgol_filter(bin_values[combo[1], bin], window_length=11, polyorder=3)
             # Calculate and store the individual CCF for the current combination of channels and bin
-            ccf = calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=num_frames, CCF_window=CCF_window, CCF_poly_order=CCF_poly_order)
+            ccf = calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=num_frames, ccf_smoothing=ccf_smoothing)
             indv_ccfs[combo_number, bin] = ccf
 
     return indv_ccfs
@@ -149,8 +148,7 @@ def calc_indv_CCF(
     signal1: np.ndarray,
     signal2: np.ndarray,
     num_frames: int,
-    CCF_window: int,
-    CCF_poly_order: int
+    ccf_smoothing: dict = None,
 ) -> np.ndarray:
     '''
     Space saving function to calculate individual cross-correlation functions (CCFs) for each combination of channels and bins.
@@ -168,8 +166,8 @@ def calc_indv_CCF(
         cc_curve = np.correlate(corr_signal1, corr_signal2, mode='full')
 
         # Normalize the cross-correlation curve
-        if CCF_window != None and CCF_poly_order != None:
-            cc_curve = sig.savgol_filter(cc_curve, window_length=CCF_window, polyorder=CCF_poly_order)
+        if ccf_smoothing is not None:
+            cc_curve = sig.savgol_filter(cc_curve, window_length=ccf_smoothing["window"], polyorder=ccf_smoothing["poly_order"])
         cc_curve = cc_curve / (num_frames * signal1.std() * signal2.std())
         # Find peaks in the cross-correlation curve
         peaks, _ = sig.find_peaks(cc_curve, prominence=0.1)

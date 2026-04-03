@@ -36,16 +36,7 @@ def combined_workflow(
     bin_shift: int = None, 
     line_width: int = None,
     test: bool = False, # for testing purposes
-    Ch1_window: int = None,
-    Ch1_poly_order: int = None,
-    Ch2_window: int = None,
-    Ch2_poly_order: int = None,
-    Ch3_window: int = None,
-    Ch3_poly_order: int = None,
-    Ch4_window: int = None,
-    Ch4_poly_order: int = None,
-    CCF_window: int = None,
-    CCF_poly_order: int = None,
+    smoothing_params: dict = None,
     smoothing: bool = False,
     dark_plots: bool = False
 ) -> pd.DataFrame:
@@ -172,16 +163,11 @@ def combined_workflow(
 
                     # smooth the bin values if specified
                     for channel in range(img_props_dict['num_channels']):
+                        ch_params = (smoothing_params or {}).get(f"Ch{channel + 1}")
                         for bin in range(num_bins):
-                            signal = bin_values[:, channel, bin]
-                            if channel == 0 and Ch1_window is not None and Ch1_poly_order is not None:
-                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch1_window, poly_order=Ch1_poly_order)
-                            elif channel == 1 and Ch2_window is not None and Ch2_poly_order is not None:
-                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch2_window, poly_order=Ch2_poly_order)
-                            elif channel == 2 and Ch3_window is not None and Ch3_poly_order is not None:
-                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch3_window, poly_order=Ch3_poly_order)
-                            elif channel == 3 and Ch4_window is not None and Ch4_poly_order is not None:
-                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=Ch4_window, poly_order=Ch4_poly_order)
+                            if ch_params is not None:
+                                signal = bin_values[:, channel, bin]
+                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=ch_params["window"], poly_order=ch_params["poly_order"])
 
                     # np.save(f'/Users/domchom/Desktop/{file_name}_bin_values.npy', bin_values)
                                     
@@ -197,16 +183,11 @@ def combined_workflow(
 
                     # smooth the bin values if specified
                     for channel in range(img_props_dict['num_channels']):
+                        ch_params = (smoothing_params or {}).get(f"Ch{channel + 1}")
                         for bin in range(num_bins):
-                            signal = bin_values[channel, bin]
-                            if channel == 0 and Ch1_window is not None and Ch1_poly_order is not None:
-                                bin_values[channel, bin] = smooth_signal(signal=signal, window=Ch1_window, poly_order=Ch1_poly_order)
-                            elif channel == 1 and Ch2_window is not None and Ch2_poly_order is not None:
-                                bin_values[channel, bin] = smooth_signal(signal=signal, window=Ch2_window, poly_order=Ch2_poly_order)
-                            elif channel == 2 and Ch3_window is not None and Ch3_poly_order is not None:
-                                bin_values[channel, bin] = smooth_signal(signal=signal, window=Ch3_window, poly_order=Ch3_poly_order)
-                            elif channel == 3 and Ch4_window is not None and Ch4_poly_order is not None:
-                                bin_values[channel, bin] = smooth_signal(signal=signal, window=Ch4_window, poly_order=Ch4_poly_order)
+                            if ch_params is not None:
+                                signal = bin_values[channel, bin]
+                                bin_values[channel, bin] = smooth_signal(signal=signal, window=ch_params["window"], poly_order=ch_params["poly_order"])
                     
                 # get the channel combinations
                 channel_combos = hf.get_channel_combos(num_channels=img_props_dict['num_channels'])
@@ -246,7 +227,7 @@ def combined_workflow(
                 
                 # Calculate the individual CCFs and shifts
                 if img_props_dict['num_channels'] > 1:
-                    indv_ccfs = sp.calc_indv_CCF_workflow(bin_values=bin_values, img_props=img_props_dict, CCF_window=CCF_window, CCF_poly_order=CCF_poly_order)
+                    indv_ccfs = sp.calc_indv_CCF_workflow(bin_values=bin_values, img_props=img_props_dict, ccf_smoothing=(smoothing_params or {}).get("CCF"))
                     indv_shifts = sp.calc_indv_shift_workflow(indv_ccfs=indv_ccfs, indv_periods=indv_periods, img_props=img_props_dict, small_shifts_correction=small_shifts_correction, ccf_peak_thresh=ccf_peak_thresh)
                     
                     # Save individual CCFs to pickle file

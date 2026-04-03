@@ -17,14 +17,14 @@ class BaseGUI(tk.Tk):
             "analysis_type": tk.StringVar(value="standard"),
             "box_size": tk.IntVar(value=20),
             "bin_shift": tk.IntVar(value=20),
-            "small_shifts_correction": tk.BooleanVar(value=False),
+            "small_shifts_correction": tk.BooleanVar(value=True),
             "plot_summary_ACFs": tk.BooleanVar(value=True),
             "plot_summary_CCFs": tk.BooleanVar(value=True),
             "plot_summary_peaks": tk.BooleanVar(value=True),
             "plot_indv_ACFs": tk.BooleanVar(value=False),
             "plot_indv_CCFs": tk.BooleanVar(value=False),
             "plot_indv_peaks": tk.BooleanVar(value=False),
-            "dark_plots": tk.BooleanVar(value=False),
+            "dark_plots": tk.BooleanVar(value=True),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
             "group_names": tk.StringVar(value=""),
@@ -68,7 +68,7 @@ class BaseGUI(tk.Tk):
             poly_label = ttk.Label(self, text=f"{label_prefix} poly order")
             poly_label.grid(row=row+1, column=col+1, padx=10, sticky="W")
             poly_scale = tk.Scale(self, from_=1, to=10, orient="horizontal", resolution=1)
-            poly_scale.set(3)
+            poly_scale.set(2)
             poly_scale.grid(row=row+1, column=col+2, padx=10, sticky="W")
 
             return cb, win_scale, poly_scale
@@ -172,15 +172,18 @@ class BaseGUI(tk.Tk):
 
         # Group names
         self.vars["group_names"] = [g.strip() for g in self.vars["group_names"].split(",")]
-        
+
+        smoothing_params = {}
         for ch in ["Ch1", "Ch2", "Ch3", "Ch4", "CCF"]:
             if self.vars[f"{ch}_smoothing"]:
-                self.vars[f"{ch}_window"] = self.smoothing_widgets[ch][1].get()
-                self.vars[f"{ch}_poly_order"] = self.smoothing_widgets[ch][2].get()
+                smoothing_params[ch] = {
+                    "window": self.smoothing_widgets[ch][1].get(),
+                    "poly_order": self.smoothing_widgets[ch][2].get(),
+                }
             else:
-                self.vars[f"{ch}_window"] = None
-                self.vars[f"{ch}_poly_order"] = None
-        
+                smoothing_params[ch] = None
+        self.vars["smoothing_params"] = smoothing_params
+
         # Destroy widget
         self.destroy()
 
@@ -312,15 +315,18 @@ class RollingGUI(tk.Tk):
         # Collect values
         for k, v in self.vars.items():
             self.vars[k] = v.get()
-        
+
+        smoothing_params = {}
         for ch in ["Ch1", "Ch2", "Ch3", "Ch4", "CCF"]:
             if self.vars[f"{ch}_smoothing"]:
-                self.vars[f"{ch}_window"] = self.smoothing_widgets[ch][1].get()
-                self.vars[f"{ch}_poly_order"] = self.smoothing_widgets[ch][2].get()
+                smoothing_params[ch] = {
+                    "window": self.smoothing_widgets[ch][1].get(),
+                    "poly_order": self.smoothing_widgets[ch][2].get(),
+                }
             else:
-                self.vars[f"{ch}_window"] = None
-                self.vars[f"{ch}_poly_order"] = None
-        
+                smoothing_params[ch] = None
+        self.vars["smoothing_params"] = smoothing_params
+
         # Destroy widget
         self.destroy()
 
@@ -480,13 +486,17 @@ class KymographGUI(tk.Tk):
 
         # Group names
         self.vars["group_names"] = [g.strip() for g in self.vars["group_names"].split(",")]
-        
+
+        smoothing_params = {}
         for ch in ["Ch1", "Ch2", "Ch3", "Ch4", "CCF"]:
             if self.vars[f"{ch}_smoothing"]:
-                self.vars[f"{ch}_window"] = self.smoothing_widgets[ch][1].get()
-                self.vars[f"{ch}_poly_order"] = self.smoothing_widgets[ch][2].get()
+                smoothing_params[ch] = {
+                    "window": self.smoothing_widgets[ch][1].get(),
+                    "poly_order": self.smoothing_widgets[ch][2].get(),
+                }
             else:
-                self.vars[f"{ch}_window"] = None
-                self.vars[f"{ch}_poly_order"] = None
+                smoothing_params[ch] = None
+        self.vars["smoothing_params"] = smoothing_params
+
         # Destroy widget
         self.destroy()

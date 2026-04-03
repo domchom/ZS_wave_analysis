@@ -29,7 +29,7 @@ def test_CCF_calc(default_CCFs):
             known_results = pickle.load(f)
         with open(img_props_file, 'r') as file:
             img_props_dict = json.load(file)
-        exp_results = calc_indv_CCF_workflow(bin_values, img_props_dict, CCF_window=11, CCF_poly_order=3)
+        exp_results = calc_indv_CCF_workflow(bin_values, img_props_dict, ccf_smoothing={"window": 11, "poly_order": 3})
 
         np.testing.assert_allclose(
             known_results,
