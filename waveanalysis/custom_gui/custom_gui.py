@@ -8,6 +8,7 @@ class _GUIBase(tk.Tk):
     """Shared widget helpers and actions used by all three analysis GUI classes."""
 
     _has_group_names = False  # subclasses with a group_names field override to True
+    _has_plot_flags = False  # subclasses with plot flag checkboxes override to True
 
     # ---- WIDGET HELPERS ----
 
@@ -75,11 +76,22 @@ class _GUIBase(tk.Tk):
             else:
                 smoothing_params[ch] = None
         self.vars["smoothing_params"] = smoothing_params
+        if self._has_plot_flags:
+            self.vars["plot_flags"] = {
+                "plot_summary_ACFs": self.vars["plot_summary_ACFs"],
+                "plot_summary_CCFs": self.vars["plot_summary_CCFs"],
+                "plot_summary_peaks": self.vars["plot_summary_peaks"],
+                "plot_indv_ACFs": self.vars["plot_indv_ACFs"],
+                "plot_indv_CCFs": self.vars["plot_indv_CCFs"],
+                "plot_indv_peaks": self.vars["plot_indv_peaks"],
+                "dark_plots": self.vars["dark_plots"],
+            }
         self.destroy()
 
 
 class BaseGUI(_GUIBase):
     _has_group_names = True
+    _has_plot_flags = True
 
     def __init__(self):
         super().__init__()
@@ -238,6 +250,7 @@ class RollingGUI(_GUIBase):
 
 class KymographGUI(_GUIBase):
     _has_group_names = True
+    _has_plot_flags = True
 
     def __init__(self):
         super().__init__()

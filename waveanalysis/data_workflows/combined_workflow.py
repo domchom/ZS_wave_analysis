@@ -24,12 +24,7 @@ def combined_workflow(
     acf_peak_thresh: float,
     ccf_peak_thresh: float,
     small_shifts_correction: bool,
-    plot_summary_ACFs: bool,
-    plot_summary_CCFs: bool,
-    plot_summary_peaks: bool,
-    plot_indv_ACFs: bool,
-    plot_indv_CCFs: bool,
-    plot_indv_peaks: bool,
+    plot_flags: dict[str, bool],
     calc_wave_speeds: bool = False,
     plot_wave_speeds: bool = False,
     box_size: int = None,
@@ -38,7 +33,6 @@ def combined_workflow(
     test: bool = False, # for testing purposes
     smoothing_params: dict = None,
     smoothing: bool = False,
-    dark_plots: bool = False
 ) -> pd.DataFrame:
     '''
     This is the combined workflow for kymographs and standard analysis. It processes the image files in the 
@@ -66,12 +60,7 @@ def combined_workflow(
     - log_params (dict[str, Any]): The dictionary to store the log parameters.
     - analysis_type (str): The type of analysis to perform ('standard' or 'kymograph').
     - acf_peak_thresh (float): The threshold for detecting peaks in the ACF curve.
-    - plot_summary_ACFs (bool): Whether to plot the mean ACF figures for the file.
-    - plot_summary_CCFs (bool): Whether to plot the mean CCF figures for the file.
-    - plot_summary_peaks (bool): Whether to plot the mean peak properties figures for the file.
-    - plot_indv_ACFs (bool): Whether to plot the individual ACF figures for each file.
-    - plot_indv_CCFs (bool): Whether to plot the individual CCF figures for each file.
-    - plot_indv_peaks (bool): Whether to plot the individual peak properties figures for each file.
+    - plot_flags (dict[str, bool]): A dictionary containing flags for plotting different types of figures.
     - calc_wave_speeds (bool, optional): Whether to calculate wave speeds. Defaults to False.
     - plot_wave_speeds (bool, optional): Whether to plot the wave speeds. Defaults to False.
     - box_size (int, optional): The size of the box for standard analysis. Defaults to None.
@@ -267,31 +256,31 @@ def combined_workflow(
                 ############################################
 
                 # plot the mean ACF figures for the file
-                if plot_summary_ACFs:
+                if plot_flags["plot_summary_ACFs"]:
                     mean_acf_figs = pt.plot_mean_ACF_workflow(
                         img_parameters_dict=img_parameters_dict,
                         img_props=img_props_dict,
                         indv_acfs=indv_acfs,
-                        dark_plots=dark_plots
+                        dark_plots=plot_flags["dark_plots"]
                     )
                     hf.save_plots(mean_acf_figs, im_save_path)
 
                 # plot the mean peak properties figures for the file
-                if plot_summary_peaks:
+                if plot_flags["plot_summary_peaks"]:
                     mean_peak_figs = pt.plot_mean_peak_props_workflow(
                         img_parameters_dict=img_parameters_dict,
                         img_props=img_props_dict,
-                        dark_plots=dark_plots
+                        dark_plots=plot_flags["dark_plots"]
                     )
                     hf.save_plots(mean_peak_figs, im_save_path)
 
                 # plot the mean CCF figures for the file
-                if plot_summary_CCFs and img_props_dict['num_channels'] > 1:
+                if plot_flags["plot_summary_CCFs"] and img_props_dict['num_channels'] > 1:
                     mean_ccf_figs = pt.plot_mean_CCF_workflow(
                         img_parameters_dict=img_parameters_dict,
                         img_props=img_props_dict,
                         indv_ccfs=indv_ccfs,
-                        dark_plots=dark_plots
+                        dark_plots=plot_flags["dark_plots"]
                     )
                     hf.save_plots(mean_ccf_figs, im_save_path)
                     # save the mean CCF values for the file
@@ -299,38 +288,38 @@ def combined_workflow(
                     save_ccf_values_to_csv(mean_ccf_values, im_save_path)
 
                 # Error check for plotting individual CCFs
-                elif plot_summary_CCFs and img_props_dict['num_channels'] == 1:
+                elif plot_flags["plot_summary_CCFs"] and img_props_dict['num_channels'] == 1:
                     log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
 
                 # plot the individual ACF figures for the file
-                if plot_indv_ACFs:
+                if plot_flags["plot_indv_ACFs"]:
                     indv_acf_plots = pt.plot_indv_acf_workflow(
                         raw_bin_values=raw_bin_values,
                         bin_values=bin_values,
                         indv_acfs=indv_acfs,
                         img_parameters_dict=img_parameters_dict,
                         img_props=img_props_dict,
-                        dark_plots=dark_plots
+                        dark_plots=plot_flags["dark_plots"]
                     )
                     indv_acf_path = os.path.join(im_save_path, 'Individual_ACF_plots')
                     os.makedirs(indv_acf_path, exist_ok=True)
                     hf.save_plots(indv_acf_plots, indv_acf_path)
 
                 # plot the individual peak properties figures for the file
-                if plot_indv_peaks:        
+                if plot_flags["plot_indv_peaks"]:        
                     indv_peak_figs = pt.plot_indv_peak_workflow(
                         raw_bin_values=raw_bin_values if raw_bin_values is not None else bin_values,
                         img_prop_dict=img_props_dict,
                         indv_peak_props=indv_peak_props,
                         num_frames=img_props_dict['num_frames'],
-                        dark_plots=dark_plots
+                        dark_plots=plot_flags["dark_plots"]
                     )
                     indv_peak_path = os.path.join(im_save_path, 'Individual_peak_plots')
                     os.makedirs(indv_peak_path, exist_ok=True)
                     hf.save_plots(indv_peak_figs, indv_peak_path)
                     
                 # plot the individual CCF figures for the file
-                if plot_indv_CCFs and img_props_dict['num_channels'] > 1:
+                if plot_flags["plot_indv_CCFs"] and img_props_dict['num_channels'] > 1:
                     if img_props_dict['num_channels'] == 1:
                         log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
                     indv_ccf_plots = pt.plot_indv_ccf_workflow(
@@ -338,7 +327,7 @@ def combined_workflow(
                         indv_ccfs=indv_ccfs,
                         img_parameters_dict=img_parameters_dict,
                         img_props=img_props_dict,
-                        dark_plots=dark_plots
+                        dark_plots=plot_flags["dark_plots"]
                     )
                     indv_ccf_plots_path = os.path.join(im_save_path, 'Individual_CCF_plots')
                     os.makedirs(indv_ccf_plots_path, exist_ok=True)
@@ -409,7 +398,7 @@ def combined_workflow(
 
         if group_names != ['']:
             # generate comparisons between each group
-            mean_parameter_figs = pt.generate_group_comparison(summary_df = summary_df, log_params = log_params, dark_plots = dark_plots)
+            mean_parameter_figs = pt.generate_group_comparison(summary_df = summary_df, log_params = log_params, dark_plots = plot_flags["dark_plots"])
             group_plots_save_path = os.path.join(main_save_path, "group_comparison_graphs")
             os.makedirs(group_plots_save_path, exist_ok=True) if not test else None
             hf.save_plots(mean_parameter_figs, group_plots_save_path) if not test else None

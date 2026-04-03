@@ -11,14 +11,17 @@ def default_log_params():
         'Base Directory': 'tests/assets/kymo',
         'ACF Peak Prominence': 0.1,
         'Group Names': ['Group1', 'Group2'],
-        'Plot Summary ACFs': False,
-        'Plot Summary CCFs': False,
-        'Plot Summary Peaks': False,
-        'Plot Individual ACFs': False,
-        'Plot Individual CCFs': False,
-        'Plot Individual Peaks': False,
+        'plot_flags': {
+            'plot_summary_ACFs': False,
+            'plot_summary_CCFs': False,
+            'plot_summary_peaks': False,
+            'plot_indv_ACFs': False,
+            'plot_indv_CCFs': False,
+            'plot_indv_peaks': False,
+            'dark_plots': False,
+        },
         'Calc Wave Speeds': False,
-        'Plot Wave Speeds': False, 
+        'Plot Wave Speeds': False,
         'Files Processed': [],
         'Files Not Processed': [],
         'Errors': [],
@@ -34,7 +37,6 @@ def default_log_params():
             "Ch4": {"window": 11, "poly_order": 3},
             "CCF": {"window": 11, "poly_order": 3},
         },
-        "Dark Plots": False,
     }
 
 def test_kymo_workflow(default_log_params):
@@ -43,27 +45,21 @@ def test_kymo_workflow(default_log_params):
     assert isinstance(known_results, pd.DataFrame)
     exp_results = combined_workflow(
         folder_path=str(Path('tests/assets/kymo')),
-        group_names= default_log_params['Group Names'],
+        group_names=default_log_params['Group Names'],
         log_params=default_log_params,
         analysis_type='kymograph',
         box_size=None, #type: ignore
         bin_shift=default_log_params['Line Shift(px)'],
-        line_width=default_log_params['Line Size(px)'],         
+        line_width=default_log_params['Line Size(px)'],
         acf_peak_thresh=default_log_params['ACF Peak Prominence'],
         ccf_peak_thresh=default_log_params['CCF Peak Prominence'],
         small_shifts_correction=default_log_params['Small Shifts Correction'],
-        plot_summary_ACFs=default_log_params['Plot Summary ACFs'],
-        plot_summary_CCFs=default_log_params['Plot Summary CCFs'],
-        plot_summary_peaks=default_log_params['Plot Summary Peaks'],
-        plot_indv_ACFs=default_log_params['Plot Individual ACFs'],
-        plot_indv_CCFs=default_log_params['Plot Individual CCFs'],
-        plot_indv_peaks=default_log_params['Plot Individual Peaks'],
+        plot_flags=default_log_params['plot_flags'],
         calc_wave_speeds=default_log_params['Calc Wave Speeds'],
         plot_wave_speeds=default_log_params['Plot Wave Speeds'],
         smoothing_params=default_log_params['smoothing_params'],
         smoothing=default_log_params['Smoothing'],
         test=True,
-        dark_plots=default_log_params['Dark Plots'],
     )
     pd.testing.assert_frame_equal(
         known_results.reset_index(drop=True),

@@ -11,12 +11,15 @@ def default_log_params():
         'Base Directory': 'tests/assets/standard',
         'ACF Peak Prominence': 0.1,
         'Group Names': ['Group1', 'Group2'], #['DC191', 'DC192', 'DC193', 'DC206'], # #['WT','Y653A','F649A','FYAA','FY-AA_P731D','FY-AA_PC-DK'], # # #
-        'Plot Summary ACFs': False,
-        'Plot Summary CCFs': False,
-        'Plot Summary Peaks': False,
-        'Plot Individual ACFs': False,
-        'Plot Individual CCFs': False,
-        'Plot Individual Peaks': False,
+        'plot_flags': {
+            'plot_summary_ACFs': False,
+            'plot_summary_CCFs': False,
+            'plot_summary_peaks': False,
+            'plot_indv_ACFs': False,
+            'plot_indv_CCFs': False,
+            'plot_indv_peaks': False,
+            'dark_plots': False,
+        },
         'Calc Wave Speeds': False,
         'Plot Wave Speeds': False,
         'Files Processed': [],
@@ -52,17 +55,11 @@ def test_standard_workflow(default_log_params):
         acf_peak_thresh=default_log_params['ACF Peak Prominence'],
         ccf_peak_thresh=default_log_params['CCF Peak Prominence'],
         small_shifts_correction=default_log_params['Small Shifts Correction'],
-        plot_summary_ACFs=default_log_params['Plot Summary ACFs'],
-        plot_summary_CCFs=default_log_params['Plot Summary CCFs'],
-        plot_summary_peaks=default_log_params['Plot Summary Peaks'],
-        plot_indv_ACFs=default_log_params['Plot Individual ACFs'],
-        plot_indv_CCFs=default_log_params['Plot Individual CCFs'],
-        plot_indv_peaks=default_log_params['Plot Individual Peaks'],
+        plot_flags=default_log_params['plot_flags'],
         calc_wave_speeds=None, #type: ignore
         plot_wave_speeds=None, #type: ignore
         smoothing_params=default_log_params['smoothing_params'],
         smoothing=default_log_params['Smoothing'],
-        dark_plots=default_log_params['Dark Plots'],
         test=True
     )
     # assert pd.testing.assert_frame_equal(known_results, exp_results) is None
