@@ -41,7 +41,7 @@ def plot_indv_peak_workflow(
 				# Extract the bin values for the current channel and bin
 				to_plot = raw_bin_values[:,channel, bin] if analysis_type == 'standard' else raw_bin_values[channel, bin]
 				# Generate and store the figure for the current channel and bin
-				indv_peak_figs[f'Ch{channel + 1} Bin {bin + 1} Peak Props'] = return_indv_peak_prop_figure(
+				indv_peak_figs[f'Ch{channel + 1} Bin {bin + 1} Peak Props'] = _return_indv_peak_prop_figure(
 					bin_signal=to_plot,
 					prop_dict=indv_peak_props[f'Ch {channel} Bin {bin}'],
 					channel_name=f'Ch{channel + 1} Bin {bin + 1}',
@@ -52,7 +52,7 @@ def plot_indv_peak_workflow(
 	
 	return indv_peak_figs
 
-def return_indv_peak_prop_figure(
+def _return_indv_peak_prop_figure(
     bin_signal: np.ndarray, 
     prop_dict: dict, 
     channel_name: str,
@@ -214,7 +214,7 @@ def plot_indv_acf_workflow(
 					raw_to_plot = raw_bin_values[:,channel, bin] if analysis_type == 'standard' else raw_bin_values[channel, bin]
 				to_plot = bin_values[:,channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
 				# Generate and store the figure for the current channel and bin
-				indv_acf_plots[f'Ch{channel + 1} Bin {bin + 1} ACF'] = return_indv_acf_figure(
+				indv_acf_plots[f'Ch{channel + 1} Bin {bin + 1} ACF'] = _return_indv_acf_figure(
 					raw_to_plot = raw_to_plot if raw_bin_values is not None else None,
 					signal=to_plot, 
 					acf_curve=indv_acfs[channel, bin], 
@@ -227,7 +227,7 @@ def plot_indv_acf_workflow(
 				
 	return indv_acf_plots
 
-def return_indv_acf_figure(
+def _return_indv_acf_figure(
     raw_to_plot: np.ndarray,
     signal: np.ndarray, 
     acf_curve: np.ndarray, 
@@ -329,9 +329,9 @@ def plot_indv_ccf_workflow(
 					to_plot1 = bin_values[combo[0], bin]
 					to_plot2 = bin_values[combo[1], bin]
 				# Generate and store the figure for the current channel and bin
-				indv_ccf_plots[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Bin {bin + 1} CCF'] = return_indv_ccf_figure(
-					ch1 = normalize_signal(to_plot1),
-					ch2 = normalize_signal(to_plot2),
+				indv_ccf_plots[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Bin {bin + 1} CCF'] = _return_indv_ccf_figure(
+					ch1 = _normalize_signal(to_plot1),
+					ch2 = _normalize_signal(to_plot2),
 					ccf_curve = indv_ccfs[combo_number, bin],
 					ch1_name = f'Ch{combo[0] + 1}',
 					ch2_name = f'Ch{combo[1] + 1}',
@@ -343,7 +343,7 @@ def plot_indv_ccf_workflow(
 				
 	return indv_ccf_plots
 
-def return_indv_ccf_figure(
+def _return_indv_ccf_figure(
     ch1: np.ndarray, 
     ch2: np.ndarray, 
     ccf_curve: np.ndarray, 
@@ -403,7 +403,7 @@ def return_indv_ccf_figure(
     return fig
 
 
-def normalize_signal(signal: np.ndarray) -> np.ndarray:
+def _normalize_signal(signal: np.ndarray) -> np.ndarray:
     '''
     Normalize a signal between 0 and 1.
     '''

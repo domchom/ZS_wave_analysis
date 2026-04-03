@@ -37,7 +37,7 @@ def summarize_image(
         for submovie in range(num_submovies):
             stats_rows = []
             for parameter, parameter_measurements in img_metrics.items():
-                parameter_with_stats = add_stats_for_parameter(parameter_measurements[submovie], parameter, num_channels, channel_combos)
+                parameter_with_stats = _add_stats_for_parameter(parameter_measurements[submovie], parameter, num_channels, channel_combos)
                 for channel_combo_stat in parameter_with_stats:
                     stats_rows.append(channel_combo_stat)
 
@@ -47,7 +47,7 @@ def summarize_image(
     else:
         # insert Mean, Median, StdDev, and SEM into the beginning of each list
         for parameter, parameter_measurements in img_metrics.items():
-            parameter_with_stats = add_stats_for_parameter(parameter_measurements, parameter, num_channels, channel_combos)
+            parameter_with_stats = _add_stats_for_parameter(parameter_measurements, parameter, num_channels, channel_combos)
             stats_by_parameter[parameter] = parameter_with_stats
             for channel_combo_stat in parameter_with_stats:
                 im_measurements.append(channel_combo_stat)
@@ -57,7 +57,7 @@ def summarize_image(
 
     return im_measurements, stats_by_parameter
 
-def add_stats_for_parameter(
+def _add_stats_for_parameter(
     measurements: np.ndarray,
     measurement_name: str,
     num_channels: int,

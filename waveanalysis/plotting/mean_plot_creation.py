@@ -29,7 +29,7 @@ def plot_mean_ACF_workflow(
     # Loop through each channel and generate the mean ACF figure
     for channel in range(num_channels):
         # Generate and store the figure for the current channel
-        mean_acf_figs[f'Ch{channel + 1} Mean ACF'] = return_mean_ACF_figure(
+        mean_acf_figs[f'Ch{channel + 1} Mean ACF'] = _return_mean_ACF_figure(
             signal=indv_acfs[channel], 
             periods=indv_periods[channel], 
             channel=f'Ch{channel + 1}',
@@ -39,7 +39,7 @@ def plot_mean_ACF_workflow(
 
     return mean_acf_figs
 
-def return_mean_ACF_figure(
+def _return_mean_ACF_figure(
     signal: np.ndarray, 
     periods: np.ndarray, 
     channel: str,
@@ -121,7 +121,7 @@ def plot_mean_peak_props_workflow(
     # Loop through each channel and generate the mean peak property figure
     for channel in range(num_channels):
         # Generate and store the figure for the current channel
-        mean_peak_figs[f'Ch{channel + 1} Peak Props'] = return_mean_prop_peaks_figure(
+        mean_peak_figs[f'Ch{channel + 1} Peak Props'] = _return_mean_prop_peaks_figure(
             min_array=indv_peak_mins[channel], 
             max_array=indv_peak_maxs[channel], 
             amp_array=indv_peak_amps[channel], 
@@ -133,7 +133,7 @@ def plot_mean_peak_props_workflow(
 
     return mean_peak_figs
 
-def return_mean_prop_peaks_figure(
+def _return_mean_prop_peaks_figure(
     min_array: np.ndarray, 
     max_array: np.ndarray, 
     amp_array: np.ndarray, 
@@ -245,7 +245,7 @@ def plot_mean_CCF_workflow(
     # Loop through each channel combination and generate the mean CCF figure
     for combo_number, combo in enumerate(channel_combos):
         # Generate and store the figure for the current channel combination
-        mean_ccf_figs[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Mean CCF'] = return_mean_CCF_figure(
+        mean_ccf_figs[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Mean CCF'] = _return_mean_CCF_figure(
         signal=indv_ccfs[combo_number], 
         shifts=indv_shifts[combo_number], 
         channel_combo=f'Ch{combo[0] + 1}-Ch{combo[1] + 1}',
@@ -255,7 +255,7 @@ def plot_mean_CCF_workflow(
 
     return mean_ccf_figs
 
-def return_mean_CCF_figure(
+def _return_mean_CCF_figure(
     signal: np.ndarray, 
     shifts: np.ndarray, 
     channel_combo: str, 

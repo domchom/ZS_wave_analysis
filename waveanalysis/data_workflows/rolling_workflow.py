@@ -1,6 +1,5 @@
 import os
 import timeit
-import datetime
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
@@ -10,9 +9,9 @@ import waveanalysis.plotting as pt
 import waveanalysis.signal_processing as sp
 import waveanalysis.housekeeping.housekeeping_functions as hf
 
-from waveanalysis.image_props.image_bin_calc import create_multi_frame_bin_array, smooth_signal
+from waveanalysis.data_workflows._helpers import _setup_workflow, _load_image_props, _smooth_bin_values_inplace
+from waveanalysis.image_props.image_bin_calc import create_multi_frame_bin_array
 from waveanalysis.image_props.image_to_np_arrays import tiff_to_np_array_multi_frame
-from waveanalysis.image_props.image_properties import get_multi_frame_properties
 from waveanalysis.summarize_save.summarize_images import summarize_image, combine_stats_rolling
 
 def rolling_workflow(
@@ -55,16 +54,7 @@ def rolling_workflow(
     Returns:
     - pd.DataFrame: The summary data for each file.
     '''       
-    # list of file names in specified directory
-    file_names = [fname for fname in os.listdir(folder_path) if fname.endswith('.tif') and not fname.startswith('.')]
-
-    # performance tracker
-    start = timeit.default_timer()
-
-    # create main save path
-    now = datetime.datetime.now()
-    main_save_path = os.path.join(folder_path, f"0_signalProcessing-{now.strftime('%Y%m%d%H%M')}")
-    os.makedirs(main_save_path, exist_ok=True) if not test else None
+    file_names, start, now, main_save_path = _setup_workflow(folder_path, test)
 
     print('Processing files...')
 
@@ -79,63 +69,32 @@ def rolling_workflow(
                 ####### Image Convert and Properties #######
                 ############################################
 
-                # Get image properties
                 image_path = f'{folder_path}/{file_name}'
-                img_props = get_multi_frame_properties(image_path=image_path)
+                assert isinstance(roll_size, int) and isinstance(roll_by, int), 'Roll size and roll by must be integers'
 
-                # check if frame interval is not 1 or None and log it
-                frame_interval = hf.check_frame_interval(frame_interval=img_props['frame_interval'], log_params=log_params, file_name=file_name)
-                img_props['frame_interval'] = frame_interval
+                img_props = _load_image_props(
+                    image_path, log_params, file_name,
+                    bin_shift=box_shift, box_size=box_size, acf_peak_thresh=acf_peak_thresh,
+                )
+                if img_props is None:
+                    log_params['Files Not Processed'].append(f'{file_name} has less than 11 frames')
+                    continue
 
-                # add other image properties to the dictionary for later use
-                img_props['step'] = box_shift
-                img_props['box_size'] = box_size
-                img_props['peak_thresh'] = acf_peak_thresh
                 num_frames = img_props['num_frames']
                 num_channels = img_props['num_channels']
-
-                # log image properties
-                log_params['Pixel Size'].append(f"{file_name}: {img_props['pixel_size']} {img_props['pixel_unit']}s")
-                log_params['Frame Interval'].append(f"{file_name}: {img_props['frame_interval']} seconds")
-
-                assert isinstance(roll_size, int) and isinstance(roll_by, int), 'Roll size and roll by must be integers'
                 num_submovies = (num_frames - roll_size) // roll_by
                 img_props['num_submovies'] = num_submovies
 
-                # log error and skip image if frames < 2; otherwise
-                if img_props['num_frames'] < 11:
-                    print(f"****** ERROR ******",
-                        f"\n{file_name} has less than 11 frames. Movies must have more than 10 frames",
-                        "\n****** ERROR ******")
-                    log_params['Files Not Processed'].append(f'{file_name} has less than 11 frames')
-                    continue
-                
-                # Create the array for which all future processing will be based on
                 image_array = tiff_to_np_array_multi_frame(image_path)
-                bin_values, num_bins, num_x_bins, num_y_bins = create_multi_frame_bin_array(
-                                                                    image = image_array,
-                                                                    img_props = img_props
-                                                                )
-                
-                if smoothing:
-                    raw_bin_values = bin_values.copy() # keep a copy of the raw bin values before smoothing
-                else:
-                    raw_bin_values = None
+                bin_values, num_bins, num_x_bins, num_y_bins = create_multi_frame_bin_array(image=image_array, img_props=img_props)
+                raw_bin_values = bin_values.copy() if smoothing else None
+                _smooth_bin_values_inplace(bin_values, num_bins, num_channels, smoothing_params)
 
-                # smooth the bin values if specified
-                for channel in range(img_props['num_channels']):
-                    ch_params = (smoothing_params or {}).get(f"Ch{channel + 1}")
-                    for bin in range(num_bins):
-                        if ch_params is not None:
-                            signal = bin_values[:, channel, bin]
-                            bin_values[:, channel, bin] = smooth_signal(signal=signal, window=ch_params["window"], poly_order=ch_params["poly_order"])
-            
                 img_props['num_bins'] = num_bins
                 img_props['num_x_bins'] = num_x_bins
                 img_props['num_y_bins'] = num_y_bins
 
-                # name without the extension
-                file_stem = file_name.rsplit(".",1)[0]
+                file_stem = file_name.rsplit(".", 1)[0]
 
                 ############################################
                 ############## Signal Processing ###########

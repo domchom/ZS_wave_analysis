@@ -20,8 +20,8 @@ def get_multi_frame_properties(image_path: str) -> dict:
         metadata = tif_file.imagej_metadata
 
         # Get the pixel size in the X, Y, and Z dimensions
-        x = get_voxel_size(tags, 'XResolution')
-        y = get_voxel_size(tags, 'YResolution')
+        x = _get_voxel_size(tags, 'XResolution')
+        y = _get_voxel_size(tags, 'YResolution')
         z = metadata.get('spacing', 1.0)
         pixel_size = [x, y, z]
 
@@ -51,8 +51,8 @@ def get_single_frame_properties(image_path: str) -> dict:
         metadata = tif_file.imagej_metadata
 
         # Get the pixel size in the X, Y, and Z dimensions
-        x = get_voxel_size(tags, 'XResolution')
-        y = get_voxel_size(tags, 'YResolution')
+        x = _get_voxel_size(tags, 'XResolution')
+        y = _get_voxel_size(tags, 'YResolution')
         z = metadata.get('spacing', 1.0)
         pixel_size = [x, y, z]
         
@@ -76,7 +76,7 @@ def get_single_frame_properties(image_path: str) -> dict:
         
     return img_props_dict
 
-def get_voxel_size(tags, key) -> float:
+def _get_voxel_size(tags, key) -> float:
     '''
     Get the size of each pixel in the image.
     '''

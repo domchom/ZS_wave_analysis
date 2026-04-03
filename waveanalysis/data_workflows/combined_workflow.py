@@ -1,17 +1,16 @@
 import os
 import timeit
-import datetime
 import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from typing import Any
 import waveanalysis.plotting as pt
 import waveanalysis.signal_processing as sp
-import waveanalysis.housekeeping.housekeeping_functions as hf 
+import waveanalysis.housekeeping.housekeeping_functions as hf
 
+from waveanalysis.data_workflows._helpers import _setup_workflow, _load_image_props, _smooth_bin_values_inplace
 from waveanalysis.image_props.image_bin_calc import create_multi_frame_bin_array, create_kymo_bin_array, smooth_signal
 from waveanalysis.image_props.image_to_np_arrays import tiff_to_np_array_multi_frame, tiff_to_np_array_single_frame
-from waveanalysis.image_props.image_properties import get_multi_frame_properties, get_single_frame_properties
 from waveanalysis.summarize_save.save_stats import save_parameter_means_to_csv, get_mean_CCF_values, get_indv_CCF_values, save_ccf_values_to_csv
 from waveanalysis.summarize_save.summarize_images import summarize_image, combine_stats_for_image_kymo_standard
 #import pickle
@@ -78,19 +77,8 @@ def combined_workflow(
     Returns:
     - pd.DataFrame: The summary data for each file.
     '''
-    # list of file names in specified directory
-    file_names = [fname for fname in os.listdir(folder_path) if fname.endswith('.tif') and not fname.startswith('.')]
-
-    # check for group name errors          
+    file_names, start, now, main_save_path = _setup_workflow(folder_path, test)
     hf.group_name_error_check(file_names=file_names, group_names=group_names, log_params=log_params)
-
-    # performance tracker
-    start = timeit.default_timer()
-
-    # create main save path
-    now = datetime.datetime.now()
-    main_save_path = os.path.join(folder_path, f"0_signalProcessing-{now.strftime('%Y%m%d%H%M')}")
-    os.makedirs(main_save_path, exist_ok=True) if not test else None
 
     # empty list to fill with summary data for each file, and column headers list
     summary_list, col_headers = [], []
@@ -108,75 +96,38 @@ def combined_workflow(
                 ####### Image Convert and Properties #######
                 ############################################
 
-                image_path = f'{folder_path}/{file_name}'  
-                
-                # Get image properties
-                if analysis_type == 'standard':
-                    img_props = get_multi_frame_properties(image_path=image_path)
-                else: 
-                    img_props = get_single_frame_properties(image_path=image_path)
+                image_path = f'{folder_path}/{file_name}'
 
-                # check if frame interval is not 1 or None and log it
-                frame_interval = hf.check_frame_interval(frame_interval=img_props['frame_interval'], log_params=log_params, file_name=file_name)
-                img_props['frame_interval'] = frame_interval
-
-                # add other image properties to the dictionary for later use
-                img_props['step'] = bin_shift
-                img_props['box_size'] = box_size if analysis_type == 'standard' else None
-                img_props['line_width'] = line_width if analysis_type == 'kymograph' else None
-                img_props['analysis_type'] = analysis_type
-                img_props['peak_thresh'] = acf_peak_thresh
-
-                # log image properties
-                log_params['Pixel Size'].append(f"{file_name}: {img_props['pixel_size']} {img_props['pixel_unit']}s")
-                log_params['Frame Interval'].append(f"{file_name}: {img_props['frame_interval']} seconds")
-
-                # log error and skip image if frames < 2; otherwise, log image as processed
-                if img_props['num_frames'] < 11:
-                    print(f"****** ERROR ******",
-                        f"\n{file_name} has less than 11 frames. Movies must have more than 10 frames",
-                        "\n****** ERROR ******")
-                    log_params['Files Not Processed'].append(f'{file_name}')
+                img_props = _load_image_props(
+                    image_path, log_params, file_name,
+                    bin_shift=bin_shift,
+                    box_size=box_size if analysis_type == 'standard' else None,
+                    acf_peak_thresh=acf_peak_thresh,
+                    analysis_type=analysis_type,
+                    extra_props={
+                        'line_width': line_width if analysis_type == 'kymograph' else None,
+                        'analysis_type': analysis_type,
+                    },
+                )
+                if img_props is None:
+                    log_params['Files Not Processed'].append(file_name)
                     log_params['Errors'].append(f'{file_name} has less than 11 frames')
                     continue
 
-                # Create the array of bin values for which all the stats will be calculated
                 if analysis_type == 'standard':
                     image_array = tiff_to_np_array_multi_frame(image_path)
-                    bin_values, num_bins, _, _ = create_multi_frame_bin_array(image = image_array, 
-                                                                                img_props = img_props)
-                    if smoothing:
-                        raw_bin_values = bin_values.copy() # keep a copy of the raw bin values before smoothing
-                    else:
-                        raw_bin_values = None
-
-                    # smooth the bin values if specified
-                    for channel in range(img_props['num_channels']):
-                        ch_params = (smoothing_params or {}).get(f"Ch{channel + 1}")
-                        for bin in range(num_bins):
-                            if ch_params is not None:
-                                signal = bin_values[:, channel, bin]
-                                bin_values[:, channel, bin] = smooth_signal(signal=signal, window=ch_params["window"], poly_order=ch_params["poly_order"])
-
-                    # np.save(f'/Users/domchom/Desktop/{file_name}_bin_values.npy', bin_values)
-                                    
-                else: # analysis_type == 'kymograph'
+                    bin_values, num_bins, _, _ = create_multi_frame_bin_array(image=image_array, img_props=img_props)
+                    raw_bin_values = bin_values.copy() if smoothing else None
+                    _smooth_bin_values_inplace(bin_values, num_bins, img_props['num_channels'], smoothing_params)
+                else:  # kymograph
                     image_array = tiff_to_np_array_single_frame(image_path)
-                    bin_values, num_bins = create_kymo_bin_array(image = image_array,
-                                                                    img_props = img_props)
-                    
-                    if smoothing:
-                        raw_bin_values = bin_values.copy() # keep a copy of the raw bin values before smoothing
-                    else:
-                        raw_bin_values = None
-
-                    # smooth the bin values if specified
+                    bin_values, num_bins = create_kymo_bin_array(image=image_array, img_props=img_props)
+                    raw_bin_values = bin_values.copy() if smoothing else None
                     for channel in range(img_props['num_channels']):
                         ch_params = (smoothing_params or {}).get(f"Ch{channel + 1}")
-                        for bin in range(num_bins):
-                            if ch_params is not None:
-                                signal = bin_values[channel, bin]
-                                bin_values[channel, bin] = smooth_signal(signal=signal, window=ch_params["window"], poly_order=ch_params["poly_order"])
+                        if ch_params is not None:
+                            for bin in range(num_bins):
+                                bin_values[channel, bin] = smooth_signal(signal=bin_values[channel, bin], window=ch_params["window"], poly_order=ch_params["poly_order"])
                     
                 # get the channel combinations
                 channel_combos = hf.get_channel_combos(num_channels=img_props['num_channels'])

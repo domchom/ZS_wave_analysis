@@ -122,7 +122,7 @@ def get_indv_CCF_values(
             # Create a list of tuples containing the time, channel 1 value, channel 2 value, and CCF value
             ccf_curve = indv_ccfs[combo_number, bin]
             arr_list = [i * frame_interval for i in range(len(ccf_curve))]
-            measurements = list(zip_longest(arr_list,  normalize_signal(to_plot1), normalize_signal(to_plot2), ccf_curve, fillvalue=None))
+            measurements = list(zip_longest(arr_list,  _normalize_signal(to_plot1), _normalize_signal(to_plot2), ccf_curve, fillvalue=None))
 
             indv_ccf_values[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Bin {bin + 1} CCF'] = measurements
             
@@ -137,10 +137,10 @@ def save_ccf_values_to_csv(
     '''
     for filename, measurements in values.items():
         file_path = os.path.join(path, f'{filename}.csv')
-        headers, data = determine_structure_and_values(measurements)
-        write_to_csv(file_path, headers, data)
+        headers, data = _determine_structure_and_values(measurements)
+        _write_to_csv(file_path, headers, data)
 
-def determine_structure_and_values(measurements: Union[List[Tuple], List[List]]) -> Tuple[List[str], List[Tuple]]:
+def _determine_structure_and_values(measurements: Union[List[Tuple], List[List]]) -> Tuple[List[str], List[Tuple]]:
     '''
     Determine the structure of the measurements and return the headers and values.
     '''
@@ -157,7 +157,7 @@ def determine_structure_and_values(measurements: Union[List[Tuple], List[List]])
 
     return headers, measurements
 
-def write_to_csv(file_path: str, headers: List[str], data: List[Tuple]) -> None:
+def _write_to_csv(file_path: str, headers: List[str], data: List[Tuple]) -> None:
     '''
     Write the headers and data to a CSV file.
     '''
@@ -166,7 +166,7 @@ def write_to_csv(file_path: str, headers: List[str], data: List[Tuple]) -> None:
         writer.writerow(headers)
         writer.writerows(data)
 
-def normalize_signal(signal: np.ndarray) -> np.ndarray:
+def _normalize_signal(signal: np.ndarray) -> np.ndarray:
     '''
     Normalize a signal between 0 and 1.
     '''

@@ -26,7 +26,7 @@ def plot_rolling_summary(
 
     # Generate the rolling mean plots for the mean period
     for channel in range(num_channels):
-        rolling_mean_periods[f'Ch{channel + 1} Period'] = return_mean_periods_shifts_props_plots(
+        rolling_mean_periods[f'Ch{channel + 1} Period'] = _return_mean_periods_shifts_props_plots(
             independent_variable='Submovie',
             dependent_variable=f'Ch {channel + 1} Mean Period',
             dependent_error=f'Ch {channel + 1} StdDev Period',
@@ -41,7 +41,7 @@ def plot_rolling_summary(
     # Generate the rolling mean plots for the mean shifts
     if num_channels > 1:
         for combo_number, combo in enumerate(channel_combos):
-            rolling_mean_shifts[f'Ch{combo[0]+1}-Ch{combo[1]+1} Shift'] = return_mean_periods_shifts_props_plots(
+            rolling_mean_shifts[f'Ch{combo[0]+1}-Ch{combo[1]+1} Shift'] = _return_mean_periods_shifts_props_plots(
                 independent_variable='Submovie',
                 dependent_variable=f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift',
                 dependent_error=f'Ch{combo[0]+1}-Ch{combo[1]+1} StdDev Shift',
@@ -56,7 +56,7 @@ def plot_rolling_summary(
     # Generate the rolling mean plots for the peak properties
     for channel in range(num_channels):
         for prop_name in ['Width', 'Max', 'Min', 'Amp', 'Rel Amp', 'Offset', 'Area']:
-            rolling_mean_peak_props[f'Ch{channel+1} {prop_name}'] = return_mean_periods_shifts_props_plots(
+            rolling_mean_peak_props[f'Ch{channel+1} {prop_name}'] = _return_mean_periods_shifts_props_plots(
                 independent_variable='Submovie',
                 dependent_variable=f'Ch {channel+1} Mean Peak {prop_name}',
                 dependent_error=f'Ch {channel+1} StdDev Peak {prop_name}',
@@ -70,7 +70,7 @@ def plot_rolling_summary(
 
     return rolling_mean_plots_dict
 
-def return_mean_periods_shifts_props_plots(
+def _return_mean_periods_shifts_props_plots(
     independent_variable: str, 
     dependent_variable: str, 
     dependent_error: str, 
