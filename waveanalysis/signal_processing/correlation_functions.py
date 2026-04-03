@@ -22,6 +22,14 @@ _CCF_PEAK_PROMINENCE = 0.1
 # from noise or other factors.
 _SMALL_SHIFT_CORRECTION_THRESHOLD = 0.6
 
+def _get_signal(bin_values: np.ndarray, channel: int, bin: int, analysis_type: str) -> np.ndarray:
+    """Extract a single channel/bin signal from bin_values.
+
+    standard analysis stores frames along axis 0: bin_values[frames, channels, bins]
+    kymograph/rolling stores no frames axis: bin_values[channels, bins]
+    """
+    return bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
+
 def calc_indv_ACF_workflow(
     bin_values: np.ndarray,
     img_props: dict,
@@ -50,7 +58,7 @@ def calc_indv_ACF_workflow(
     for channel in range(num_channels):
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
-            signal = bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin] 
+            signal = _get_signal(bin_values, channel, bin, analysis_type)
             # Calculate and store the individual ACF for the current channel and bin
             acf_curve = calc_indv_ACF(signal=signal, num_frames=num_frames, peak_thresh=acf_peak_thresh)
             indv_acfs[channel, bin] = acf_curve
@@ -153,12 +161,8 @@ def calc_indv_CCF_workflow(
     for combo_number, combo in enumerate(channel_combos):
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
-            if analysis_type == 'standard':
-                signal1 = bin_values[:, combo[0], bin] #sig.savgol_filter(bin_values[:, combo[0], bin], window_length=11, polyorder=3)
-                signal2 = bin_values[:, combo[1], bin] #sig.savgol_filter(bin_values[:, combo[1], bin], window_length=11, polyorder=3)
-            else:
-                signal1 = bin_values[combo[0], bin] #signal1 = sig.savgol_filter(bin_values[combo[0], bin], window_length=11, polyorder=3)
-                signal2 = bin_values[combo[1], bin] #signal2 = sig.savgol_filter(bin_values[combo[1], bin], window_length=11, polyorder=3)
+            signal1 = _get_signal(bin_values, combo[0], bin, analysis_type)
+            signal2 = _get_signal(bin_values, combo[1], bin, analysis_type)
             # Calculate and store the individual CCF for the current combination of channels and bin
             ccf = calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=num_frames, ccf_smoothing=ccf_smoothing)
             indv_ccfs[combo_number, bin] = ccf
@@ -236,7 +240,7 @@ def calc_indv_shift_workflow(
         for bin in range(num_bins):
             # Calculate and store the individual shift for the current combination of channels and bin
             shift = calc_indv_shift(cc_curve=indv_ccfs[combo_number, bin], ccf_peak_thresh=ccf_peak_thresh)
-            if small_shifts_correction == True:
+            if small_shifts_correction:
                 average_period = np.mean(indv_periods[:, bin]) # If the shift is too small, correct it
                 shift = correct_small_shifts(delay_frames=shift, average_period=average_period)
             indv_shifts[combo_number, bin] = shift

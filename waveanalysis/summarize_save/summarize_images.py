@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy as np
 import pandas as pd
 
@@ -177,7 +178,7 @@ def combine_stats_for_image_kymo_standard(
 def combine_stats_rolling(
     img_props: dict,
     img_metrics: dict,
-    indv_ccfs: np.ndarray = None,
+    indv_ccfs: Optional[np.ndarray] = None,
 ) -> pd.DataFrame:
     '''
     Combine statistics for rolling analysis.

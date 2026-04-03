@@ -1,44 +1,46 @@
-import pytest
+"""
+Tests for calc_indv_shift_workflow (correlation_functions.py).
+
+Takes pre-computed CCF arrays and periods as inputs (reuses *_indv_ccfs.pkl
+and *_periods.pkl). small_shifts_correction=True and ccf_peak_thresh=0.1 are
+hardcoded to match the settings used when the known shifts were generated.
+To regenerate: run tests/regenerate_assets.py
+"""
+import pickle
+import json
 import numpy as np
 from waveanalysis.signal_processing.correlation_functions import calc_indv_shift_workflow
 
-import pickle
-import json
+GROUPS = ['1_Group1', '1_Group2']
 
-@pytest.fixture
-def default_shifts():
-    return [
-        'tests/assets/standard/dicts_lists/shifts_1_Group1.tif.pkl',
-        'tests/assets/standard/dicts_lists/shifts_1_Group2.tif.pkl'
-    ]
-     
-def test_shift_calc(default_shifts):
-    default_period_values = [
-        'tests/assets/standard/dicts_lists/periods_1_Group1.tif.pkl',
-        'tests/assets/standard/dicts_lists/periods_1_Group2.tif.pkl'
-        ]
-    
-    default_ccf_values = [
-        'tests/assets/standard/dicts_lists/CCF_1_Group1.tif.pkl',
-        'tests/assets/standard/dicts_lists/CCF_1_Group2.tif.pkl'
-        ]
+KNOWN_SHIFT_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_shifts.pkl' for g in GROUPS
+]
+PERIOD_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_periods.pkl' for g in GROUPS
+]
+CCF_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_indv_ccfs.pkl' for g in GROUPS
+]
+IMG_PROPS_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_img_props_unsmoothed.json' for g in GROUPS
+]
 
-    default_dicts = [
-        'tests/assets/standard/dicts_lists/standard_image_properties_1_Group1_final.json',
-        'tests/assets/standard/dicts_lists/standard_image_properties_1_Group2_final.json'
-    ]
-
-    for period_file, ccf_file, shift_file, img_props_file in zip(default_period_values, default_ccf_values, default_shifts, default_dicts):
-        # Load the pickle file
+def test_shift_calc():
+    for period_file, ccf_file, shift_file, img_props_file in zip(PERIOD_FILES, CCF_FILES, KNOWN_SHIFT_FILES, IMG_PROPS_FILES):
         with open(period_file, 'rb') as f:
             periods = pickle.load(f)
         with open(ccf_file, 'rb') as f:
             ccfs = pickle.load(f)
-        with open(img_props_file, 'r') as file:
-            img_props_dict = json.load(file)
+        with open(img_props_file, 'r') as f:
+            img_props = json.load(f)
         with open(shift_file, 'rb') as f:
-            known_results = pickle.load(f)
+            known_shifts = pickle.load(f)
 
-        exp_results = calc_indv_shift_workflow(ccfs, periods, img_props_dict, small_shifts_correction=True, ccf_peak_thresh=0.1)
+        exp_shifts = calc_indv_shift_workflow(
+            ccfs, periods, img_props,
+            small_shifts_correction=True,
+            ccf_peak_thresh=0.1,
+        )
 
-        assert np.array_equal(known_results, exp_results)
+        assert np.array_equal(known_shifts, exp_shifts)

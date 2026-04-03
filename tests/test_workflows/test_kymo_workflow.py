@@ -1,3 +1,13 @@
+"""
+End-to-end test for the kymograph (single-frame line-scan) workflow.
+
+Runs combined_workflow on two 2-channel kymograph TIFFs and compares the
+summary DataFrame against a known-good CSV. Plotting is disabled because
+test=True skips directory creation.
+
+To regenerate known_kymograph_summary.csv: run combined_workflow with test=False
+on the same TIFFs and copy the output CSV here.
+"""
 import pytest
 import pandas as pd
 from pathlib import Path
@@ -40,7 +50,6 @@ def default_log_params():
     }
 
 def test_kymo_workflow(default_log_params):
-    # load csv
     known_results = pd.read_csv('tests/assets/kymo/known_kymograph_summary.csv')
     assert isinstance(known_results, pd.DataFrame)
     exp_results = combined_workflow(

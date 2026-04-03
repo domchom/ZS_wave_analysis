@@ -16,11 +16,10 @@ def make_log(
     """
     now = datetime.datetime.now()
     logPath = os.path.join(directory, f"!log-{now.strftime('%Y%m%d%H%M')}.txt")
-    logFile = open(logPath, "w")                                    
-    logFile.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")     
-    for key, value in logParams.items():                            
-        logFile.write('%s: %s\n' % (key, value))                    
-    logFile.close()
+    with open(logPath, "w") as logFile:
+        logFile.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")
+        for key, value in logParams.items():
+            logFile.write('%s: %s\n' % (key, value))
 
 def group_name_error_check(
     file_names: list[str],

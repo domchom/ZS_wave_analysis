@@ -1,3 +1,13 @@
+"""
+End-to-end test for the standard (box-based, multi-frame) workflow.
+
+Runs combined_workflow on two 2-channel TIFFs and compares the summary
+DataFrame against a known-good CSV. Plotting is disabled (plot_flags all
+False) because test=True skips directory creation, so save_plots would fail.
+
+To regenerate known_standard_summary.csv: run combined_workflow with test=False
+on the same TIFFs and copy the output CSV here.
+"""
 import pytest
 import pandas as pd
 from pathlib import Path
@@ -10,7 +20,7 @@ def default_log_params():
         'Box Shift(px)': 20,
         'Base Directory': 'tests/assets/standard',
         'ACF Peak Prominence': 0.1,
-        'Group Names': ['Group1', 'Group2'], #['DC191', 'DC192', 'DC193', 'DC206'], # #['WT','Y653A','F649A','FYAA','FY-AA_P731D','FY-AA_PC-DK'], # # #
+        'Group Names': ['Group1', 'Group2'],
         'plot_flags': {
             'plot_summary_ACFs': False,
             'plot_summary_CCFs': False,
@@ -41,9 +51,7 @@ def default_log_params():
     }
 
 def test_standard_workflow(default_log_params):
-    # load csv
     known_results = pd.read_csv('tests/assets/standard/known_standard_summary.csv')
-    assert isinstance(known_results, pd.DataFrame)
     exp_results = combined_workflow(
         folder_path=str(Path('tests/assets/standard/')),
         group_names= default_log_params['Group Names'],
@@ -62,7 +70,6 @@ def test_standard_workflow(default_log_params):
         smoothing=default_log_params['Smoothing'],
         test=True
     )
-    # assert pd.testing.assert_frame_equal(known_results, exp_results) is None
     pd.testing.assert_frame_equal(
         known_results.reset_index(drop=True),
         exp_results.reset_index(drop=True),

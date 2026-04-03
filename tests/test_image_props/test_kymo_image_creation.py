@@ -1,23 +1,24 @@
-import pytest
+"""
+Tests for tiff_to_np_array_single_frame (image_to_np_arrays.py).
+
+Verifies that loading a single-frame (kymograph) TIFF produces the expected
+numpy array (channels × height × width).
+To regenerate: run tests/regenerate_assets.py
+"""
 import numpy as np
 from waveanalysis.image_props.image_to_np_arrays import tiff_to_np_array_single_frame
 
+TIFF_FILES = [
+    'tests/assets/kymo/1_Group1.tif',
+    'tests/assets/kymo/1_Group2.tif',
+]
+KNOWN_ARRAY_FILES = [
+    'tests/assets/kymo/numpy_arrays/1_Group1_raw_image.npy',
+    'tests/assets/kymo/numpy_arrays/1_Group2_raw_image.npy',
+]
 
-@pytest.fixture
-def default_filepaths():
-    return [
-        'tests/assets/kymo/1_Group1.tif',
-        'tests/assets/kymo/1_Group2.tif'
-    ]
-
-def test_kymo_image_creation(default_filepaths):
-    default_arrays = [
-        np.load('tests/assets/kymo/numpy_arrays/kymo_1_Group1_array.npy'),
-        np.load('tests/assets/kymo/numpy_arrays/kymo_1_Group2_array.npy')
-    ]
-    # load csv
-    for file_path in default_filepaths:
-        known_results = default_arrays[default_filepaths.index(file_path)]
-        exp_results = tiff_to_np_array_single_frame(file_path)
-
-        assert np.array_equal(known_results, exp_results)
+def test_kymo_image_creation():
+    for tiff_file, known_file in zip(TIFF_FILES, KNOWN_ARRAY_FILES):
+        known_array = np.load(known_file)
+        exp_array = tiff_to_np_array_single_frame(tiff_file)
+        assert np.array_equal(known_array, exp_array)

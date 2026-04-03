@@ -1,6 +1,7 @@
 import warnings
 import numpy as np
 import scipy.signal as sig
+from .correlation_functions import _get_signal
 
 warnings.filterwarnings("ignore") # Ignore warnings
 
@@ -58,7 +59,7 @@ def calc_indv_peak_props_workflow(
     for channel in range(num_channels):
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
-            signal = bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
+            signal = _get_signal(bin_values, channel, bin, analysis_type)
             peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*_PEAK_PROMINENCE_FRACTION)
 
             # If peaks detected, calculate properties, otherwise return NaNs

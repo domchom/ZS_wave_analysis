@@ -1,3 +1,14 @@
+"""
+End-to-end test for the rolling (subframe, box-based) workflow.
+
+Runs rolling_workflow on two 2-channel TIFFs and compares the summary
+DataFrame against a known-good CSV. The workflow processes files in order
+and returns early (after 1_Group2) when test=True, so only that file's
+results are in the known CSV.
+
+To regenerate known_1_Group2_summary.csv: run rolling_workflow with test=True
+and save the returned DataFrame.
+"""
 import pytest
 import pandas as pd
 from pathlib import Path
@@ -32,7 +43,6 @@ def default_log_params():
 
 
 def test_rolling_workflow(default_log_params):
-    # load csv
     known_results = pd.read_csv('tests/assets/rolling/known_1_Group2_summary.csv')
     assert isinstance(known_results, pd.DataFrame)
     exp_results = rolling_workflow(

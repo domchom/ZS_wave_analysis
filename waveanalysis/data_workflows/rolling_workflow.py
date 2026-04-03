@@ -66,9 +66,6 @@ def rolling_workflow(
     main_save_path = os.path.join(folder_path, f"0_signalProcessing-{now.strftime('%Y%m%d%H%M')}")
     os.makedirs(main_save_path, exist_ok=True) if not test else None
 
-    # list of file names in specified directory
-    file_names = [fname for fname in os.listdir(folder_path) if fname.endswith('.tif') and not fname.startswith('.')]
-
     print('Processing files...')
 
     with tqdm(total = len(file_names)) as pbar:
@@ -293,5 +290,5 @@ def rolling_workflow(
 
             pbar.update(1)
 
-            if file_stem == '1_Group2':
-                return summary_df # only return this now for testing purposes. Will remove later
+            if test and file_stem == '1_Group2':
+                return summary_df

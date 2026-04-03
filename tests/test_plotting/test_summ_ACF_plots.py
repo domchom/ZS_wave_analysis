@@ -1,44 +1,44 @@
-import pytest
-from waveanalysis.plotting.mean_plot_creation import plot_mean_ACF_workflow
+"""
+Tests for plot_mean_ACF_workflow (mean_plot_creation.py).
 
+Verifies that the function runs without error and returns the expected number
+of figures (one per channel). Comparing matplotlib Figure objects across
+environments is not reliable, so we only check the count.
+To regenerate inputs: run tests/regenerate_assets.py
+
+Inputs:
+  - img_parameters: per-bin analysis results dict (Period, Peak Amp, etc.)
+  - img_props: image metadata + analysis config (unsmoothed variant)
+  - acf_array: pre-computed ACF curves (channels × bins × frames)
+"""
 import pickle
 import json
+from waveanalysis.plotting.mean_plot_creation import plot_mean_ACF_workflow
 
-@pytest.fixture
-def default_mean_ACF_plots():
-    return [
-        'tests/assets/standard/dicts_lists/mean_acf_figs_1_Group1.tif.pkl',
-        'tests/assets/standard/dicts_lists/mean_acf_figs_1_Group2.tif.pkl'
-        ]
-     
-def test_mean_ACF_plot(default_mean_ACF_plots):
-    default_img_params = [
-        'tests/assets/standard/dicts_lists/img_parameters_1_Group1.tif.pkl',
-        'tests/assets/standard/dicts_lists/img_parameters_1_Group2.tif.pkl'       
-        ]
+GROUPS = ['1_Group1', '1_Group2']
 
-    default_dicts = [
-        'tests/assets/standard/dicts_lists/1_Group1_img_props.json',
-        'tests/assets/standard/dicts_lists/1_Group2_img_props.json'
-    ]
+IMG_PARAMETERS_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_img_parameters.pkl' for g in GROUPS
+]
+IMG_PROPS_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_img_props_unsmoothed.json' for g in GROUPS
+]
+ACF_ARRAY_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_indv_acfs.pkl' for g in GROUPS
+]
 
-    default_ACFs = [
-        'tests/assets/standard/dicts_lists/ACF_1_Group1.tif.pkl',
-        'tests/assets/standard/dicts_lists/ACF_1_Group2.tif.pkl'
-    ]
+# Both test images have 2 channels → expect 2 figures each
+EXPECTED_PLOT_COUNT = 2
 
-    for img_param_file, acf_file, img_props_file, mean_acf_plot_file in zip(default_img_params, default_ACFs, default_dicts, default_mean_ACF_plots):
-        # Load the pickle file
-        with open(acf_file, 'rb') as f:
-            acf_curves = pickle.load(f)
-        with open(img_props_file, 'r') as file:
-            img_props_dict = json.load(file)
-        with open(img_param_file, 'rb') as f:
+def test_mean_ACF_plot():
+    for img_params_file, img_props_file, acf_file in zip(IMG_PARAMETERS_FILES, IMG_PROPS_FILES, ACF_ARRAY_FILES):
+        with open(img_params_file, 'rb') as f:
             img_params = pickle.load(f)
-        with open(mean_acf_plot_file, 'rb') as f:
-            known_results = pickle.load(f)
-        exp_results = plot_mean_ACF_workflow(img_params, img_props_dict, acf_curves)
+        with open(img_props_file, 'r') as f:
+            img_props = json.load(f)
+        with open(acf_file, 'rb') as f:
+            acf_array = pickle.load(f)
 
-        
-        assert len(exp_results) == len(known_results)
-        # TODO: figure out a better way to test this
+        result = plot_mean_ACF_workflow(img_params, img_props, acf_array)
+
+        assert len(result) == EXPECTED_PLOT_COUNT
