@@ -4,6 +4,24 @@ import scipy.signal as sig
 
 warnings.filterwarnings("ignore") # Ignore warnings
 
+# Fraction of signal amplitude (max - min) required as peak prominence for detection
+# for calculating peak properties.
+# TODO: make this user-configurable in the future, but for now we want to be able to
+# detect smaller peaks that may be present in the data, so we set a relatively low threshold.
+_PEAK_PROMINENCE_FRACTION = 0.1
+
+# rel_height used when computing left/right peak bases — 0.99 gives the
+# full-width near the base of the peak rather than at half-height.
+# Used to determine if one peak entirely encompasses another, 
+# which would indicate that the encompassed peak is not fully resolved 
+# and should be excluded from offset calculations.
+_PEAK_BASE_REL_HEIGHT = 0.99
+
+# Savitzky-Golay pre-smoothing applied inside rolling peak detection.
+# This is separate from the user-configurable per-channel smoothing.
+_ROLLING_SMOOTH_WINDOW = 11
+_ROLLING_SMOOTH_POLY = 2
+
 def calc_indv_peak_props_workflow(
     bin_values:np.ndarray,
     img_props:dict
@@ -41,7 +59,7 @@ def calc_indv_peak_props_workflow(
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
             signal = bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
-            peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*0.1)
+            peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*_PEAK_PROMINENCE_FRACTION)
 
             # If peaks detected, calculate properties, otherwise return NaNs
             if len(peaks) > 0:
@@ -50,11 +68,11 @@ def calc_indv_peak_props_workflow(
                 proms, _, _ = sig.peak_prominences(signal, peaks)
 
                 # calculate the left and right bases of the peaks, then midpoints and peak offsets
-                _, _, left_bases, right_bases = sig.peak_widths(signal, peaks, rel_height=.99)
+                _, _, left_bases, right_bases = sig.peak_widths(signal, peaks, rel_height=_PEAK_BASE_REL_HEIGHT)
                 midpoints = (leftWidthIndex + rightWidthIndex) / 2
                 peak_offsets = peaks - midpoints
 
-                # Check if one peak entirely encompasses another
+                # Check if one peak entirely encompasses another. If so, the encompassed peak is not fully resolved and should be excluded from offset calculations.
                 for i in range(len(peaks)):
                     for j in range(len(peaks)):
                         if i != j:  # Avoid self-comparison
@@ -177,8 +195,8 @@ def calc_indv_peak_props_rolling(signal: np.ndarray) -> tuple:
         tuple: A tuple containing the mean width, mean maximum, mean minimum, and mean offset of the peaks. If no peaks are detected, NaN values are returned.
     '''
     # Calculate the peak properties
-    signal = sig.savgol_filter(signal, window_length = 11, polyorder = 2)                 
-    peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*0.1)
+    signal = sig.savgol_filter(signal, window_length=_ROLLING_SMOOTH_WINDOW, polyorder=_ROLLING_SMOOTH_POLY)
+    peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*_PEAK_PROMINENCE_FRACTION)
 
     # If peaks detected, calculate properties, otherwise return NaNs
     if len(peaks) > 0:
@@ -191,7 +209,7 @@ def calc_indv_peak_props_rolling(signal: np.ndarray) -> tuple:
         mean_min = np.mean(signal[peaks]-proms, axis = 0)
 
         # calculate the left and right bases of the peaks, then midpoints and peak offsets
-        _, _, left_bases, right_bases = sig.peak_widths(signal, peaks, rel_height=.99)
+        _, _, left_bases, right_bases = sig.peak_widths(signal, peaks, rel_height=_PEAK_BASE_REL_HEIGHT)
         midpoints = (leftWidthIndex + rightWidthIndex) / 2
         peak_offsets = peaks - midpoints
         # Check if one peak entirely encompasses another

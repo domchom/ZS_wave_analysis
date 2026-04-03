@@ -1,6 +1,27 @@
 import numpy as np
 from scipy import signal as sig
 
+# Fraction of signal amplitude required as prominence to confirm both signals
+# are oscillatory before computing CCF. Filters out flat or noisy signals.
+# Not sure how much this specific value actually matters.
+_CCF_SIGNAL_PEAK_PROMINENCE = 0.25
+
+# Minimum prominence in the normalized CCF curve for a peak to be considered valid.
+# This is not the user-configurable threshold for calculating the shift, 
+# but rather a threshold to filter out noisy or flat CCF curves that do not have clear peaks.
+_CCF_PEAK_PROMINENCE = 0.1
+
+# If a detected shift exceeds this fraction of the period it is assumed to be a
+# phase-aliased measurement and is corrected by ±1 period. 
+# We chose 0.6 as the threshold to allow for some variability in the period while 
+# still correcting for small shifts that are likely due to noise or phase aliasing. 
+# This means that if the detected shift is greater than 60% of the average period, 
+# it will be corrected by adding or subtracting the average period, depending on 
+# the direction of the shift. This helps to improve the accuracy of the shift 
+# measurements by reducing the impact of small, spurious shifts that may arise 
+# from noise or other factors.
+_SMALL_SHIFT_CORRECTION_THRESHOLD = 0.6
+
 def calc_indv_ACF_workflow(
     bin_values: np.ndarray,
     img_props: dict,
@@ -154,8 +175,8 @@ def calc_indv_CCF(
     Space saving function to calculate individual cross-correlation functions (CCFs) for each combination of channels and bins.
     '''
     # Find peaks in the signals
-    peaks1, _ = sig.find_peaks(signal1, prominence=(np.max(signal1)-np.min(signal1))*0.25)
-    peaks2, _ = sig.find_peaks(signal2, prominence=(np.max(signal2)-np.min(signal2))*0.25)
+    peaks1, _ = sig.find_peaks(signal1, prominence=(np.max(signal1)-np.min(signal1))*_CCF_SIGNAL_PEAK_PROMINENCE)
+    peaks2, _ = sig.find_peaks(signal2, prominence=(np.max(signal2)-np.min(signal2))*_CCF_SIGNAL_PEAK_PROMINENCE)
 
     # If peaks are found in both signals
     if len(peaks1) > 0 and len(peaks2) > 0:
@@ -170,7 +191,7 @@ def calc_indv_CCF(
             cc_curve = sig.savgol_filter(cc_curve, window_length=ccf_smoothing["window"], polyorder=ccf_smoothing["poly_order"])
         cc_curve = cc_curve / (num_frames * signal1.std() * signal2.std())
         # Find peaks in the cross-correlation curve
-        peaks, _ = sig.find_peaks(cc_curve, prominence=0.1)
+        peaks, _ = sig.find_peaks(cc_curve, prominence=_CCF_PEAK_PROMINENCE)
 
         # If less than two peaks found, return NaNs
         if len(peaks) < 2:
@@ -250,7 +271,7 @@ def correct_small_shifts(
     Correct small shifts in the cross-correlation curve.
     '''
     # If the shift is larger than 60% of the average period, correct it by subtracting the average period
-    if abs(delay_frames) > abs(average_period * .6):
+    if abs(delay_frames) > abs(average_period * _SMALL_SHIFT_CORRECTION_THRESHOLD):
         if delay_frames < 0:
             delay_frames = delay_frames + average_period
         elif delay_frames > 0:
