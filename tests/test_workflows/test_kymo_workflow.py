@@ -28,6 +28,7 @@ def default_log_params():
             'plot_indv_ACFs': False,
             'plot_indv_CCFs': False,
             'plot_indv_peaks': False,
+            'plot_heatmaps': False,
             'dark_plots': False,
         },
         'Calc Wave Speeds': False,

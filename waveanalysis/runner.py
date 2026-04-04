@@ -49,6 +49,7 @@ def main():
             "Plot Individual ACFs": params["plot_flags"]["plot_indv_ACFs"],
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
+            "Plot Heatmaps": params["plot_flags"]["plot_heatmaps"],
             "Dark Plots": params["plot_flags"]["dark_plots"],
         })
     elif analysis_type == "rolling":
@@ -72,6 +73,7 @@ def main():
             "Plot Individual ACFs": params["plot_flags"]["plot_indv_ACFs"],
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
+            "Plot Heatmaps": params["plot_flags"]["plot_heatmaps"],
             "Dark Plots": params["plot_flags"]["dark_plots"],
             "Calc Wave Speeds": params["calculate_wave_speeds"],
             "Plot Wave Speeds": True,

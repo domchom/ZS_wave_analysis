@@ -116,7 +116,9 @@ def combined_workflow(
 
                 if analysis_type == 'standard':
                     image_array = tiff_to_np_array_multi_frame(image_path)
-                    bin_values, num_bins, _, _ = create_multi_frame_bin_array(image=image_array, img_props=img_props)
+                    bin_values, num_bins, num_x_bins, num_y_bins = create_multi_frame_bin_array(image=image_array, img_props=img_props)
+                    img_props['num_x_bins'] = num_x_bins
+                    img_props['num_y_bins'] = num_y_bins
                     raw_bin_values = bin_values.copy() if smoothing else None
                     _smooth_bin_values_inplace(bin_values, num_bins, img_props['num_channels'], smoothing_params)
                 else:  # kymograph
@@ -224,6 +226,18 @@ def combined_workflow(
                         dark_plots=plot_flags["dark_plots"]
                     )
                     hf.save_plots(mean_peak_figs, im_save_path)
+
+                # plot spatial metric heatmaps (standard analysis only)
+                if plot_flags["plot_heatmaps"] and analysis_type == 'standard':
+                    heatmap_figs = pt.plot_metric_heatmaps_workflow(
+                        img_metrics=img_metrics,
+                        img_props=img_props,
+                        image_array=image_array,
+                        dark_plots=plot_flags["dark_plots"],
+                    )
+                    heatmap_path = os.path.join(im_save_path, 'Metric_Heatmaps')
+                    os.makedirs(heatmap_path, exist_ok=True)
+                    hf.save_plots(heatmap_figs, heatmap_path)
 
                 # plot the mean CCF figures for the file
                 if plot_flags["plot_summary_CCFs"] and img_props['num_channels'] > 1:
