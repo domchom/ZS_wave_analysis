@@ -16,11 +16,6 @@ _DEFAULT_PEAK_PROMINENCE_FRACTION = 0.1
 # and should be excluded from offset calculations.
 _PEAK_BASE_REL_HEIGHT = 0.99
 
-# Savitzky-Golay pre-smoothing applied inside rolling peak detection.
-# This is separate from the user-configurable per-channel smoothing.
-_ROLLING_SMOOTH_WINDOW = 11
-_ROLLING_SMOOTH_POLY = 2
-
 def calc_indv_peak_props_workflow(
     bin_values:np.ndarray,
     img_props:dict

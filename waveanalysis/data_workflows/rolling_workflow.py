@@ -139,9 +139,10 @@ def rolling_workflow(
                                 indv_peak_maxs[submovie, channel, bin] = mean_max
                                 indv_peak_mins[submovie, channel, bin] = mean_min
                                 indv_peak_offsets[submovie, channel, bin] = mean_offset
-                                indv_peak_amps = indv_peak_maxs - indv_peak_mins
-                                indv_peak_rel_amps = indv_peak_amps / indv_peak_mins
                                 indv_peak_areas[submovie, channel, bin] = mean_area
+
+                indv_peak_amps = indv_peak_maxs - indv_peak_mins
+                indv_peak_rel_amps = indv_peak_amps / indv_peak_mins
 
                 channel_combos = hf.get_channel_combos(num_channels=num_channels)
                 num_combos = len(channel_combos)
@@ -167,7 +168,7 @@ def rolling_workflow(
                                     
                                     shift = sp.calc_indv_shift(cc_curve=ccf, ccf_peak_thresh=ccf_peak_thresh)
                                     if small_shifts_correction:
-                                        average_period = np.nanmean(indv_periods[:, :, bin])
+                                        average_period = np.nanmean(indv_periods[submovie, :, bin])
                                         shift = sp.correct_small_shifts(delay_frames=shift, average_period=average_period)
                                     indv_shifts[submovie, combo_number, bin] = shift
 
