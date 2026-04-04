@@ -119,6 +119,7 @@ class BaseGUI(_GUIBase):
             "dark_plots": tk.BooleanVar(value=True),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
+            "peak_prominence_fraction": tk.DoubleVar(value=0.1),
             "group_names": tk.StringVar(value=""),
             "smoothing": tk.BooleanVar(value=True),
             "folder_path": tk.StringVar(value=""),
@@ -150,24 +151,25 @@ class BaseGUI(_GUIBase):
         self._add_entry(4, 0, self.vars["bin_shift"], "Box shift (pixels)")
         self._add_entry(5, 0, self.vars["acf_peak_thresh"], "ACF peak threshold")
         self._add_entry(6, 0, self.vars["ccf_peak_thresh"], "CCF peak threshold")
-        self._add_checkbutton(7, 0, self.vars["small_shifts_correction"], "Small shifts correction")
+        self._add_entry(7, 0, self.vars["peak_prominence_fraction"], "Peak prominence fraction")
+        self._add_checkbutton(8, 0, self.vars["small_shifts_correction"], "Small shifts correction")
 
         # ---- SEPARATORS ----
-        ttk.Separator(self, orient="horizontal").grid(row=8, column=0, columnspan=11, sticky="ew", pady=10)
-        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=9, sticky="ns", pady=10)
+        ttk.Separator(self, orient="horizontal").grid(row=9, column=0, columnspan=11, sticky="ew", pady=10)
+        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=10, sticky="ns", pady=10)
 
         # ---- PLOT OPTIONS ----
         ttk.Label(self, text="PLOT OPTIONS",
                   font=("TkDefaultFont", 16, "bold"), anchor="center").grid(
-            row=9, column=1, columnspan=3, padx=10, pady=(0, 10), sticky="ew")
-        self._add_checkbutton(10, 0, self.vars["plot_summary_ACFs"], "Plot summary ACFs")
-        self._add_checkbutton(11, 0, self.vars["plot_summary_CCFs"], "Plot summary CCFs")
-        self._add_checkbutton(12, 0, self.vars["plot_summary_peaks"], "Plot summary peaks")
-        self._add_checkbutton(10, 2, self.vars["plot_indv_ACFs"], "Plot individual ACFs")
-        self._add_checkbutton(11, 2, self.vars["plot_indv_CCFs"], "Plot individual CCFs")
-        self._add_checkbutton(12, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
-        self._add_checkbutton(10, 4, self.vars["dark_plots"], "Dark plots")
-        self._add_checkbutton(11, 4, self.vars["plot_heatmaps"], "Plot heatmaps")
+            row=10, column=1, columnspan=3, padx=10, pady=(0, 10), sticky="ew")
+        self._add_checkbutton(11, 0, self.vars["plot_summary_ACFs"], "Plot summary ACFs")
+        self._add_checkbutton(12, 0, self.vars["plot_summary_CCFs"], "Plot summary CCFs")
+        self._add_checkbutton(13, 0, self.vars["plot_summary_peaks"], "Plot summary peaks")
+        self._add_checkbutton(11, 2, self.vars["plot_indv_ACFs"], "Plot individual ACFs")
+        self._add_checkbutton(12, 2, self.vars["plot_indv_CCFs"], "Plot individual CCFs")
+        self._add_checkbutton(13, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
+        self._add_checkbutton(11, 4, self.vars["dark_plots"], "Dark plots")
+        self._add_checkbutton(12, 4, self.vars["plot_heatmaps"], "Plot heatmaps")
 
         # ---- SMOOTHING OPTIONS ----
         self._build_smoothing_section(default_poly=2)
@@ -175,10 +177,10 @@ class BaseGUI(_GUIBase):
         ttk.Label(self, text="Enable smoothing").grid(row=6, column=4, sticky="W")
 
         # ---- BUTTONS ----
-        ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=10, column=8, columnspan=2, padx=10, sticky="E")
-        ttk.Button(self, text="Cancel", command=self.cancel_analysis).grid(row=9, column=8, columnspan=2, padx=10, sticky="E")
-        ttk.Button(self, text="Launch rolling analysis", command=self.launch_rolling_analysis).grid(row=11, column=8, columnspan=2, padx=10, sticky="E")
-        ttk.Button(self, text="Launch kymograph analysis", command=self.launch_kymograph_analysis).grid(row=12, column=8, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=11, column=8, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Cancel", command=self.cancel_analysis).grid(row=10, column=8, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Launch rolling analysis", command=self.launch_rolling_analysis).grid(row=12, column=8, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Launch kymograph analysis", command=self.launch_kymograph_analysis).grid(row=13, column=8, columnspan=2, padx=10, sticky="E")
 
     def launch_rolling_analysis(self):
         self.rolling = True
@@ -212,6 +214,7 @@ class RollingGUI(_GUIBase):
             "dark_plots": tk.BooleanVar(value=False),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
+            "peak_prominence_fraction": tk.DoubleVar(value=0.1),
             "smoothing": tk.BooleanVar(value=True),
             "folder_path": tk.StringVar(value=""),
             "Ch1_smoothing": tk.BooleanVar(value=True),
@@ -239,18 +242,19 @@ class RollingGUI(_GUIBase):
         self._add_entry(6, 0, self.vars["subframe_roll"], "Subframe roll (frames)")
         self._add_entry(7, 0, self.vars["acf_peak_thresh"], "ACF peak threshold")
         self._add_entry(8, 0, self.vars["ccf_peak_thresh"], "CCF peak threshold")
-        self._add_checkbutton(9, 0, self.vars["small_shifts_correction"], "Small shifts correction")
-        self._add_checkbutton(10, 0, self.vars["dark_plots"], "Dark plots")
+        self._add_entry(9, 0, self.vars["peak_prominence_fraction"], "Peak prominence fraction")
+        self._add_checkbutton(10, 0, self.vars["small_shifts_correction"], "Small shifts correction")
+        self._add_checkbutton(11, 0, self.vars["dark_plots"], "Dark plots")
 
         # ---- SEPARATORS ----
-        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=11, sticky="ns", pady=10)
+        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=12, sticky="ns", pady=10)
 
         # ---- SMOOTHING OPTIONS ----
         self._build_smoothing_section(default_poly=3)
 
         # ---- BUTTONS ----
-        ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=11, column=7, columnspan=2, padx=10, sticky="E")
-        ttk.Button(self, text="Cancel", command=self.cancel_analysis).grid(row=10, column=7, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=12, column=7, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Cancel", command=self.cancel_analysis).grid(row=11, column=7, columnspan=2, padx=10, sticky="E")
 
 
 class KymographGUI(_GUIBase):
@@ -280,6 +284,7 @@ class KymographGUI(_GUIBase):
             "dark_plots": tk.BooleanVar(value=False),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
+            "peak_prominence_fraction": tk.DoubleVar(value=0.1),
             "group_names": tk.StringVar(value=""),
             "smoothing": tk.BooleanVar(value=True),
             "folder_path": tk.StringVar(value=""),
@@ -311,24 +316,25 @@ class KymographGUI(_GUIBase):
         self._add_entry(4, 0, self.vars["bin_shift"], "Line shift (pixels)")
         self._add_entry(5, 0, self.vars["acf_peak_thresh"], "ACF peak threshold")
         self._add_entry(6, 0, self.vars["ccf_peak_thresh"], "CCF peak threshold")
-        self._add_checkbutton(7, 0, self.vars["small_shifts_correction"], "Small shifts correction")
+        self._add_entry(7, 0, self.vars["peak_prominence_fraction"], "Peak prominence fraction")
+        self._add_checkbutton(8, 0, self.vars["small_shifts_correction"], "Small shifts correction")
 
         # ---- SEPARATORS ----
-        ttk.Separator(self, orient="horizontal").grid(row=8, column=0, columnspan=11, sticky="ew", pady=10)
-        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=9, sticky="ns", pady=10)
+        ttk.Separator(self, orient="horizontal").grid(row=9, column=0, columnspan=11, sticky="ew", pady=10)
+        ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=10, sticky="ns", pady=10)
 
         # ---- PLOT OPTIONS ----
         ttk.Label(self, text="PLOT OPTIONS",
                   font=("TkDefaultFont", 16, "bold"), anchor="center").grid(
-            row=9, column=1, columnspan=3, padx=10, pady=(0, 10), sticky="ew")
-        self._add_checkbutton(10, 0, self.vars["plot_summary_ACFs"], "Plot summary ACFs")
-        self._add_checkbutton(11, 0, self.vars["plot_summary_CCFs"], "Plot summary CCFs")
-        self._add_checkbutton(12, 0, self.vars["plot_summary_peaks"], "Plot summary peaks")
-        self._add_checkbutton(10, 2, self.vars["plot_indv_ACFs"], "Plot individual ACFs")
-        self._add_checkbutton(11, 2, self.vars["plot_indv_CCFs"], "Plot individual CCFs")
-        self._add_checkbutton(12, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
-        self._add_checkbutton(10, 4, self.vars["dark_plots"], "Dark plots")
-        self._add_checkbutton(11, 4, self.vars["plot_heatmaps"], "Plot heatmaps")
+            row=10, column=1, columnspan=3, padx=10, pady=(0, 10), sticky="ew")
+        self._add_checkbutton(11, 0, self.vars["plot_summary_ACFs"], "Plot summary ACFs")
+        self._add_checkbutton(12, 0, self.vars["plot_summary_CCFs"], "Plot summary CCFs")
+        self._add_checkbutton(13, 0, self.vars["plot_summary_peaks"], "Plot summary peaks")
+        self._add_checkbutton(11, 2, self.vars["plot_indv_ACFs"], "Plot individual ACFs")
+        self._add_checkbutton(12, 2, self.vars["plot_indv_CCFs"], "Plot individual CCFs")
+        self._add_checkbutton(13, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
+        self._add_checkbutton(11, 4, self.vars["dark_plots"], "Dark plots")
+        self._add_checkbutton(12, 4, self.vars["plot_heatmaps"], "Plot heatmaps")
 
         # ---- SMOOTHING OPTIONS ----
         self._build_smoothing_section(default_poly=3)
@@ -336,5 +342,5 @@ class KymographGUI(_GUIBase):
         ttk.Label(self, text="Enable smoothing").grid(row=6, column=4, sticky="W")
 
         # ---- BUTTONS ----
-        ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=10, column=8, columnspan=2, padx=10, sticky="E")
-        ttk.Button(self, text="Cancel", command=self.cancel_analysis).grid(row=9, column=8, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=11, column=8, columnspan=2, padx=10, sticky="E")
+        ttk.Button(self, text="Cancel", command=self.cancel_analysis).grid(row=10, column=8, columnspan=2, padx=10, sticky="E")

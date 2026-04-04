@@ -5,11 +5,9 @@ from .correlation_functions import _get_signal
 
 warnings.filterwarnings("ignore") # Ignore warnings
 
-# Fraction of signal amplitude (max - min) required as peak prominence for detection
-# for calculating peak properties.
-# TODO: make this user-configurable in the future, but for now we want to be able to
-# detect smaller peaks that may be present in the data, so we set a relatively low threshold.
-_PEAK_PROMINENCE_FRACTION = 0.1
+# Default fraction of signal amplitude (max - min) required as peak prominence.
+# Overridden by the user-supplied value passed through img_props.
+_DEFAULT_PEAK_PROMINENCE_FRACTION = 0.1
 
 # rel_height used when computing left/right peak bases — 0.99 gives the
 # full-width near the base of the peak rather than at half-height.
@@ -46,6 +44,7 @@ def calc_indv_peak_props_workflow(
     num_channels = img_props['num_channels']
     num_bins = img_props['num_bins']
     analysis_type = img_props['analysis_type']
+    peak_prominence_fraction = img_props.get('peak_prominence_fraction', _DEFAULT_PEAK_PROMINENCE_FRACTION)
 
     # Initialize arrays to store the individual peak properties
     indv_peak_widths = np.zeros(shape=(num_channels, num_bins))
@@ -60,7 +59,7 @@ def calc_indv_peak_props_workflow(
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
             signal = _get_signal(bin_values, channel, bin, analysis_type)
-            peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*_PEAK_PROMINENCE_FRACTION)
+            peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*peak_prominence_fraction)
 
             # If peaks detected, calculate properties, otherwise return NaNs
             if len(peaks) > 0:
@@ -185,7 +184,7 @@ def calc_indv_peak_props_workflow(
     
     return indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas
 
-def calc_indv_peak_props_rolling(signal: np.ndarray) -> tuple:
+def calc_indv_peak_props_rolling(signal: np.ndarray, peak_prominence_fraction: float = _DEFAULT_PEAK_PROMINENCE_FRACTION) -> tuple:
     '''
     Calculate the individual peak properties of a signal using rolling window.
 
@@ -196,7 +195,7 @@ def calc_indv_peak_props_rolling(signal: np.ndarray) -> tuple:
         tuple: A tuple containing the mean width, mean maximum, mean minimum, and mean offset of the peaks. If no peaks are detected, NaN values are returned.
     '''
     # Find peaks in the (already-smoothed) signal
-    peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*_PEAK_PROMINENCE_FRACTION)
+    peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*peak_prominence_fraction)
 
     # If peaks detected, calculate properties, otherwise return NaNs
     if len(peaks) > 0:

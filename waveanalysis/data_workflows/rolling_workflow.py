@@ -23,6 +23,7 @@ def rolling_workflow(
     acf_peak_thresh: float,
     ccf_peak_thresh: float,
     small_shifts_correction: bool,
+    peak_prominence_fraction: float = 0.1,
     test: bool = False, # for testing purposes
     smoothing_params: dict = None,
     smoothing: bool = True,
@@ -74,6 +75,7 @@ def rolling_workflow(
                 img_props = _load_image_props(
                     image_path, log_params, file_name,
                     bin_shift=bin_shift, box_size=box_size, acf_peak_thresh=acf_peak_thresh,
+                    peak_prominence_fraction=peak_prominence_fraction,
                 )
                 if img_props is None:
                     log_params['Files Not Processed'].append(f'{file_name} has less than 11 frames')
@@ -130,7 +132,7 @@ def rolling_workflow(
                                 pbar.update(1)
                                 signal = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, channel, bin]
 
-                                mean_width, mean_max, mean_min, mean_offset, mean_area = sp.calc_indv_peak_props_rolling(signal=signal)
+                                mean_width, mean_max, mean_min, mean_offset, mean_area = sp.calc_indv_peak_props_rolling(signal=signal, peak_prominence_fraction=img_props['peak_prominence_fraction'])
 
                                 # Store peak measurements for each bin in each channel
                                 indv_peak_widths[submovie, channel, bin] = mean_width

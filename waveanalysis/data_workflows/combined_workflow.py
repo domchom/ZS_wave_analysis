@@ -24,6 +24,7 @@ def combined_workflow(
     ccf_peak_thresh: float,
     small_shifts_correction: bool,
     plot_flags: dict[str, bool],
+    peak_prominence_fraction: float = 0.1,
     calc_wave_speeds: bool = False,
     plot_wave_speeds: bool = False,
     box_size: int = None,
@@ -103,6 +104,7 @@ def combined_workflow(
                     bin_shift=bin_shift,
                     box_size=box_size if analysis_type == 'standard' else None,
                     acf_peak_thresh=acf_peak_thresh,
+                    peak_prominence_fraction=peak_prominence_fraction,
                     analysis_type=analysis_type,
                     extra_props={
                         'line_width': line_width if analysis_type == 'kymograph' else None,

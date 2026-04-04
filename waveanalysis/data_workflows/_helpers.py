@@ -32,6 +32,7 @@ def _setup_workflow(folder_path: str, test: bool):
 
 def _load_image_props(image_path: str, log_params: dict[str, Any], file_name: str,
                       bin_shift: int, box_size: int, acf_peak_thresh: float,
+                      peak_prominence_fraction: float = 0.1,
                       analysis_type: str = 'standard',
                       extra_props: dict = None) -> dict:
     """
@@ -61,6 +62,7 @@ def _load_image_props(image_path: str, log_params: dict[str, Any], file_name: st
     img_props['step'] = bin_shift
     img_props['box_size'] = box_size
     img_props['peak_thresh'] = acf_peak_thresh
+    img_props['peak_prominence_fraction'] = peak_prominence_fraction
 
     if extra_props:
         img_props.update(extra_props)
