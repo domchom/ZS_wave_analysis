@@ -18,9 +18,9 @@ def rolling_workflow(
     folder_path: str,
     log_params: dict[str, Any],
     box_size: int,
-    box_shift: int,
-    roll_size: int,
-    roll_by: int,
+    bin_shift: int,
+    subframe_size: int,
+    subframe_roll: int,
     acf_peak_thresh: float,
     ccf_peak_thresh: float,
     small_shifts_correction: bool,
@@ -48,8 +48,8 @@ def rolling_workflow(
     - acf_peak_thresh (float): The threshold for detecting peaks in the ACF curve.
     - box_size (int, optional): The size of the box for standard analysis. Defaults to None.
     - bin_shift (int, optional): The shift value for binning. Defaults to None.
-    - roll_size (int, optional): The size of the submovies.
-    - roll_by (int, optional): The amount to roll the submovies by.
+    - subframe_size (int, optional): The size of the submovies.
+    - subframe_roll (int, optional): The amount to roll the submovies by.
 
     Returns:
     - pd.DataFrame: The summary data for each file.
@@ -70,11 +70,11 @@ def rolling_workflow(
                 ############################################
 
                 image_path = f'{folder_path}/{file_name}'
-                assert isinstance(roll_size, int) and isinstance(roll_by, int), 'Roll size and roll by must be integers'
+                assert isinstance(subframe_size, int) and isinstance(subframe_roll, int), 'Roll size and roll by must be integers'
 
                 img_props = _load_image_props(
                     image_path, log_params, file_name,
-                    bin_shift=box_shift, box_size=box_size, acf_peak_thresh=acf_peak_thresh,
+                    bin_shift=bin_shift, box_size=box_size, acf_peak_thresh=acf_peak_thresh,
                 )
                 if img_props is None:
                     log_params['Files Not Processed'].append(f'{file_name} has less than 11 frames')
@@ -82,7 +82,7 @@ def rolling_workflow(
 
                 num_frames = img_props['num_frames']
                 num_channels = img_props['num_channels']
-                num_submovies = (num_frames - roll_size) // roll_by
+                num_submovies = (num_frames - subframe_size) // subframe_roll
                 img_props['num_submovies'] = num_submovies
 
                 image_array = tiff_to_np_array_multi_frame(image_path)
@@ -109,8 +109,8 @@ def rolling_workflow(
                         for channel in range(num_channels):
                             for bin in range(num_bins):
                                 pbar.update(1)
-                                signal = bin_values[roll_by * submovie: roll_size + roll_by * submovie, channel, bin]
-                                acf_curve = sp.calc_indv_ACF(signal=signal, num_frames=roll_size, peak_thresh=acf_peak_thresh)
+                                signal = bin_values[subframe_roll * submovie: subframe_size + subframe_roll * submovie, channel, bin]
+                                acf_curve = sp.calc_indv_ACF(signal=signal, num_frames=subframe_size, peak_thresh=acf_peak_thresh)
                                 period = sp.calc_indv_period(acf_curve=acf_curve, peak_thresh=acf_peak_thresh)
 
                                 indv_periods[submovie, channel, bin] = period
@@ -129,7 +129,7 @@ def rolling_workflow(
                         for channel in range(num_channels):
                             for bin in range(num_bins):
                                 pbar.update(1)
-                                signal = sig.savgol_filter(bin_values[roll_by*submovie : roll_size + roll_by*submovie, channel, bin], window_length=11, polyorder=2)
+                                signal = sig.savgol_filter(bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, channel, bin], window_length=11, polyorder=2)
 
                                 mean_width, mean_max, mean_min, mean_offset, mean_area = sp.calc_indv_peak_props_rolling(signal=signal)
 
@@ -151,7 +151,7 @@ def rolling_workflow(
                 ccf_smoothing = (smoothing_params or {}).get("CCF")
                 if num_channels > 1:
                     indv_shifts = np.zeros(shape=(num_submovies, num_combos, num_bins))
-                    indv_ccfs = np.zeros(shape=(num_submovies, num_combos, num_bins, roll_size*2-1))
+                    indv_ccfs = np.zeros(shape=(num_submovies, num_combos, num_bins, subframe_size*2-1))
                     its = num_submovies*num_combos*num_bins
                     with tqdm(total = its, miniters=its/100) as pbar:
                         pbar.set_description( 'Shifts: ')
@@ -159,9 +159,9 @@ def rolling_workflow(
                             for combo_number, combo in enumerate(channel_combos):
                                 for bin in range(num_bins):
                                     pbar.update(1)
-                                    signal1 = bin_values[roll_by*submovie : roll_size + roll_by*submovie, combo[0], bin]
-                                    signal2 = bin_values[roll_by*submovie : roll_size + roll_by*submovie, combo[1], bin]
-                                    ccf = sp.calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=roll_size, ccf_smoothing=ccf_smoothing)
+                                    signal1 = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, combo[0], bin]
+                                    signal2 = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, combo[1], bin]
+                                    ccf = sp.calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=subframe_size, ccf_smoothing=ccf_smoothing)
                                     indv_ccfs[submovie, combo_number, bin] = ccf
                                     
                                     shift = sp.calc_indv_shift(cc_curve=ccf, ccf_peak_thresh=ccf_peak_thresh)

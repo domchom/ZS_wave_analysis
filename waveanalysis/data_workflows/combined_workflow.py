@@ -210,7 +210,7 @@ def combined_workflow(
 
                 # plot the mean ACF figures for the file
                 if plot_flags["plot_summary_ACFs"]:
-                    mean_acf_figs = pt.plot_mean_ACF_workflow(
+                    mean_acf_figs = pt.plot_mean_acf_workflow(
                         img_metrics=img_metrics,
                         img_props=img_props,
                         indv_acfs=indv_acfs,
@@ -241,7 +241,7 @@ def combined_workflow(
 
                 # plot the mean CCF figures for the file
                 if plot_flags["plot_summary_CCFs"] and img_props['num_channels'] > 1:
-                    mean_ccf_figs = pt.plot_mean_CCF_workflow(
+                    mean_ccf_figs = pt.plot_mean_ccf_workflow(
                         img_metrics=img_metrics,
                         img_props=img_props,
                         indv_ccfs=indv_ccfs,

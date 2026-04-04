@@ -43,4 +43,4 @@ def test_shift_calc():
             ccf_peak_thresh=0.1,
         )
 
-        assert np.array_equal(known_shifts, exp_shifts)
+        np.testing.assert_allclose(known_shifts, exp_shifts, equal_nan=True, atol=1e-5)

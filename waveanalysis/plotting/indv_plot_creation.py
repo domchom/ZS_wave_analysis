@@ -2,6 +2,7 @@ import numpy as np
 from tqdm import tqdm
 import scipy.signal as sig
 import matplotlib.pyplot as plt
+from waveanalysis.signal_processing.correlation_functions import normalize_signal
 
 def plot_indv_peak_workflow(
 	raw_bin_values: np.ndarray,
@@ -41,10 +42,10 @@ def plot_indv_peak_workflow(
 				# Extract the bin values for the current channel and bin
 				to_plot = raw_bin_values[:,channel, bin] if analysis_type == 'standard' else raw_bin_values[channel, bin]
 				# Generate and store the figure for the current channel and bin
-				indv_peak_figs[f'Ch{channel + 1} Bin {bin + 1} Peak Props'] = _return_indv_peak_prop_figure(
+				indv_peak_figs[f'Ch {channel + 1} Bin {bin + 1} Peak Props'] = _return_indv_peak_prop_figure(
 					bin_signal=to_plot,
 					prop_dict=indv_peak_props[f'Ch {channel} Bin {bin}'],
-					channel_name=f'Ch{channel + 1} Bin {bin + 1}',
+					channel_name=f'Ch {channel + 1} Bin {bin + 1}',
 					frame_interval=frame_interval,
 					num_frames=num_frames,
 					dark_plots=dark_plots
@@ -71,8 +72,8 @@ def _return_indv_peak_prop_figure(
     leftWidthIndex = prop_dict['leftWidthIndex']
     rightWidthIndex = prop_dict['rightWidthIndex']
     midpoints = prop_dict['midpoints']
-    left_bases = prop_dict['left_base']
-    right_bases = prop_dict['right_base']
+    left_bases = prop_dict['left_bases']
+    right_bases = prop_dict['right_bases']
 
     style = 'dark_background' if dark_plots else 'default'
 
@@ -214,11 +215,11 @@ def plot_indv_acf_workflow(
 					raw_to_plot = raw_bin_values[:,channel, bin] if analysis_type == 'standard' else raw_bin_values[channel, bin]
 				to_plot = bin_values[:,channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
 				# Generate and store the figure for the current channel and bin
-				indv_acf_plots[f'Ch{channel + 1} Bin {bin + 1} ACF'] = _return_indv_acf_figure(
+				indv_acf_plots[f'Ch {channel + 1} Bin {bin + 1} ACF'] = _return_indv_acf_figure(
 					raw_to_plot = raw_to_plot if raw_bin_values is not None else None,
-					signal=to_plot, 
-					acf_curve=indv_acfs[channel, bin], 
-					channel_name=f'Ch{channel + 1}', 
+					signal=to_plot,
+					acf_curve=indv_acfs[channel, bin],
+					channel_name=f'Ch {channel + 1}',
 					period=indv_periods[channel, bin],
 					num_frames=num_frames,
 					frame_interval=frame_interval,
@@ -330,8 +331,8 @@ def plot_indv_ccf_workflow(
 					to_plot2 = bin_values[combo[1], bin]
 				# Generate and store the figure for the current channel and bin
 				indv_ccf_plots[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Bin {bin + 1} CCF'] = _return_indv_ccf_figure(
-					ch1 = _normalize_signal(to_plot1),
-					ch2 = _normalize_signal(to_plot2),
+					ch1 = normalize_signal(to_plot1),
+					ch2 = normalize_signal(to_plot2),
 					ccf_curve = indv_ccfs[combo_number, bin],
 					ch1_name = f'Ch{combo[0] + 1}',
 					ch2_name = f'Ch{combo[1] + 1}',
@@ -403,8 +404,3 @@ def _return_indv_ccf_figure(
     return fig
 
 
-def _normalize_signal(signal: np.ndarray) -> np.ndarray:
-    '''
-    Normalize a signal between 0 and 1.
-    '''
-    return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))

@@ -296,8 +296,8 @@ def regenerate_rolling():
     summary = rolling_workflow(
         folder_path=str(src),
         log_params=log_params,
-        box_size=20, box_shift=20,
-        roll_size=50, roll_by=5,
+        box_size=20, bin_shift=20,
+        subframe_size=50, subframe_roll=5,
         acf_peak_thresh=0.1, ccf_peak_thresh=0.1,
         small_shifts_correction=True,
         smoothing_params=SMOOTHING_PARAMS, smoothing=True,

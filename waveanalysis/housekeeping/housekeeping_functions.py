@@ -4,22 +4,22 @@ import datetime
 import numpy as np
 
 def make_log(
-    directory: str, 
-    logParams: dict
+    directory: str,
+    log_params: dict
 ) -> None:
     """
     Creates a log file with the current timestamp and writes the log parameters to it.
 
     Args:
         directory (str): The directory where the log file will be created.
-        logParams (dict): A dictionary containing the log parameters.
+        log_params (dict): A dictionary containing the log parameters.
     """
     now = datetime.datetime.now()
-    logPath = os.path.join(directory, f"!log-{now.strftime('%Y%m%d%H%M')}.txt")
-    with open(logPath, "w") as logFile:
-        logFile.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")
-        for key, value in logParams.items():
-            logFile.write('%s: %s\n' % (key, value))
+    log_path = os.path.join(directory, f"!log-{now.strftime('%Y%m%d%H%M')}.txt")
+    with open(log_path, "w") as log_file:
+        log_file.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")
+        for key, value in log_params.items():
+            log_file.write('%s: %s\n' % (key, value))
 
 def group_name_error_check(
     file_names: list[str],

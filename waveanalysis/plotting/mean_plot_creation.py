@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def plot_mean_ACF_workflow(
+def plot_mean_acf_workflow(
     img_metrics: dict,
     img_props: dict,
     indv_acfs: np.ndarray,
@@ -29,17 +29,17 @@ def plot_mean_ACF_workflow(
     # Loop through each channel and generate the mean ACF figure
     for channel in range(num_channels):
         # Generate and store the figure for the current channel
-        mean_acf_figs[f'Ch{channel + 1} Mean ACF'] = _return_mean_ACF_figure(
-            signal=indv_acfs[channel], 
-            periods=indv_periods[channel], 
-            channel=f'Ch{channel + 1}',
+        mean_acf_figs[f'Ch {channel + 1} Mean ACF'] = _return_mean_acf_figure(
+            signal=indv_acfs[channel],
+            periods=indv_periods[channel],
+            channel=f'Ch {channel + 1}',
             num_frames= num_frames,
             frame_interval=img_props['frame_interval'],
             dark_plots=dark_plots)    
 
     return mean_acf_figs
 
-def _return_mean_ACF_figure(
+def _return_mean_acf_figure(
     signal: np.ndarray, 
     periods: np.ndarray, 
     channel: str,
@@ -121,13 +121,13 @@ def plot_mean_peak_props_workflow(
     # Loop through each channel and generate the mean peak property figure
     for channel in range(num_channels):
         # Generate and store the figure for the current channel
-        mean_peak_figs[f'Ch{channel + 1} Peak Props'] = _return_mean_prop_peaks_figure(
-            min_array=indv_peak_mins[channel], 
-            max_array=indv_peak_maxs[channel], 
-            amp_array=indv_peak_amps[channel], 
-            width_array=indv_peak_widths[channel], 
+        mean_peak_figs[f'Ch {channel + 1} Peak Props'] = _return_mean_prop_peaks_figure(
+            min_array=indv_peak_mins[channel],
+            max_array=indv_peak_maxs[channel],
+            amp_array=indv_peak_amps[channel],
+            width_array=indv_peak_widths[channel],
             offsets_array=indv_peak_offsets[channel],
-            channel_name=f'Ch{channel + 1}',
+            channel_name=f'Ch {channel + 1}',
             dark_plots=dark_plots
             )
 
@@ -217,7 +217,7 @@ def _return_mean_prop_peaks_figure(
     return fig
 
 
-def plot_mean_CCF_workflow(
+def plot_mean_ccf_workflow(
     img_metrics: dict,
     img_props: dict,
     indv_ccfs: np.ndarray,
@@ -245,7 +245,7 @@ def plot_mean_CCF_workflow(
     # Loop through each channel combination and generate the mean CCF figure
     for combo_number, combo in enumerate(channel_combos):
         # Generate and store the figure for the current channel combination
-        mean_ccf_figs[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Mean CCF'] = _return_mean_CCF_figure(
+        mean_ccf_figs[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Mean CCF'] = _return_mean_ccf_figure(
         signal=indv_ccfs[combo_number], 
         shifts=indv_shifts[combo_number], 
         channel_combo=f'Ch{combo[0] + 1}-Ch{combo[1] + 1}',
@@ -255,7 +255,7 @@ def plot_mean_CCF_workflow(
 
     return mean_ccf_figs
 
-def _return_mean_CCF_figure(
+def _return_mean_ccf_figure(
     signal: np.ndarray, 
     shifts: np.ndarray, 
     channel_combo: str, 

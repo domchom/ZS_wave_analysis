@@ -56,7 +56,7 @@ def plot_metric_heatmaps_workflow(
         vmax = float(np.max(valid_all)) if valid_all.size > 0 else 1.0
 
         panels = [
-            (data[ch], bg_images[ch], f'Ch{ch + 1}')
+            (data[ch], bg_images[ch], f'Ch {ch + 1}')
             for ch in range(num_channels)
         ]
         heatmap_figs[f'{metric_name} Heatmap'] = _return_metric_figure(

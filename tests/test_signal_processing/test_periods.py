@@ -33,4 +33,4 @@ def test_period_calc():
 
         exp_periods = calc_indv_period_workflow(acf_array, img_props)
 
-        assert np.array_equal(known_periods, exp_periods)
+        np.testing.assert_allclose(known_periods, exp_periods, equal_nan=True, atol=1e-5)

@@ -4,6 +4,7 @@ import numpy as np
 import pandas as pd
 from itertools import zip_longest
 from typing import Union, List, Tuple
+from waveanalysis.signal_processing.correlation_functions import normalize_signal
 
 def save_parameter_means_to_csv(
     summary_df: pd.DataFrame,
@@ -122,7 +123,7 @@ def get_indv_CCF_values(
             # Create a list of tuples containing the time, channel 1 value, channel 2 value, and CCF value
             ccf_curve = indv_ccfs[combo_number, bin]
             arr_list = [i * frame_interval for i in range(len(ccf_curve))]
-            measurements = list(zip_longest(arr_list,  _normalize_signal(to_plot1), _normalize_signal(to_plot2), ccf_curve, fillvalue=None))
+            measurements = list(zip_longest(arr_list, normalize_signal(to_plot1), normalize_signal(to_plot2), ccf_curve, fillvalue=None))
 
             indv_ccf_values[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Bin {bin + 1} CCF'] = measurements
             
@@ -166,8 +167,3 @@ def _write_to_csv(file_path: str, headers: List[str], data: List[Tuple]) -> None
         writer.writerow(headers)
         writer.writerows(data)
 
-def _normalize_signal(signal: np.ndarray) -> np.ndarray:
-    '''
-    Normalize a signal between 0 and 1.
-    '''
-    return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))

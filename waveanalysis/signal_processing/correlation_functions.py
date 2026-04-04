@@ -282,3 +282,10 @@ def correct_small_shifts(
             delay_frames = delay_frames - average_period
 
     return delay_frames
+
+
+def normalize_signal(signal: np.ndarray) -> np.ndarray:
+    '''
+    Normalize a signal to the range [0, 1].
+    '''
+    return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))

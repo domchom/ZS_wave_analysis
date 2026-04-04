@@ -168,16 +168,16 @@ def calc_indv_peak_props_workflow(
             indv_peak_areas[channel, bin] = mean_area  
 
             # Store the individual peak properties in the dictionary
-            indv_peak_props[f'Ch {channel} Bin {bin}'] = {'signal': signal, 
+            indv_peak_props[f'Ch {channel} Bin {bin}'] = {'signal': signal,
                                                                 'peaks': peaks,
-                                                                'proms': proms, 
-                                                                'heights': heights, 
-                                                                'leftWidthIndex': leftWidthIndex, 
+                                                                'proms': proms,
+                                                                'heights': heights,
+                                                                'leftWidthIndex': leftWidthIndex,
                                                                 'rightWidthIndex': rightWidthIndex,
                                                                 'midpoints': midpoints,
                                                                 'peak_offsets': peak_offsets,
-                                                                'left_base': left_bases,
-                                                                'right_base': right_bases,
+                                                                'left_bases': left_bases,
+                                                                'right_bases': right_bases,
                                                                 'peak_areas': peak_areas
                                                                 }
                         

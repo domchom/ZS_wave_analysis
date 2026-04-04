@@ -13,7 +13,7 @@ Inputs:
 """
 import pickle
 import json
-from waveanalysis.plotting.mean_plot_creation import plot_mean_ACF_workflow
+from waveanalysis.plotting.mean_plot_creation import plot_mean_acf_workflow
 
 GROUPS = ['1_Group1', '1_Group2']
 
@@ -39,6 +39,6 @@ def test_mean_ACF_plot():
         with open(acf_file, 'rb') as f:
             acf_array = pickle.load(f)
 
-        result = plot_mean_ACF_workflow(img_params, img_props, acf_array)
+        result = plot_mean_acf_workflow(img_params, img_props, acf_array)
 
         assert len(result) == EXPECTED_PLOT_COUNT
