@@ -81,7 +81,8 @@ def _add_stats_for_parameter(
         meas_mean = np.nanmean(measurements_subset)
         meas_median = np.nanmedian(measurements_subset)
         meas_std = np.nanstd(measurements_subset)
-        meas_sem = meas_std / np.sqrt(len(measurements_subset))
+        n_valid = int(np.sum(np.isfinite(measurements_subset)))
+        meas_sem = meas_std / np.sqrt(n_valid) if n_valid > 0 else np.nan
         if isinstance(measurements_subset, np.ndarray):
             measurements_subset = measurements_subset.tolist()
         return [channel_label, meas_mean, meas_median, meas_std, meas_sem] + measurements_subset
