@@ -197,8 +197,12 @@ def combined_workflow(
                 if img_props['num_channels'] > 1:
                     indv_shifts = indv_shifts * img_props['frame_interval']
                     img_metrics['Shift'] = indv_shifts
-                    indv_phase_shifts = indv_shifts / np.mean(indv_periods, axis=0)
-                    img_metrics['% Phase Shift'] = indv_phase_shifts 
+                    channel_combos = img_props['channel_combos']
+                    indv_phase_shifts = np.zeros_like(indv_shifts)
+                    for combo_idx, (ch1, ch2) in enumerate(channel_combos):
+                        combo_period = np.nanmean(indv_periods[[ch1, ch2], :], axis=0)
+                        indv_phase_shifts[combo_idx] = (indv_shifts[combo_idx] / combo_period) * 100
+                    img_metrics['% Phase Shift'] = indv_phase_shifts
                     
                 # create the directory to save the figures and data for the image
                 im_save_path = os.path.join(main_save_path, file_stem)

@@ -123,14 +123,21 @@ def calc_indv_period(
     '''
     Space saving function to calculate individual periods for each channel and bin based on the autocorrelation function curve.
     '''
-    # Find peaks in the autocorrelation curve, Calculate absolute differences between peaks and center
+    center = acf_curve.shape[0] // 2
     peaks, _ = sig.find_peaks(acf_curve, prominence=peak_thresh)
-    peaks_abs = np.abs(peaks - acf_curve.shape[0] // 2)
+    peaks_abs = np.abs(peaks - center)
 
-    # If peaks are identified, pick the closest one to the center as the period
-    period = np.min(peaks_abs[np.nonzero(peaks_abs)]) if len(peaks) > 1 else np.nan
-        
-    return period
+    # Exclude the zero-lag peak, then pick the highest-prominence off-center peak.
+    # Using highest prominence rather than closest-to-center avoids reporting T/2
+    # when sub-harmonic peaks are present (e.g. sharp-wave signals).
+    nonzero_mask = peaks_abs != 0
+    if np.sum(nonzero_mask) < 1:
+        return np.nan
+
+    off_center_peaks = peaks[nonzero_mask]
+    proms, _, _ = sig.peak_prominences(acf_curve, off_center_peaks)
+    best_peak = off_center_peaks[np.argmax(proms)]
+    return float(np.abs(best_peak - center))
 
 def calc_indv_CCF_workflow(
     bin_values: np.ndarray,

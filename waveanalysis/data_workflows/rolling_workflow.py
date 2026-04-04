@@ -165,7 +165,7 @@ def rolling_workflow(
                                     
                                     shift = sp.calc_indv_shift(cc_curve=ccf, ccf_peak_thresh=ccf_peak_thresh)
                                     if small_shifts_correction:
-                                        average_period = np.mean(indv_periods[:, :, bin])
+                                        average_period = np.nanmean(indv_periods[:, :, bin])
                                         shift = sp.correct_small_shifts(delay_frames=shift, average_period=average_period)
                                     indv_shifts[submovie, combo_number, bin] = shift
 
@@ -193,7 +193,11 @@ def rolling_workflow(
                 if img_props['num_channels'] > 1:
                     indv_shifts = indv_shifts * img_props['frame_interval']
                     img_metrics['Shift'] = indv_shifts
-                    img_metrics['% Phase Shift'] = indv_shifts / indv_periods
+                    indv_phase_shifts = np.zeros_like(indv_shifts)
+                    for combo_idx, (ch1, ch2) in enumerate(channel_combos):
+                        combo_period = np.nanmean(indv_periods[:, [ch1, ch2], :], axis=1)
+                        indv_phase_shifts[:, combo_idx, :] = (indv_shifts[:, combo_idx, :] / combo_period) * 100
+                    img_metrics['% Phase Shift'] = indv_phase_shifts
 
                 # calculate the number of subframes used
                 log_params['Submovies Used'].append(num_submovies)

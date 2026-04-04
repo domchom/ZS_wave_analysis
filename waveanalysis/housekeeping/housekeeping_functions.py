@@ -179,5 +179,13 @@ def check_frame_interval(
 
         # set frame interval to 1 if it is not provided or 0
         frame_interval = 1
-    
+
+    elif frame_interval > 1000:
+        print(f"****** WARNING ******",
+            f"\n{file_name} frame interval is {frame_interval} seconds, which is unusually large.",
+            "\nImageJ/Fiji stores 'finterval' in seconds. If your software stores it in milliseconds,",
+            "\nthe reported periods, shifts, and phase shifts will be 1000x too large.",
+            "\n****** WARNING ******")
+        log_params['Errors'].append(f'{file_name} frame interval is {frame_interval} s — verify units (expected seconds, not ms)')
+
     return frame_interval

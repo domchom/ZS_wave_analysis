@@ -242,7 +242,7 @@ def combine_stats_rolling(
             
             # Calculate statistics for other parameters excluding Shift and Period
             for name, measurements in img_metrics.items():
-                if name != 'Shift':
+                if name not in ('Shift', '% Phase Shift'):
                     for stat_name, func in stat_name_and_func.items():
                         submovie_summary[f'Ch {channel + 1} {stat_name} {name}'] = func(measurements[submovie, channel])
 
