@@ -190,10 +190,10 @@ def calc_indv_CCF(
         # Calculate cross-correlation curve
         cc_curve = np.correlate(corr_signal1, corr_signal2, mode='full')
 
-        # Normalize the cross-correlation curve
+        # Normalize then optionally smooth the cross-correlation curve
+        cc_curve = cc_curve / (num_frames * signal1.std() * signal2.std())
         if ccf_smoothing is not None:
             cc_curve = sig.savgol_filter(cc_curve, window_length=ccf_smoothing["window"], polyorder=ccf_smoothing["poly_order"])
-        cc_curve = cc_curve / (num_frames * signal1.std() * signal2.std())
         # Find peaks in the cross-correlation curve
         peaks, _ = sig.find_peaks(cc_curve, prominence=_CCF_PEAK_PROMINENCE)
 

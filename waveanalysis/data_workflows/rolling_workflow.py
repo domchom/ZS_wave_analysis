@@ -4,7 +4,6 @@ import numpy as np
 import pandas as pd
 from tqdm import tqdm
 from typing import Any
-import scipy.signal as sig
 import waveanalysis.plotting as pt
 import waveanalysis.signal_processing as sp
 import waveanalysis.housekeeping.housekeeping_functions as hf
@@ -129,7 +128,7 @@ def rolling_workflow(
                         for channel in range(num_channels):
                             for bin in range(num_bins):
                                 pbar.update(1)
-                                signal = sig.savgol_filter(bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, channel, bin], window_length=11, polyorder=2)
+                                signal = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, channel, bin]
 
                                 mean_width, mean_max, mean_min, mean_offset, mean_area = sp.calc_indv_peak_props_rolling(signal=signal)
 
