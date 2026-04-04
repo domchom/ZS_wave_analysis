@@ -51,7 +51,7 @@ def plot_metric_heatmaps_workflow(
         if metric_name not in img_metrics:
             continue
         data = img_metrics[metric_name]  # (num_channels, num_bins)
-        valid_all = data[~np.isnan(data)]
+        valid_all = data[np.isfinite(data)]
         vmin = float(np.min(valid_all)) if valid_all.size > 0 else 0.0
         vmax = float(np.max(valid_all)) if valid_all.size > 0 else 1.0
 
@@ -82,7 +82,7 @@ def plot_metric_heatmaps_workflow(
             combo_label = f'Ch{ch1 + 1}-Ch{ch2 + 1}'
             values = img_metrics[metric_name][combo_idx]
             bg = (bg_images[ch1].astype(float) + bg_images[ch2].astype(float)) / 2
-            valid = values[~np.isnan(values)]
+            valid = values[np.isfinite(values)]
             vmin = float(np.min(valid)) if valid.size > 0 else 0.0
             vmax = float(np.max(valid)) if valid.size > 0 else 1.0
 
@@ -259,7 +259,7 @@ def _draw_hist_panel(
     Draw a distribution histogram with inferno-coloured bars.
     The title shows the bin detection count.
     """
-    valid   = values[~np.isnan(values)]
+    valid   = values[np.isfinite(values)]
     valid_n = valid.size
     total_n = values.size
 
