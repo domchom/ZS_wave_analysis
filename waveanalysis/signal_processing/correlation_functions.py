@@ -73,10 +73,10 @@ def calc_indv_ACF(
     '''
     Space saving function to calculate individual Auto-Correlation Function (ACF).
     '''
-    # calc autocorrelation and normalize
+    # calc autocorrelation and normalize by the zero-lag value
     corr_signal = signal - np.mean(signal)
     acf_curve = np.correlate(corr_signal, corr_signal, mode='full')
-    acf_curve = acf_curve / (num_frames * np.std(signal) ** 2)
+    acf_curve = acf_curve / acf_curve[acf_curve.shape[0] // 2]
 
     # Find peaks in the autocorrelation curve. If less than two peaks found, return NaNs
     peaks, _ = sig.find_peaks(acf_curve, prominence=peak_thresh)
