@@ -4,23 +4,22 @@ import datetime
 import numpy as np
 
 def make_log(
-    directory: str, 
-    logParams: dict
+    directory: str,
+    log_params: dict
 ) -> None:
     """
     Creates a log file with the current timestamp and writes the log parameters to it.
 
     Args:
         directory (str): The directory where the log file will be created.
-        logParams (dict): A dictionary containing the log parameters.
+        log_params (dict): A dictionary containing the log parameters.
     """
     now = datetime.datetime.now()
-    logPath = os.path.join(directory, f"!log-{now.strftime('%Y%m%d%H%M')}.txt")
-    logFile = open(logPath, "w")                                    
-    logFile.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")     
-    for key, value in logParams.items():                            
-        logFile.write('%s: %s\n' % (key, value))                    
-    logFile.close()
+    log_path = os.path.join(directory, f"!log-{now.strftime('%Y%m%d%H%M')}.txt")
+    with open(log_path, "w") as log_file:
+        log_file.write("\n" + now.strftime("%Y-%m-%d %H:%M") + "\n")
+        for key, value in log_params.items():
+            log_file.write('%s: %s\n' % (key, value))
 
 def group_name_error_check(
     file_names: list[str],
@@ -180,5 +179,13 @@ def check_frame_interval(
 
         # set frame interval to 1 if it is not provided or 0
         frame_interval = 1
-    
+
+    elif frame_interval > 1000:
+        print(f"****** WARNING ******",
+            f"\n{file_name} frame interval is {frame_interval} seconds, which is unusually large.",
+            "\nImageJ/Fiji stores 'finterval' in seconds. If your software stores it in milliseconds,",
+            "\nthe reported periods, shifts, and phase shifts will be 1000x too large.",
+            "\n****** WARNING ******")
+        log_params['Errors'].append(f'{file_name} frame interval is {frame_interval} s — verify units (expected seconds, not ms)')
+
     return frame_interval

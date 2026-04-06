@@ -1,42 +1,43 @@
-import pytest
+"""
+Tests for calc_indv_peak_props_workflow (peak_properties.py).
+
+Uses SMOOTHED bin_values (same data as test_CCFs.py) and img_props that embed
+those smoothed bin_values. Known results are a dict of dicts:
+  { bin_index: { property_name: np.ndarray } }
+To regenerate: run tests/regenerate_assets.py
+"""
+import pickle
+import json
 import numpy as np
 from waveanalysis.signal_processing.peak_properties import calc_indv_peak_props_workflow
 
-import pickle
-import json
+GROUPS = ['1_Group1', '1_Group2']
 
-@pytest.fixture
-def default_peak_props():
-    return [
-        'tests/assets/standard/dicts_lists/1_Group1.tif_peak_props.pkl',
-        'tests/assets/standard/dicts_lists/1_Group2.tif_peak_props.pkl'
-        ]
-     
-def test_peak_props_calc(default_peak_props):
+KNOWN_PEAK_PROP_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_peak_props.pkl' for g in GROUPS
+]
+BIN_VALUE_FILES = [
+    f'tests/assets/standard/numpy_arrays/{g}_bin_values_smoothed.npy' for g in GROUPS
+]
+IMG_PROPS_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_img_props_smoothed.json' for g in GROUPS
+]
 
-    default_bin_values = [
-        np.load('tests/assets/standard/numpy_arrays/standard_1_Group1.tif_bin_values.npy'),
-        np.load('tests/assets/standard/numpy_arrays/standard_1_Group2.tif_bin_values.npy')
-        ]
+def test_peak_props_calc():
+    for bin_values_file, peak_props_file, img_props_file in zip(BIN_VALUE_FILES, KNOWN_PEAK_PROP_FILES, IMG_PROPS_FILES):
+        bin_values = np.load(bin_values_file)
+        with open(peak_props_file, 'rb') as f:
+            known_peak_props = pickle.load(f)
+        with open(img_props_file, 'r') as f:
+            img_props = json.load(f)
 
-    default_dicts = [
-        'tests/assets/standard/dicts_lists/1_Group1_img_props.json',
-        'tests/assets/standard/dicts_lists/1_Group2_img_props.json'
-    ]
+        _, _, _, _, exp_peak_props, _ = calc_indv_peak_props_workflow(bin_values, img_props)
 
-    for bin_values, peak_prop_file, img_props_file in zip(default_bin_values, default_peak_props, default_dicts):
-        # Load the pickle file
-        with open(peak_prop_file, 'rb') as f:
-            known_results = pickle.load(f)
-        with open(img_props_file, 'r') as file:
-            img_props_dict = json.load(file)
-        _, _, _, _, exp_results = calc_indv_peak_props_workflow(bin_values, img_props_dict)
-
-        for key, value in known_results.items():
-            for new_key, new_value in value.items():
+        for key, value in known_peak_props.items():
+            for prop_name, known_arr in value.items():
                 np.testing.assert_allclose(
-                    new_value,
-                    exp_results[key][new_key],
+                    known_arr,
+                    exp_peak_props[key][prop_name],
                     equal_nan=True,
                     atol=1.01,
                 )

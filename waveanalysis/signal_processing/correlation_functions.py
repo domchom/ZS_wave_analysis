@@ -1,9 +1,38 @@
 import numpy as np
 from scipy import signal as sig
 
+# Fraction of signal amplitude required as prominence to confirm both signals
+# are oscillatory before computing CCF. Filters out flat or noisy signals.
+# Not sure how much this specific value actually matters.
+_CCF_SIGNAL_PEAK_PROMINENCE = 0.25
+
+# Minimum prominence in the normalized CCF curve for a peak to be considered valid.
+# This is not the user-configurable threshold for calculating the shift, 
+# but rather a threshold to filter out noisy or flat CCF curves that do not have clear peaks.
+_CCF_PEAK_PROMINENCE = 0.1
+
+# If a detected shift exceeds this fraction of the period it is assumed to be a
+# phase-aliased measurement and is corrected by ±1 period. 
+# We chose 0.6 as the threshold to allow for some variability in the period while 
+# still correcting for small shifts that are likely due to noise or phase aliasing. 
+# This means that if the detected shift is greater than 60% of the average period, 
+# it will be corrected by adding or subtracting the average period, depending on 
+# the direction of the shift. This helps to improve the accuracy of the shift 
+# measurements by reducing the impact of small, spurious shifts that may arise 
+# from noise or other factors.
+_SMALL_SHIFT_CORRECTION_THRESHOLD = 0.6
+
+def _get_signal(bin_values: np.ndarray, channel: int, bin: int, analysis_type: str) -> np.ndarray:
+    """Extract a single channel/bin signal from bin_values.
+
+    standard analysis stores frames along axis 0: bin_values[frames, channels, bins]
+    kymograph/rolling stores no frames axis: bin_values[channels, bins]
+    """
+    return bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
+
 def calc_indv_ACF_workflow(
     bin_values: np.ndarray,
-    img_props: dict
+    img_props: dict,
 ) -> np.ndarray: 
     '''
     Calculate individual Auto-Correlation Function (ACF) workflow.
@@ -29,7 +58,7 @@ def calc_indv_ACF_workflow(
     for channel in range(num_channels):
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
-            signal = bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
+            signal = _get_signal(bin_values, channel, bin, analysis_type)
             # Calculate and store the individual ACF for the current channel and bin
             acf_curve = calc_indv_ACF(signal=signal, num_frames=num_frames, peak_thresh=acf_peak_thresh)
             indv_acfs[channel, bin] = acf_curve
@@ -44,10 +73,10 @@ def calc_indv_ACF(
     '''
     Space saving function to calculate individual Auto-Correlation Function (ACF).
     '''
-    # calc autocorrelation and normalize
+    # calc autocorrelation and normalize by the zero-lag value
     corr_signal = signal - np.mean(signal)
     acf_curve = np.correlate(corr_signal, corr_signal, mode='full')
-    acf_curve = acf_curve / (num_frames * np.std(signal) ** 2)
+    acf_curve = acf_curve / acf_curve[acf_curve.shape[0] // 2]
 
     # Find peaks in the autocorrelation curve. If less than two peaks found, return NaNs
     peaks, _ = sig.find_peaks(acf_curve, prominence=peak_thresh)
@@ -94,18 +123,24 @@ def calc_indv_period(
     '''
     Space saving function to calculate individual periods for each channel and bin based on the autocorrelation function curve.
     '''
-    # Find peaks in the autocorrelation curve, Calculate absolute differences between peaks and center
+    center = acf_curve.shape[0] // 2
     peaks, _ = sig.find_peaks(acf_curve, prominence=peak_thresh)
-    peaks_abs = np.abs(peaks - acf_curve.shape[0] // 2)
+    peaks_abs = np.abs(peaks - center)
 
-    # If peaks are identified, pick the closest one to the center as the period
-    period = np.min(peaks_abs[np.nonzero(peaks_abs)]) if len(peaks) > 1 else np.nan
-        
-    return period
+    # Exclude the zero-lag peak, then pick the closest off-center peak.
+    nonzero_mask = peaks_abs != 0
+    if np.sum(nonzero_mask) < 1:
+        return np.nan
+
+    off_center_peaks = peaks[nonzero_mask]
+    off_center_peaks_abs = peaks_abs[nonzero_mask]
+    best_peak = off_center_peaks[np.argmin(off_center_peaks_abs)]
+    return float(np.abs(best_peak - center))
 
 def calc_indv_CCF_workflow(
     bin_values: np.ndarray,
-    img_props: dict
+    img_props: dict,
+    ccf_smoothing: dict = None,
 ) -> np.ndarray:
     '''
     Calculate individual cross-correlation functions (CCFs) for each combination of channels and bins.
@@ -131,14 +166,10 @@ def calc_indv_CCF_workflow(
     for combo_number, combo in enumerate(channel_combos):
         for bin in range(num_bins):
             # Extract the bin values for the current channel and bin
-            if analysis_type == 'standard':
-                signal1 = sig.savgol_filter(bin_values[:, combo[0], bin], window_length=11, polyorder=3)
-                signal2 = sig.savgol_filter(bin_values[:, combo[1], bin], window_length=11, polyorder=3)
-            else:
-                signal1 = sig.savgol_filter(bin_values[combo[0], bin], window_length=11, polyorder=3)
-                signal2 = sig.savgol_filter(bin_values[combo[1], bin], window_length=11, polyorder=3)
+            signal1 = _get_signal(bin_values, combo[0], bin, analysis_type)
+            signal2 = _get_signal(bin_values, combo[1], bin, analysis_type)
             # Calculate and store the individual CCF for the current combination of channels and bin
-            ccf = calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=num_frames)
+            ccf = calc_indv_CCF(signal1=signal1, signal2=signal2, num_frames=num_frames, ccf_smoothing=ccf_smoothing)
             indv_ccfs[combo_number, bin] = ccf
 
     return indv_ccfs
@@ -147,13 +178,14 @@ def calc_indv_CCF(
     signal1: np.ndarray,
     signal2: np.ndarray,
     num_frames: int,
+    ccf_smoothing: dict = None,
 ) -> np.ndarray:
     '''
     Space saving function to calculate individual cross-correlation functions (CCFs) for each combination of channels and bins.
     '''
     # Find peaks in the signals
-    peaks1, _ = sig.find_peaks(signal1, prominence=(np.max(signal1)-np.min(signal1))*0.25)
-    peaks2, _ = sig.find_peaks(signal2, prominence=(np.max(signal2)-np.min(signal2))*0.25)
+    peaks1, _ = sig.find_peaks(signal1, prominence=(np.max(signal1)-np.min(signal1))*_CCF_SIGNAL_PEAK_PROMINENCE)
+    peaks2, _ = sig.find_peaks(signal2, prominence=(np.max(signal2)-np.min(signal2))*_CCF_SIGNAL_PEAK_PROMINENCE)
 
     # If peaks are found in both signals
     if len(peaks1) > 0 and len(peaks2) > 0:
@@ -163,11 +195,12 @@ def calc_indv_CCF(
         # Calculate cross-correlation curve
         cc_curve = np.correlate(corr_signal1, corr_signal2, mode='full')
 
-        # Normalize the cross-correlation curve
-        cc_curve = sig.savgol_filter(cc_curve, window_length=11, polyorder=3)
+        # Normalize then optionally smooth the cross-correlation curve
         cc_curve = cc_curve / (num_frames * signal1.std() * signal2.std())
+        if ccf_smoothing is not None:
+            cc_curve = sig.savgol_filter(cc_curve, window_length=ccf_smoothing["window"], polyorder=ccf_smoothing["poly_order"])
         # Find peaks in the cross-correlation curve
-        peaks, _ = sig.find_peaks(cc_curve, prominence=0.1)
+        peaks, _ = sig.find_peaks(cc_curve, prominence=_CCF_PEAK_PROMINENCE)
 
         # If less than two peaks found, return NaNs
         if len(peaks) < 2:
@@ -212,7 +245,7 @@ def calc_indv_shift_workflow(
         for bin in range(num_bins):
             # Calculate and store the individual shift for the current combination of channels and bin
             shift = calc_indv_shift(cc_curve=indv_ccfs[combo_number, bin], ccf_peak_thresh=ccf_peak_thresh)
-            if small_shifts_correction == True:
+            if small_shifts_correction:
                 average_period = np.mean(indv_periods[:, bin]) # If the shift is too small, correct it
                 shift = correct_small_shifts(delay_frames=shift, average_period=average_period)
             indv_shifts[combo_number, bin] = shift
@@ -247,10 +280,17 @@ def correct_small_shifts(
     Correct small shifts in the cross-correlation curve.
     '''
     # If the shift is larger than 60% of the average period, correct it by subtracting the average period
-    if abs(delay_frames) > abs(average_period * .6):
+    if abs(delay_frames) > abs(average_period * _SMALL_SHIFT_CORRECTION_THRESHOLD):
         if delay_frames < 0:
             delay_frames = delay_frames + average_period
         elif delay_frames > 0:
             delay_frames = delay_frames - average_period
 
     return delay_frames
+
+
+def normalize_signal(signal: np.ndarray) -> np.ndarray:
+    '''
+    Normalize a signal to the range [0, 1].
+    '''
+    return (signal - np.min(signal)) / (np.max(signal) - np.min(signal))

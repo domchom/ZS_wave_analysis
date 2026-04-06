@@ -1,36 +1,36 @@
-import pytest
+"""
+Tests for calc_indv_period_workflow (correlation_functions.py).
+
+Takes pre-computed ACF arrays as input (reuses *_indv_acfs.pkl from test_ACFs)
+and returns the period for each channel/bin.
+To regenerate: run tests/regenerate_assets.py
+"""
+import pickle
+import json
 import numpy as np
 from waveanalysis.signal_processing.correlation_functions import calc_indv_period_workflow
 
-import pickle
-import json
+GROUPS = ['1_Group1', '1_Group2']
 
-@pytest.fixture
-def default_periods():
-    return [
-        'tests/assets/standard/dicts_lists/periods_1_Group1.tif.pkl',
-        'tests/assets/standard/dicts_lists/periods_1_Group2.tif.pkl'
-    ]
-     
-def test_period_calc(default_periods):
-    default_acf_values = [
-        'tests/assets/standard/dicts_lists/ACF_1_Group1.tif.pkl',
-        'tests/assets/standard/dicts_lists/ACF_1_Group2.tif.pkl'
-        ]
+KNOWN_PERIOD_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_periods.pkl' for g in GROUPS
+]
+ACF_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_indv_acfs.pkl' for g in GROUPS
+]
+IMG_PROPS_FILES = [
+    f'tests/assets/standard/dicts_lists/{g}_img_props_unsmoothed.json' for g in GROUPS
+]
 
-    default_dicts = [
-        'tests/assets/standard/dicts_lists/standard_image_properties_1_Group1_final.json',
-        'tests/assets/standard/dicts_lists/standard_image_properties_1_Group2_final.json'
-    ]
-
-    for acf_array, period_file, img_props_file in zip(default_acf_values, default_periods, default_dicts):
-        # Load the pickle file
+def test_period_calc():
+    for acf_file, period_file, img_props_file in zip(ACF_FILES, KNOWN_PERIOD_FILES, IMG_PROPS_FILES):
         with open(period_file, 'rb') as f:
-            known_results = pickle.load(f)
-        with open(acf_array, 'rb') as f:
+            known_periods = pickle.load(f)
+        with open(acf_file, 'rb') as f:
             acf_array = pickle.load(f)
-        with open(img_props_file, 'r') as file:
-            img_props_dict = json.load(file)
-        exp_results = calc_indv_period_workflow(acf_array, img_props_dict)
+        with open(img_props_file, 'r') as f:
+            img_props = json.load(f)
 
-        assert np.array_equal(known_results, exp_results)
+        exp_periods = calc_indv_period_workflow(acf_array, img_props)
+
+        np.testing.assert_allclose(known_periods, exp_periods, equal_nan=True, atol=1e-5)

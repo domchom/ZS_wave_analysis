@@ -1,0 +1,1 @@
+{"num_channels": 2, "num_columns": 58, "num_frames": 157, "frame_interval": 3.84, "pixel_size": [0.2661448807564476, 1.0, 1.0], "pixel_unit": "micron", "analysis_type": "kymograph", "line_width": 5, "step": 5, "box_size": null, "peak_thresh": 0.1, "num_bins": 11, "num_combos": 1, "channel_combos": [[0, 1]]}

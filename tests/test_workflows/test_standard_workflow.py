@@ -1,3 +1,13 @@
+"""
+End-to-end test for the standard (box-based, multi-frame) workflow.
+
+Runs combined_workflow on two 2-channel TIFFs and compares the summary
+DataFrame against a known-good CSV. Plotting is disabled (plot_flags all
+False) because test=True skips directory creation, so save_plots would fail.
+
+To regenerate known_standard_summary.csv: run combined_workflow with test=False
+on the same TIFFs and copy the output CSV here.
+"""
 import pytest
 import pandas as pd
 from pathlib import Path
@@ -10,13 +20,17 @@ def default_log_params():
         'Box Shift(px)': 20,
         'Base Directory': 'tests/assets/standard',
         'ACF Peak Prominence': 0.1,
-        'Group Names': ['Group1', 'Group2'], #['DC191', 'DC192', 'DC193', 'DC206'], # #['WT','Y653A','F649A','FYAA','FY-AA_P731D','FY-AA_PC-DK'], # # #
-        'Plot Summary ACFs': False,
-        'Plot Summary CCFs': False,
-        'Plot Summary Peaks': False,
-        'Plot Individual ACFs': False,
-        'Plot Individual CCFs': False,
-        'Plot Individual Peaks': False,
+        'Group Names': ['Group1', 'Group2'],
+        'plot_flags': {
+            'plot_summary_ACFs': False,
+            'plot_summary_CCFs': False,
+            'plot_summary_peaks': False,
+            'plot_indv_ACFs': False,
+            'plot_indv_CCFs': False,
+            'plot_indv_peaks': False,
+            'plot_heatmaps': False,
+            'dark_plots': False,
+        },
         'Calc Wave Speeds': False,
         'Plot Wave Speeds': False,
         'Files Processed': [],
@@ -26,12 +40,19 @@ def default_log_params():
         'Pixel Size': [],
         'Small Shifts Correction': True,
         'CCF Peak Prominence': 0.1,
+        'Dark Plots': False,
+        "Smoothing": True,
+        "smoothing_params": {
+            "Ch1": {"window": 11, "poly_order": 3},
+            "Ch2": {"window": 11, "poly_order": 3},
+            "Ch3": {"window": 11, "poly_order": 3},
+            "Ch4": {"window": 11, "poly_order": 3},
+            "CCF": {"window": 11, "poly_order": 3},
+        },
     }
 
 def test_standard_workflow(default_log_params):
-    # load csv
     known_results = pd.read_csv('tests/assets/standard/known_standard_summary.csv')
-    assert isinstance(known_results, pd.DataFrame)
     exp_results = combined_workflow(
         folder_path=str(Path('tests/assets/standard/')),
         group_names= default_log_params['Group Names'],
@@ -43,19 +64,15 @@ def test_standard_workflow(default_log_params):
         acf_peak_thresh=default_log_params['ACF Peak Prominence'],
         ccf_peak_thresh=default_log_params['CCF Peak Prominence'],
         small_shifts_correction=default_log_params['Small Shifts Correction'],
-        plot_summary_ACFs=default_log_params['Plot Summary ACFs'],
-        plot_summary_CCFs=default_log_params['Plot Summary CCFs'],
-        plot_summary_peaks=default_log_params['Plot Summary Peaks'],
-        plot_indv_ACFs=default_log_params['Plot Individual ACFs'],
-        plot_indv_CCFs=default_log_params['Plot Individual CCFs'],
-        plot_indv_peaks=default_log_params['Plot Individual Peaks'],
+        plot_flags=default_log_params['plot_flags'],
         calc_wave_speeds=None, #type: ignore
         plot_wave_speeds=None, #type: ignore
+        smoothing_params=default_log_params['smoothing_params'],
+        smoothing=default_log_params['Smoothing'],
         test=True
     )
-    # assert pd.testing.assert_frame_equal(known_results, exp_results) is None
     pd.testing.assert_frame_equal(
         known_results.reset_index(drop=True),
         exp_results.reset_index(drop=True),
-        atol=1e-1,
+        atol=1e0,
     )

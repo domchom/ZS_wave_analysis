@@ -88,3 +88,32 @@ def create_multi_frame_bin_array(
     box_values = box_values.reshape(num_frames, num_channels, num_bins)
 
     return box_values, num_bins, num_x_bins, num_y_bins
+
+def smooth_signal(
+    signal: np.ndarray,
+    window: int,
+    poly_order: int
+) -> np.ndarray:
+    """
+    Smooth the input signal using Savitzky-Golay filter.
+
+    Args:
+        signal (np.ndarray): The input signal to be smoothed.
+        window (int): The length of the filter window (must be a positive odd integer).
+        poly_order (int): The order of the polynomial used to fit the samples (must be less than window).
+
+    Returns:
+        np.ndarray: The smoothed signal.
+    """
+    from scipy.signal import savgol_filter
+
+    # Ensure the window size is odd and at least 3
+    if window % 2 == 0:
+        window += 1
+    if window < 3:
+        window = 3
+
+    # Apply Savitzky-Golay filter to smooth the signal
+    smoothed_signal = savgol_filter(signal, window_length=window, polyorder=poly_order)
+
+    return smoothed_signal
