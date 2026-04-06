@@ -198,7 +198,8 @@ def _return_metric_figure(
         cbar = fig.colorbar(last_im, ax=hmap_axes, fraction=0.03, pad=0.02)
         cbar.set_label(cbar_label)
 
-        fig.suptitle(metric_title, y=1.01)
+        fig.suptitle(metric_title)
+        fig.tight_layout()
         plt.close(fig)
 
     return fig
