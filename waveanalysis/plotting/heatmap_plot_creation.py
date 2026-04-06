@@ -27,10 +27,7 @@ def plot_metric_heatmaps_workflow(
     dark_plots: bool = False,
 ) -> dict:
     """
-    Generate overlay heatmaps for every metric in img_metrics.
-
-    image_array : (num_frames, num_slices, num_channels, height, width)
-    Returns dict mapping figure name -> plt.Figure.
+    Generate overlay heatmaps for every metric + a Bin ID Reference Map with grids.
     """
     num_channels   = img_props['num_channels']
     num_x_bins     = img_props['num_x_bins']
@@ -46,11 +43,33 @@ def plot_metric_heatmaps_workflow(
 
     heatmap_figs = {}
 
-    # Per-channel metrics: one figure per metric with all channels side by side
+    # --- 1. GENERATE BIN REFERENCE CHART ---
+    total_bins = num_x_bins * num_y_bins
+    bin_ids = np.arange(1, total_bins + 1, dtype=float)
+
+    # Use Channel 1 as the background for the reference chart
+    ref_panels = [(bin_ids, bg_images[0], 'Bin Reference Map (IDs)')]
+    heatmap_figs['Bin Reference Chart'] = _return_metric_figure(
+        panels=ref_panels,
+        vmin=1,
+        vmax=total_bins,
+        num_x_bins=num_x_bins,
+        num_y_bins=num_y_bins,
+        box_size=box_size,
+        step=step,
+        metric_title='Bin Reference Index',
+        cbar_label='Bin ID Number',
+        pixel_size=pixel_size,
+        pixel_unit=pixel_unit,
+        dark_plots=dark_plots,
+        show_bin_ids=True # Trigger text labels and grid lines
+    )
+
+    # --- 2. PER-CHANNEL METRICS ---
     for metric_name, cbar_label in _CHANNEL_METRICS.items():
         if metric_name not in img_metrics:
             continue
-        data = img_metrics[metric_name]  # (num_channels, num_bins)
+        data = img_metrics[metric_name]
         valid_all = data[np.isfinite(data)]
         vmin = float(np.min(valid_all)) if valid_all.size > 0 else 0.0
         vmax = float(np.max(valid_all)) if valid_all.size > 0 else 1.0
@@ -72,9 +91,10 @@ def plot_metric_heatmaps_workflow(
             pixel_size=pixel_size,
             pixel_unit=pixel_unit,
             dark_plots=dark_plots,
+            show_bin_ids=False # Ensure other metrics don't have lines
         )
 
-    # Per-combo metrics: one figure per combo
+    # --- 3. PER-COMBO METRICS ---
     for metric_name, cbar_label in _COMBO_METRICS.items():
         if metric_name not in img_metrics:
             continue
@@ -100,6 +120,7 @@ def plot_metric_heatmaps_workflow(
                 pixel_size=pixel_size,
                 pixel_unit=pixel_unit,
                 dark_plots=dark_plots,
+                show_bin_ids=False
             )
 
     return heatmap_figs
@@ -122,20 +143,15 @@ def _return_metric_figure(
     pixel_size: float,
     pixel_unit: str,
     dark_plots: bool,
+    show_bin_ids: bool = False,
 ) -> plt.Figure:
-    """
-    Build a figure with one column per entry in `panels`.
-    Top row: heatmap overlay + scale bar.
-    Bottom row: value distribution histogram + bin count.
-    panels = list of (values_1d, bg_image, panel_title).
-    """
     n_panels  = len(panels)
     height_px, width_px = panels[0][1].shape
 
     scale    = 6.0 / max(height_px, width_px)
     panel_w  = width_px  * scale
     panel_h  = height_px * scale
-    hist_h   = 1.4                                   # fixed height for histogram strip
+    hist_h   = 1.4
     figsize  = (n_panels * panel_w + 1.4, panel_h + hist_h)
 
     cmap = plt.cm.inferno.copy()
@@ -169,6 +185,7 @@ def _return_metric_figure(
                 cmap=cmap,
                 pixel_size=pixel_size,
                 pixel_unit=pixel_unit,
+                show_bin_ids=show_bin_ids,
             )
             _draw_hist_panel(
                 ax=ax_d,
@@ -178,7 +195,6 @@ def _return_metric_figure(
                 cbar_label=cbar_label,
             )
 
-        # Shared colorbar aligned to the heatmap row only
         cbar = fig.colorbar(last_im, ax=hmap_axes, fraction=0.03, pad=0.02)
         cbar.set_label(cbar_label)
 
@@ -202,11 +218,8 @@ def _draw_heatmap_panel(
     cmap,
     pixel_size: float,
     pixel_unit: str,
+    show_bin_ids: bool = False,
 ):
-    """
-    Draw background image + heatmap overlay + scale bar.
-    Returns the overlay imshow handle for the shared colorbar.
-    """
     grid        = values.reshape(num_x_bins, num_y_bins)
     grid_masked = np.ma.masked_invalid(grid)
 
@@ -220,6 +233,7 @@ def _draw_heatmap_panel(
 
     height_px, width_px = bg_image.shape
 
+    # Drawing background
     ax.imshow(
         bg_image,
         cmap='gray',
@@ -229,6 +243,7 @@ def _draw_heatmap_panel(
         vmax=np.percentile(bg_image, 99),
     )
 
+    # Drawing overlay
     im = ax.imshow(
         grid_masked,
         cmap=cmap,
@@ -241,6 +256,39 @@ def _draw_heatmap_panel(
         alpha=0.6,
     )
 
+    # --- TEXT OVERLAY AND GRID LINES FOR REFERENCE CHART ---
+    if show_bin_ids:
+        # 1. Overlay Numbers
+        for r in range(num_x_bins):
+            for c in range(num_y_bins):
+                bin_val = grid[r, c]
+                if np.isfinite(bin_val):
+                    # Data coordinates for text center
+                    x_center = ind + (c * step)
+                    y_center = ind + (r * step)
+                    ax.text(
+                        x_center, y_center, str(int(bin_val)),
+                        color='white', fontsize=6, ha='center', va='center',
+                        weight='bold'
+                    )
+
+        # 2. Draw Grid Lines
+        line_style = {'color': 'white', 'linestyle': '-', 'linewidth': 0.5, 'alpha': 0.8}
+        
+        # Determine center points of bins
+        x_centers = np.arange(num_y_bins) * step + ind
+        y_centers = np.arange(num_x_bins) * step + ind
+        
+        # Draw vertical lines between columns
+        if num_y_bins > 1:
+            v_lines = x_centers[:-1] + step/2.0
+            ax.vlines(v_lines, ymin=row_start, ymax=row_end, **line_style)
+            
+        # Draw horizontal lines between rows
+        if num_x_bins > 1:
+            h_lines = y_centers[:-1] + step/2.0
+            ax.hlines(h_lines, xmin=col_start, xmax=col_end, **line_style)
+
     _add_scale_bar(ax, width_px, height_px, pixel_size, pixel_unit)
 
     ax.set_title(panel_title, fontsize=9)
@@ -248,23 +296,11 @@ def _draw_heatmap_panel(
     return im
 
 
-def _draw_hist_panel(
-    ax,
-    values: np.ndarray,
-    vmin: float,
-    vmax: float,
-    cbar_label: str,
-):
-    """
-    Draw a distribution histogram with inferno-coloured bars.
-    The title shows the bin detection count.
-    """
+def _draw_hist_panel(ax, values, vmin, vmax, cbar_label):
     valid   = values[np.isfinite(values)]
     valid_n = valid.size
     total_n = values.size
-
     ax.set_title(f'{valid_n}/{total_n} bins detected', fontsize=7, pad=3)
-
     if valid_n >= 5:
         n_bins = min(20, max(5, valid_n // 3))
         _, bin_edges, patches = ax.hist(valid, bins=n_bins, edgecolor='none')
@@ -273,49 +309,26 @@ def _draw_hist_panel(
         for patch, bc in zip(patches, bin_centers):
             patch.set_facecolor(plt.cm.inferno((bc - vmin) / norm_range))
     else:
-        ax.text(0.5, 0.5, 'insufficient data', transform=ax.transAxes,
-                ha='center', va='center', fontsize=7)
-
+        ax.text(0.5, 0.5, 'insufficient data', transform=ax.transAxes, ha='center', va='center', fontsize=7)
     ax.set_xlabel(cbar_label, fontsize=7)
     ax.set_ylabel('Count', fontsize=7)
     ax.tick_params(labelsize=6)
-    for spine in ['top', 'right']:
-        ax.spines[spine].set_visible(False)
+    for spine in ['top', 'right']: ax.spines[spine].set_visible(False)
 
-
-def _add_scale_bar(ax, width_px: int, height_px: int, pixel_size: float, pixel_unit: str):
-    """Draw a scale bar in image-pixel data coordinates (bottom-left corner)."""
-    if pixel_size <= 0:
-        return
-
-    target_physical  = width_px * pixel_size / 5.0
-    bar_physical      = _nice_scale_length(target_physical)
-    bar_px            = bar_physical / pixel_size
-
-    margin_x = width_px  * 0.04
-    margin_y = height_px * 0.05
-    x0 = margin_x
-    x1 = margin_x + bar_px
-    y  = height_px - margin_y
-
+def _add_scale_bar(ax, width_px, height_px, pixel_size, pixel_unit):
+    if pixel_size <= 0: return
+    target_physical = width_px * pixel_size / 5.0
+    bar_physical = _nice_scale_length(target_physical)
+    bar_px = bar_physical / pixel_size
+    margin_x, margin_y = width_px * 0.04, height_px * 0.05
+    x0, x1, y = margin_x, margin_x + bar_px, height_px - margin_y
     ax.plot([x0, x1], [y, y], color='white', linewidth=2, solid_capstyle='butt')
-    ax.text(
-        (x0 + x1) / 2, y - height_px * 0.025,
-        f'{bar_physical:g} {pixel_unit}',
-        color='white',
-        ha='center',
-        va='bottom',
-        fontsize=6,
-    )
+    ax.text((x0 + x1) / 2, y - height_px * 0.025, f'{bar_physical:g} {pixel_unit}',
+            color='white', ha='center', va='bottom', fontsize=6)
 
-
-def _nice_scale_length(target: float) -> float:
-    """Return the largest value from {1,2,5}×10^n that is ≤ target."""
-    if target <= 0:
-        return 1.0
+def _nice_scale_length(target):
+    if target <= 0: return 1.0
     magnitude = 10 ** np.floor(np.log10(target))
     for factor in [5, 2, 1]:
-        candidate = factor * magnitude
-        if candidate <= target:
-            return candidate
+        if factor * magnitude <= target: return factor * magnitude
     return magnitude

@@ -24,7 +24,7 @@ def summarize_image(
 
     # column names for the dataframe summarizing the bin results
     col_names = ["Parameter", "Mean", "Median", "StdDev", "SEM"]
-    col_names.extend([f'Bin {i}' for i in range(num_bins)])
+    col_names.extend([f'Bin {i}' for i in range(1, num_bins + 1)])
 
     # combine all the statified measurements into a single list
     im_measurements = []

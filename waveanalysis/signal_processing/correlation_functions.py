@@ -127,16 +127,14 @@ def calc_indv_period(
     peaks, _ = sig.find_peaks(acf_curve, prominence=peak_thresh)
     peaks_abs = np.abs(peaks - center)
 
-    # Exclude the zero-lag peak, then pick the highest-prominence off-center peak.
-    # Using highest prominence rather than closest-to-center avoids reporting T/2
-    # when sub-harmonic peaks are present (e.g. sharp-wave signals).
+    # Exclude the zero-lag peak, then pick the closest off-center peak.
     nonzero_mask = peaks_abs != 0
     if np.sum(nonzero_mask) < 1:
         return np.nan
 
     off_center_peaks = peaks[nonzero_mask]
-    proms, _, _ = sig.peak_prominences(acf_curve, off_center_peaks)
-    best_peak = off_center_peaks[np.argmax(proms)]
+    off_center_peaks_abs = peaks_abs[nonzero_mask]
+    best_peak = off_center_peaks[np.argmin(off_center_peaks_abs)]
     return float(np.abs(best_peak - center))
 
 def calc_indv_CCF_workflow(
