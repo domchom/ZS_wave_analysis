@@ -142,9 +142,8 @@ def main():
             line_width=params["line_width"],
             test=False,
             smoothing_params=params["smoothing_params"],
-            smoothing=params["smoothing"],
-            dark_plots=params["dark_plots"],
-        )
+            smoothing=params["smoothing"]
+            )
 
 if __name__ == "__main__":
     main()

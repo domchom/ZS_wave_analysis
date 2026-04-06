@@ -49,7 +49,7 @@ def test_summarize_image_returns_dataframe():
 
 def test_summarize_image_columns():
     df, _ = summarize_image(_make_img_metrics(), _make_img_props())
-    expected_cols = ['Parameter', 'Mean', 'Median', 'StdDev', 'SEM'] + [f'Bin {i}' for i in range(NUM_BINS)]
+    expected_cols = ['Parameter', 'Mean', 'Median', 'StdDev', 'SEM'] + [f'Bin {i}' for i in range(1, NUM_BINS + 1)]
     assert list(df.columns) == expected_cols
 
 def test_summarize_image_row_count():
