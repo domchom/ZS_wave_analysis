@@ -66,6 +66,23 @@ def test_get_mean_CCF_values_mean_correct():
     _, mean_at_0, _ = entries[0]
     assert mean_at_0 == pytest.approx(expected_mean_at_0)
 
+def test_get_mean_CCF_values_std_correct():
+    indv_ccfs = _make_indv_ccfs()
+    result = get_mean_CCF_values(CHANNEL_COMBOS, indv_ccfs, FRAME_INTERVAL)
+    entries = result['Ch1-Ch2 Mean CCF values']
+    expected_std_at_0 = np.nanstd(indv_ccfs[0, :, 0])
+    _, _, std_at_0 = entries[0]
+    assert std_at_0 == pytest.approx(expected_std_at_0)
+
+def test_get_mean_CCF_values_multiple_combos():
+    two_combos = [[0, 1], [0, 2]]
+    rng = np.random.default_rng(0)
+    indv_ccfs = rng.uniform(-1, 1, (len(two_combos), NUM_BINS, CCF_LEN))
+    result = get_mean_CCF_values(two_combos, indv_ccfs, FRAME_INTERVAL)
+    assert 'Ch1-Ch2 Mean CCF values' in result
+    assert 'Ch1-Ch3 Mean CCF values' in result
+    assert len(result) == 2
+
 
 # ── get_indv_CCF_values ───────────────────────────────────────────────────────
 
@@ -125,3 +142,13 @@ def test_save_parameter_means_columns_are_group_names():
     result = save_parameter_means_to_csv(_make_summary_df(), ['Group1', 'Group2'])
     df = result['ch_1_mean_period_means.csv']
     assert set(df.columns) == {'Group1', 'Group2'}
+
+def test_save_parameter_means_single_group():
+    df = pd.DataFrame({
+        'File Name': ['Group1_file1.tif', 'Group1_file2.tif'],
+        'Group Name': ['Group1', 'Group1'],
+        'Ch 1 Mean Period': [1.0, 2.0],
+    })
+    result = save_parameter_means_to_csv(df, ['Group1'])
+    assert len(result) == 1
+    assert set(result['ch_1_mean_period_means.csv'].columns) == {'Group1'}

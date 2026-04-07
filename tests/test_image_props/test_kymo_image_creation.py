@@ -17,6 +17,8 @@ KNOWN_ARRAY_FILES = [
     'tests/assets/kymo/numpy_arrays/1_Group2_raw_image.npy',
 ]
 
+# ── tiff_to_np_array_single_frame ────────────────────────────────────────────
+
 def test_kymo_image_creation():
     for tiff_file, known_file in zip(TIFF_FILES, KNOWN_ARRAY_FILES):
         known_array = np.load(known_file)

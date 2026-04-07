@@ -22,6 +22,8 @@ IMG_PROPS_FILES = [
     f'tests/assets/kymo/dicts_lists/{g}_img_props.json' for g in GROUPS
 ]
 
+# ── create_kymo_bin_array ─────────────────────────────────────────────────────
+
 def test_kymo_bin_calc():
     for raw_image_file, known_file, img_props_file in zip(RAW_IMAGE_FILES, KNOWN_BIN_VALUE_FILES, IMG_PROPS_FILES):
         raw_image = np.load(raw_image_file)

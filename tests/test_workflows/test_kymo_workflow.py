@@ -52,7 +52,6 @@ def default_log_params():
 
 def test_kymo_workflow(default_log_params):
     known_results = pd.read_csv('tests/assets/kymo/known_kymograph_summary.csv')
-    assert isinstance(known_results, pd.DataFrame)
     exp_results = combined_workflow(
         folder_path=str(Path('tests/assets/kymo')),
         group_names=default_log_params['Group Names'],

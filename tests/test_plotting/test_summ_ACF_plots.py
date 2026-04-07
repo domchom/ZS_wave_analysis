@@ -30,6 +30,8 @@ ACF_ARRAY_FILES = [
 # Both test images have 2 channels → expect 2 figures each
 EXPECTED_PLOT_COUNT = 2
 
+# ── plot_mean_acf_workflow ────────────────────────────────────────────────────
+
 def test_mean_ACF_plot():
     for img_params_file, img_props_file, acf_file in zip(IMG_PARAMETERS_FILES, IMG_PROPS_FILES, ACF_ARRAY_FILES):
         with open(img_params_file, 'rb') as f:

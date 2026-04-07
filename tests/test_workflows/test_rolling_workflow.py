@@ -44,7 +44,6 @@ def default_log_params():
 
 def test_rolling_workflow(default_log_params):
     known_results = pd.read_csv('tests/assets/rolling/known_1_Group2_summary.csv')
-    assert isinstance(known_results, pd.DataFrame)
     exp_results = rolling_workflow(
         folder_path=str(Path('tests/assets/rolling/')),
         log_params=default_log_params,

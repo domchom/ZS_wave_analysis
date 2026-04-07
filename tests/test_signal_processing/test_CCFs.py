@@ -22,6 +22,8 @@ IMG_PROPS_FILES = [
     f'tests/assets/standard/dicts_lists/{g}_img_props_smoothed.json' for g in GROUPS
 ]
 
+# ── calc_indv_CCF_workflow ────────────────────────────────────────────────────
+
 def test_CCF_calc():
     for bin_values_file, ccf_file, img_props_file in zip(BIN_VALUE_FILES, KNOWN_CCF_FILES, IMG_PROPS_FILES):
         bin_values = np.load(bin_values_file)

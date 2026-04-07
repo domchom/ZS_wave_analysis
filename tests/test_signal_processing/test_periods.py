@@ -22,6 +22,8 @@ IMG_PROPS_FILES = [
     f'tests/assets/standard/dicts_lists/{g}_img_props_unsmoothed.json' for g in GROUPS
 ]
 
+# ── calc_indv_period_workflow ─────────────────────────────────────────────────
+
 def test_period_calc():
     for acf_file, period_file, img_props_file in zip(ACF_FILES, KNOWN_PERIOD_FILES, IMG_PROPS_FILES):
         with open(period_file, 'rb') as f:

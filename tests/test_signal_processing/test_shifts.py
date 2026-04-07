@@ -26,6 +26,8 @@ IMG_PROPS_FILES = [
     f'tests/assets/standard/dicts_lists/{g}_img_props_unsmoothed.json' for g in GROUPS
 ]
 
+# ── calc_indv_shift_workflow ──────────────────────────────────────────────────
+
 def test_shift_calc():
     for period_file, ccf_file, shift_file, img_props_file in zip(PERIOD_FILES, CCF_FILES, KNOWN_SHIFT_FILES, IMG_PROPS_FILES):
         with open(period_file, 'rb') as f:

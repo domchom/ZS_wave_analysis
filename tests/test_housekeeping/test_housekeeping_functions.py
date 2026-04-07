@@ -30,6 +30,9 @@ def test_get_channel_combos_four_channels():
     result = get_channel_combos(4)
     assert result == [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]]
 
+def test_get_channel_combos_zero_channels():
+    assert get_channel_combos(0) == []
+
 def test_get_channel_combos_no_duplicates():
     result = get_channel_combos(4)
     # each pair should appear exactly once
@@ -68,6 +71,15 @@ def test_check_frame_interval_none_returns_one():
 def test_check_frame_interval_nan_returns_one():
     log = {'Errors': []}
     assert check_frame_interval(float('nan'), log, 'test.tif') == 1
+
+def test_check_frame_interval_large_returns_value():
+    log = {'Errors': []}
+    assert check_frame_interval(2000.0, log, 'test.tif') == 2000.0
+
+def test_check_frame_interval_large_logs_error():
+    log = {'Errors': []}
+    check_frame_interval(2000.0, log, 'test.tif')
+    assert len(log['Errors']) == 1
 
 def test_check_frame_interval_invalid_logs_error():
     log = {'Errors': []}

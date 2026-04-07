@@ -8,7 +8,6 @@ analysis img_props dict (which adds box_size, num_bins, etc. at runtime).
 To regenerate: run tests/regenerate_assets.py
 """
 import json
-import numpy as np
 from waveanalysis.image_props.image_properties import get_multi_frame_properties
 
 TIFF_FILES = [
@@ -20,9 +19,11 @@ KNOWN_PROPS_FILES = [
     'tests/assets/standard/dicts_lists/1_Group2_basic_image_props.json',
 ]
 
+# ── get_multi_frame_properties ────────────────────────────────────────────────
+
 def test_standard_rolling_image_properties():
     for tiff_file, known_file in zip(TIFF_FILES, KNOWN_PROPS_FILES):
         with open(known_file, 'r') as f:
             known_props = json.load(f)
         exp_props = get_multi_frame_properties(tiff_file)
-        assert np.array_equal(known_props, exp_props)
+        assert known_props == exp_props
