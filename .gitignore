@@ -1,7 +1,4 @@
-
 .DS_Store
-*.tif
-*.png
-*.csv
 *.txt
 *.pyc
+.vscode/settings.json
