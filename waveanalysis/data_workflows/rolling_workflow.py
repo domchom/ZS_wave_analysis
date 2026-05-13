@@ -89,7 +89,7 @@ def rolling_workflow(
                 image_array = tiff_to_np_array_multi_frame(image_path)
                 bin_values, num_bins, num_x_bins, num_y_bins = create_multi_frame_bin_array(image=image_array, img_props=img_props)
                 raw_bin_values = bin_values.copy() if smoothing else None
-                _smooth_bin_values_inplace(bin_values, num_bins, num_channels, smoothing_params)
+                bin_values = _smooth_bin_values_inplace(bin_values, num_bins, num_channels, smoothing_params)
 
                 img_props['num_bins'] = num_bins
                 img_props['num_x_bins'] = num_x_bins

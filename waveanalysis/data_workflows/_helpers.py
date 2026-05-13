@@ -86,11 +86,14 @@ def _smooth_bin_values_inplace(
     num_bins: int,
     num_channels: int,
     smoothing_params: dict,
-) -> None:
+) -> np.ndarray:
     """
     Apply per-channel Savitzky-Golay smoothing in-place on 3-D bin_values
     (frames × channels × bins). Channels with no smoothing entry are left unchanged.
     """
+    if not np.issubdtype(bin_values.dtype, np.floating):
+        bin_values = bin_values.astype(float)
+
     for channel in range(num_channels):
         ch_params = (smoothing_params or {}).get(f"Ch{channel + 1}")
         if ch_params is not None:
@@ -100,3 +103,5 @@ def _smooth_bin_values_inplace(
                     window=ch_params["window"],
                     poly_order=ch_params["poly_order"],
                 )
+
+    return bin_values

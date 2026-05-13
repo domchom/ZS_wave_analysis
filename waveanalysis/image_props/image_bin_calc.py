@@ -1,6 +1,35 @@
 import numpy as np
 import scipy.ndimage as nd
 
+
+def _suppress_created_single_frame_extrema(
+    raw_signal: np.ndarray,
+    smoothed_signal: np.ndarray,
+) -> np.ndarray:
+    """
+    Remove isolated extrema that are introduced by smoothing rather than present
+    in the raw trace.
+    """
+    corrected_signal = smoothed_signal.copy()
+    raw_float = np.asarray(raw_signal, dtype=float)
+    smoothed_float = np.asarray(smoothed_signal, dtype=float)
+    raw_range = np.nanmax(raw_float) - np.nanmin(raw_float)
+    min_excursion = raw_range * 0.2
+
+    for i in range(1, len(smoothed_float) - 1):
+        left = smoothed_float[i - 1]
+        center = smoothed_float[i]
+        right = smoothed_float[i + 1]
+        raw_local_min = np.nanmin(raw_float[i - 1:i + 2])
+        raw_local_max = np.nanmax(raw_float[i - 1:i + 2])
+
+        if center > left and center > right and center > raw_local_max + min_excursion:
+            corrected_signal[i] = min((left + right) / 2, raw_local_max)
+        elif center < left and center < right and center < raw_local_min - min_excursion:
+            corrected_signal[i] = max((left + right) / 2, raw_local_min)
+
+    return corrected_signal
+
 def create_kymo_bin_array(
     image: np.ndarray,
     img_props: dict
@@ -116,4 +145,4 @@ def smooth_signal(
     # Apply Savitzky-Golay filter to smooth the signal
     smoothed_signal = savgol_filter(signal, window_length=window, polyorder=poly_order)
 
-    return smoothed_signal
+    return _suppress_created_single_frame_extrema(signal, smoothed_signal)

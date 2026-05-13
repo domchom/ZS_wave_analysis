@@ -122,7 +122,7 @@ def combined_workflow(
                     img_props['num_x_bins'] = num_x_bins
                     img_props['num_y_bins'] = num_y_bins
                     raw_bin_values = bin_values.copy() if smoothing else None
-                    _smooth_bin_values_inplace(bin_values, num_bins, img_props['num_channels'], smoothing_params)
+                    bin_values = _smooth_bin_values_inplace(bin_values, num_bins, img_props['num_channels'], smoothing_params)
                 else:  # kymograph
                     image_array = tiff_to_np_array_single_frame(image_path)
                     bin_values, num_bins = create_kymo_bin_array(image=image_array, img_props=img_props)
