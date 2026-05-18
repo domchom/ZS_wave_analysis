@@ -161,7 +161,7 @@ def combined_workflow(
                 indv_periods = sp.calc_indv_period_workflow(acf_curve=indv_acfs, img_props=img_props)
 
                 # Calculate the peak properties
-                indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props)
+                indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas, indv_incr_rates, indv_dec_rates, indv_ddx_maxs, indv_ddx_mins = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props)
                 
                 # with open(f'/Users/domchom/Desktop/{file_name}_peak_props.pkl', 'wb') as f:
                 #    pickle.dump(indv_peak_props, f)
@@ -183,6 +183,15 @@ def combined_workflow(
                 indv_peak_offsets = indv_peak_offsets * img_props['frame_interval']
                 indv_peak_widths = indv_peak_widths * img_props['frame_interval']
 
+                # same adjustment, use division since rates are in units/time
+                indv_incr_rates /= img_props['frame_interval']
+                indv_dec_rates /= img_props['frame_interval']
+                indv_ddx_maxs /= img_props['frame_interval']
+                indv_ddx_mins /= img_props['frame_interval']
+
+                # calculate ratio between the rate max and min
+                indv_ddx_ratios = -1 * (indv_ddx_maxs / indv_ddx_mins)
+
                 # create dictionary of image parameters and their values for later use
                 img_metrics = {
                                 'Period': indv_periods,
@@ -192,7 +201,12 @@ def combined_workflow(
                                 'Peak Max': indv_peak_maxs,
                                 'Peak Min': indv_peak_mins,
                                 'Peak Offset': indv_peak_offsets,
-                                'Peak Area': indv_peak_areas
+                                'Peak Area': indv_peak_areas,
+                                'Increasing Rate (left side)':indv_incr_rates,
+                                'Decreasing Rate (right side)': indv_dec_rates,
+                                'Max Increasing Rate': indv_ddx_maxs,
+                                'Max Decreasing Rate': indv_ddx_mins,
+                                'Max Incr Rate / Dec Rate': indv_ddx_ratios                                
                                 }    
                 
                 # add shifts to the dictionary if there are multiple channels
