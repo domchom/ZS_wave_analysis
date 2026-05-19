@@ -259,6 +259,18 @@ def combined_workflow(
                     os.makedirs(heatmap_path, exist_ok=True)
                     hf.save_plots(heatmap_figs, heatmap_path)
 
+                # plot Fourier transforms
+                if plot_flags["plot_fts"] and analysis_type == 'standard':
+                    fft_figs = pt.plot_fft_workflow(
+                        bin_values=bin_values,
+                        img_props=img_props,
+                        indv_peak_props=indv_peak_props,
+                        num_frames=img_props['num_frames']
+                    )
+                    fft_path = os.path.join(im_save_path, 'FFT_plots')
+                    os.makedirs(fft_path, exist_ok=True)
+                    hf.save_plots(fft_figs, fft_path)
+
                 # plot the mean CCF figures for the file
                 if plot_flags["plot_summary_CCFs"] and img_props['num_channels'] > 1:
                     mean_ccf_figs = pt.plot_mean_ccf_workflow(

@@ -87,7 +87,8 @@ class _GUIBase(tk.Tk):
                 "plot_indv_CCFs": self.vars["plot_indv_CCFs"],
                 "plot_indv_peaks": self.vars["plot_indv_peaks"],
                 "plot_heatmaps": self.vars["plot_heatmaps"],
-                "dark_plots": self.vars["dark_plots"],
+                "plot_fts": self.vars["plot_fts"],
+                "dark_plots": self.vars["dark_plots"]
             }
         self.destroy()
 
@@ -116,6 +117,7 @@ class BaseGUI(_GUIBase):
             "plot_indv_CCFs": tk.BooleanVar(value=False),
             "plot_indv_peaks": tk.BooleanVar(value=False),
             "plot_heatmaps": tk.BooleanVar(value=False),
+            "plot_fts":tk.BooleanVar(value=False),
             "dark_plots": tk.BooleanVar(value=True),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
@@ -170,6 +172,7 @@ class BaseGUI(_GUIBase):
         self._add_checkbutton(13, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
         self._add_checkbutton(11, 4, self.vars["dark_plots"], "Dark plots")
         self._add_checkbutton(12, 4, self.vars["plot_heatmaps"], "Plot heatmaps")
+        self._add_checkbutton(13, 4, self.vars["plot_fts"], "Plot Fourier transforms")
 
         # ---- SMOOTHING OPTIONS ----
         self._build_smoothing_section(default_poly=2)

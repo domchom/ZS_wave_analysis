@@ -50,6 +50,7 @@ def main():
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
             "Plot Heatmaps": params["plot_flags"]["plot_heatmaps"],
+            "Plot FTs": params["plot_flags"]["plot_fts"],
             "Dark Plots": params["plot_flags"]["dark_plots"],
         })
     elif analysis_type == "rolling":
