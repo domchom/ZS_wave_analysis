@@ -265,7 +265,8 @@ def combined_workflow(
                         bin_values=bin_values,
                         img_props=img_props,
                         indv_peak_props=indv_peak_props,
-                        num_frames=img_props['num_frames']
+                        num_frames=img_props['num_frames'],
+                        dark_plots=plot_flags["dark_plots"]
                     )
                     fft_path = os.path.join(im_save_path, 'FFT_plots')
                     os.makedirs(fft_path, exist_ok=True)
