@@ -33,7 +33,7 @@ def test_peak_props_calc():
         with open(img_props_file, 'r') as f:
             img_props = json.load(f)
 
-        _, _, _, _, exp_peak_props, _ = calc_indv_peak_props_workflow(bin_values, img_props)
+        _, _, _, _, exp_peak_props, _, _, _, _, _ = calc_indv_peak_props_workflow(bin_values, img_props)
 
         for key, value in known_peak_props.items():
             for prop_name, known_arr in value.items():
