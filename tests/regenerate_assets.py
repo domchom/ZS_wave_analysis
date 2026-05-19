@@ -97,8 +97,8 @@ def _base_log_params(base_dir, group_names):
         'Smoothing': True,
         'smoothing_params': SMOOTHING_PARAMS,
         'plot_flags': {k: False for k in [
-            'plot_summary_ACFs', 'plot_summary_CCFs', 'plot_summary_peaks',
-            'plot_indv_ACFs', 'plot_indv_CCFs', 'plot_indv_peaks', 'plot_heatmaps', 'dark_plots',
+            'plot_summary_ACFs', 'plot_summary_CCFs', 'plot_summary_peaks', 'plot_indv_ACFs',
+            'plot_indv_CCFs', 'plot_indv_peaks', 'plot_heatmaps', 'plot_fts', 'dark_plots'
         ]},
         'Files Processed': [],
         'Files Not Processed': [],
