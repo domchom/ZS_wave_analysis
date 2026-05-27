@@ -177,6 +177,7 @@ def combine_stats_for_image_kymo_standard(
     return file_data_summary
 
 def combine_stats_rolling(
+    bin_values: np.ndarray,
     img_props: dict,
     img_metrics: dict,
     indv_ccfs: Optional[np.ndarray] = None,
@@ -185,6 +186,7 @@ def combine_stats_rolling(
     Combine statistics for rolling analysis.
 
     Args:
+        bin_values (np.ndarray): Bin values for each bin.
         img_props (dict): A dictionary containing image properties.
         img_metrics (dict): A dictionary containing image parameters.
         indv_ccfs (np.ndarray): An array containing individual cross-correlation functions.
@@ -198,6 +200,8 @@ def combine_stats_rolling(
     num_bins = img_props['num_bins']
     num_submovies = img_props['num_submovies']
     channel_combos = img_props['channel_combos']
+    subframe_size = img_props['subframe_size']
+    subframe_roll = img_props['subframe_roll']
 
     # Extract image parameters from the dictionary
     indv_periods = img_metrics['Period']
@@ -232,6 +236,17 @@ def combine_stats_rolling(
 
         # Calculate statistics for each channel
         for channel in range(num_channels):
+
+            # Mean signal intensity
+            submovie_signal = bin_values[
+                subframe_roll * submovie :
+                subframe_roll * submovie + subframe_size,
+                channel,
+                :
+            ]
+            mean_signal = np.nanmean(submovie_signal)
+            submovie_summary[f'Ch {channel + 1} Mean Signal'] = mean_signal
+
             # Calculate percentage of no periods for the current channel
             pcnt_no_period = (np.count_nonzero(np.isnan(indv_periods[submovie, channel])) / num_bins) * 100
             submovie_summary[f'Ch {channel + 1} Pcnt No Periods'] = pcnt_no_period
