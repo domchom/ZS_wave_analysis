@@ -225,7 +225,7 @@ class RollingGUI(_GUIBase):
             "Ch3_smoothing": tk.BooleanVar(value=True),
             "Ch4_smoothing": tk.BooleanVar(value=True),
             "CCF_smoothing": tk.BooleanVar(value=True),
-            "injection_frame": tk.IntVar(value=30),
+            "injection_frame": tk.IntVar(value=0),
             "dextran_ch1": tk.BooleanVar(value=False),
             "dextran_ch2": tk.BooleanVar(value=False),
         }
@@ -267,7 +267,8 @@ class RollingGUI(_GUIBase):
         # injection frame number text and number entry box
         ttk.Label(self, text="Injection frame number").grid(row=8, column=5, padx=10, sticky="W")
         ttk.Entry(self, width=3, textvariable=self.vars["injection_frame"]).grid(row=8, column=6, padx=10, sticky="W")
-        
+        ttk.Label(self, text="(leave at 0 to ignore)").grid(row=8, column=7, padx=0, sticky="W")
+
         # option for dextran to be selected as channel 1 or 2
         ttk.Label(self, text="Dextran signal").grid(row=9, column=5, padx=10, sticky="W")
         ttk.Label(self, text="Ch1").grid(row=9, column=5, padx=10, sticky="E")

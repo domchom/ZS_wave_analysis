@@ -133,7 +133,7 @@ def _return_mean_periods_shifts_props_plots(
             )
         
         # plot vertical line indicating when injection takes place
-        if (injection_frame is not None):
+        if (injection_frame is not None and injection_frame != 0):
             ax.axvline(x=injection_frame, color='red', linestyle='--', alpha=0.5)
         
 
