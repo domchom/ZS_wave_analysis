@@ -124,6 +124,8 @@ def return_fft_figure(
             va='bottom'
         )
 
+    ax.set_xlim(0, 300)    
+
     ax.set_xlabel('1/f (s)', color=text_color)
     ax.set_ylabel('Power', color=text_color)
     ax.set_title(f'{Ch_name} Fast Fourier Transform', color=text_color)
