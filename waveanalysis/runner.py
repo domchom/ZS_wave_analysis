@@ -290,41 +290,44 @@ def main():
     Loops so the user can navigate between standard / rolling / kymograph
     GUIs without restarting the program.
     '''
-    mode = "standard"
+    import gc
 
-    while True:
+    _GUI_FOR_MODE = {
+        "standard": BaseGUI,
+        "rolling": RollingGUI,
+        "kymograph": KymographGUI,
+    }
+
+    mode = "standard"
+    while mode is not None:
+        gui = _GUI_FOR_MODE[mode]()
+        _setup_and_run(gui)
+        gui.mainloop()
+
+        # Work out where to go next from the flags the GUI set before closing.
         if mode == "standard":
-            gui = BaseGUI()
-            _setup_and_run(gui)
-            gui.mainloop()
-            if gui.rolling:
-                mode = "rolling"
-                continue
-            elif gui.kymograph:
-                mode = "kymograph"
-                continue
+            if getattr(gui, "rolling", False):
+                next_mode = "rolling"
+            elif getattr(gui, "kymograph", False):
+                next_mode = "kymograph"
             else:
-                break
-        elif mode == "rolling":
-            gui = RollingGUI()
-            _setup_and_run(gui)
-            gui.mainloop()
-            if getattr(gui, "_back_to_standard", False):
-                mode = "standard"
-                continue
-            else:
-                break
-        elif mode == "kymograph":
-            gui = KymographGUI()
-            _setup_and_run(gui)
-            gui.mainloop()
-            if getattr(gui, "_back_to_standard", False):
-                mode = "standard"
-                continue
-            else:
-                break
-        else:
-            break
+                next_mode = None
+        else:  # rolling or kymograph
+            next_mode = "standard" if getattr(gui, "_back_to_standard", False) else None
+
+        # Each mode uses its own Tk root (its own Tcl interpreter). The window is
+        # already destroyed at this point, but the Python object survives in a
+        # reference cycle until a garbage-collection sweep frees it -- and that
+        # sweep could otherwise happen inside the *next* GUI's background
+        # analysis thread. Deleting a Tcl interpreter from any thread other than
+        # the one that created it makes Tcl abort the whole process
+        # (Tcl_AsyncDelete panic). Dropping the reference and collecting here
+        # forces the interpreter to be torn down on the main thread, before the
+        # next GUI (and its worker thread) ever starts.
+        gui = None
+        gc.collect()
+
+        mode = next_mode
 
 
 if __name__ == "__main__":

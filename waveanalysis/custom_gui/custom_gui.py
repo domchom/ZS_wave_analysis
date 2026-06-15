@@ -402,7 +402,25 @@ class _GUIBase(_TkBase):
         self._test_folder_path_once = tmp
         self._ignore_group_names_once = self._has_group_names
         self.start_analysis()
-        self.vars["folder_path"].set(folder)
+
+    def _finalize_vars(self):
+        """Release this GUI's tk Variables on the main thread while the Tcl
+        interpreter is still alive.
+
+        When the program switches modes it destroys this window and builds a
+        new Tk root, but the old Variable objects linger in reference cycles
+        until a GC sweep frees them. If that sweep happens inside the next
+        GUI's background analysis thread, each Variable.__del__ calls into Tcl
+        off the main thread and raises "main thread is not in main loop"
+        (and can wedge the interpreter). Clearing them here forces their
+        finalizers to run now, on the main thread, before we navigate away.
+        """
+        import gc
+        if hasattr(self, "vars"):
+            self.vars.clear()
+        if hasattr(self, "smoothing_widgets"):
+            self.smoothing_widgets.clear()
+        gc.collect()
 
     def cancel_analysis(self):
         self.destroy()
@@ -582,11 +600,13 @@ class BaseGUI(_GUIBase):
     def launch_rolling_analysis(self):
         self.rolling = True
         self.kymograph = False
+        self._finalize_vars()
         self.destroy()
 
     def launch_kymograph_analysis(self):
         self.kymograph = True
         self.rolling = False
+        self._finalize_vars()
         self.destroy()
 
 
@@ -666,6 +686,7 @@ class RollingGUI(_GUIBase):
 
     def _go_back(self):
         self._back_to_standard = True
+        self._finalize_vars()
         self.destroy()
 
 
@@ -766,6 +787,7 @@ class KymographGUI(_GUIBase):
 
     def _go_back(self):
         self._back_to_standard = True
+        self._finalize_vars()
         self.destroy()
 
 
