@@ -6,6 +6,7 @@ import subprocess
 import sys as _sys
 import time
 import tkinter as tk
+import tkinter.font as tkfont
 from tkinter import ttk, scrolledtext
 from tkinter.filedialog import askdirectory
 
@@ -397,8 +398,9 @@ class _GUIBase(_TkBase):
             import shutil
             shutil.copy2(src, dst)
 
-        self.vars["folder_path"].set(tmp)
         self.log_message(f"Test mode: running on {chosen} only")
+        self._test_folder_path_once = tmp
+        self._ignore_group_names_once = self._has_group_names
         self.start_analysis()
         self.vars["folder_path"].set(folder)
 
@@ -422,10 +424,18 @@ class _GUIBase(_TkBase):
             self._resolved_params = {}
             for k, v in self.vars.items():
                 self._resolved_params[k] = v.get()
+            original_folder_path = self._resolved_params.get("folder_path", "")
+            test_folder_path = getattr(self, "_test_folder_path_once", None)
+            if test_folder_path is not None:
+                self._resolved_params["folder_path"] = test_folder_path
             if self._has_group_names:
                 self._resolved_params["group_names"] = [
                     g.strip() for g in self._resolved_params["group_names"].split(",")
                 ]
+                if getattr(self, "_ignore_group_names_once", False):
+                    self._resolved_params["group_names"] = [""]
+            self._test_folder_path_once = None
+            self._ignore_group_names_once = False
             sm = {}
             for ch in ["Ch1", "Ch2", "Ch3", "Ch4", "CCF"]:
                 if self._resolved_params[f"{ch}_smoothing"]:
@@ -450,7 +460,7 @@ class _GUIBase(_TkBase):
                     self.log_message(f"ERROR: {e}")
                 self.set_status("Fix errors above and try again")
                 return
-            _save_config({"last_folder": self._resolved_params["folder_path"]})
+            _save_config({"last_folder": original_folder_path})
             self._hide_results_buttons()
             self._is_running = True
             self._stop_requested = False
@@ -459,6 +469,8 @@ class _GUIBase(_TkBase):
             if self.on_start:
                 self.on_start()
         except Exception as e:
+            self._test_folder_path_once = None
+            self._ignore_group_names_once = False
             self._is_running = False
             self.start_button.configure(state="normal")
             self.log_message(f"ERROR: Failed to start: {e}")
@@ -783,6 +795,7 @@ class _FilePickerDialog(tk.Toplevel):
 
         for f in file_list:
             self.listbox.insert(tk.END, f)
+        self._fit_listbox_to_filenames(file_list)
         self.listbox.selection_set(0)
         self.listbox.bind("<Double-1>", lambda e: self._ok())
 
@@ -793,6 +806,15 @@ class _FilePickerDialog(tk.Toplevel):
 
         self.protocol("WM_DELETE_WINDOW", self._cancel)
         self.wait_window()
+
+    def _fit_listbox_to_filenames(self, file_list):
+        font = tkfont.nametofont(self.listbox.cget("font"))
+        longest_px = max(font.measure(f) for f in file_list)
+        char_px = max(font.measure("0"), 1)
+        padding_px = 36
+        available_px = max(self.winfo_screenwidth() - 120, 300)
+        width_chars = (min(longest_px + padding_px, available_px) + char_px - 1) // char_px
+        self.listbox.configure(width=max(20, int(width_chars)))
 
     def _ok(self):
         sel = self.listbox.curselection()
