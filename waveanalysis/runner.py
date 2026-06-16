@@ -61,13 +61,11 @@ class _GUIWriter:
                     and ".tif" in line):
                 self._files_done += 1
                 filename = line[len("Processing "):-3]
-                short = (filename if len(filename) <= 50
-                         else filename[:25] + "..." + filename[-22:])
                 self.gui.log_message(
                     f"[{self._files_done}/{self._total_files}] {filename}"
                 )
                 self.gui.set_status(
-                    f"Processing file {self._files_done}/{self._total_files}: {short}"
+                    f"Processing file {self._files_done}/{self._total_files}: {filename}"
                 )
                 self.gui.update_file_progress(self._files_done, self._total_files)
                 if self.gui._stop_requested:
@@ -87,6 +85,7 @@ def _build_log_params(params, analysis_type):
         "Base Directory": params["folder_path"],
         "ACF Peak Prominence": params["acf_peak_thresh"],
         "CCF Peak Prominence": params["ccf_peak_thresh"],
+        "Rise/Fall Landmark Height": params.get("edge_height_fraction", 0.5),
         "Small Shifts Correction": params["small_shifts_correction"],
         "Smoothing": params["smoothing"],
         "Smoothing Params": params["smoothing_params"],
@@ -109,6 +108,8 @@ def _build_log_params(params, analysis_type):
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
             "Plot Heatmaps": params["plot_flags"]["plot_heatmaps"],
+            "Plot Landmark Shifts": params["plot_flags"].get("plot_landmark_shifts", False),
+            "Plot Individual Landmark Shifts": params["plot_flags"].get("plot_indv_landmark_shifts", False),
             "Dark Plots": params["plot_flags"]["dark_plots"],
         })
     elif analysis_type == "rolling":
@@ -133,6 +134,8 @@ def _build_log_params(params, analysis_type):
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
             "Plot Heatmaps": params["plot_flags"]["plot_heatmaps"],
+            "Plot Landmark Shifts": params["plot_flags"].get("plot_landmark_shifts", False),
+            "Plot Individual Landmark Shifts": params["plot_flags"].get("plot_indv_landmark_shifts", False),
             "Dark Plots": params["plot_flags"]["dark_plots"],
             "Calc Wave Speeds": params["calculate_wave_speeds"],
             "Plot Wave Speeds": True,
@@ -175,6 +178,9 @@ def _run_analysis(gui):
         gui.log_message("")
         writer.set_file_tracking(total_files)
 
+        # Custom channel display names from the GUI (blanks fall back to 'ChN' in plots)
+        channel_names = [params.get(f"Ch{i}_name", "") for i in range(1, 5)]
+
         if analysis_type == "standard":
             combined_workflow(
                 folder_path=params["folder_path"],
@@ -194,6 +200,8 @@ def _run_analysis(gui):
                 test=False,
                 smoothing_params=params["smoothing_params"],
                 smoothing=params["smoothing"],
+                channel_names=channel_names,
+                edge_height_fraction=params["edge_height_fraction"],
             )
 
         elif analysis_type == "rolling":
@@ -212,6 +220,7 @@ def _run_analysis(gui):
                 smoothing_params=params["smoothing_params"],
                 smoothing=params["smoothing"],
                 dark_plots=params["dark_plots"],
+                channel_names=channel_names,
             )
 
         elif analysis_type == "kymograph":
@@ -233,6 +242,8 @@ def _run_analysis(gui):
                 test=False,
                 smoothing_params=params["smoothing_params"],
                 smoothing=params["smoothing"],
+                channel_names=channel_names,
+                edge_height_fraction=params["edge_height_fraction"],
             )
 
         if log_params["Errors"]:

@@ -90,6 +90,32 @@ class _GUIBase(_TkBase):
             poly.grid(row=i, column=5, sticky="w")
             self.smoothing_widgets[ch] = (cb, win, poly)
 
+    def _build_edge_height_slider(self, parent):
+        """Build a slider for rise/fall landmark height as a fraction of peak height."""
+        value_label = ttk.Label(parent, width=4)
+
+        def update_label(*_):
+            value_label.configure(text=f"{int(round(self.vars['edge_height_fraction'].get() * 100))}%")
+
+        # Keep the % label in sync whether the slider is dragged or the value is
+        # restored from saved settings (which sets the variable directly).
+        self.vars["edge_height_fraction"].trace_add("write", update_label)
+
+        ttk.Label(parent, text="Rise/fall height").grid(row=0, column=0, columnspan=3, sticky="w")
+        ttk.Scale(
+            parent,
+            from_=0.1,
+            to=0.9,
+            variable=self.vars["edge_height_fraction"],
+            command=lambda _value: update_label(),
+        ).grid(row=1, column=0, columnspan=2, sticky="ew", padx=(0, 4))
+        value_label.grid(row=1, column=2, sticky="e")
+        ttk.Label(parent, text="10%").grid(row=2, column=0, sticky="w")
+        ttk.Label(parent, text="90%").grid(row=2, column=1, sticky="e")
+        parent.columnconfigure(0, weight=1)
+        parent.columnconfigure(1, weight=1)
+        update_label()
+
     # ---- log / progress / status area ----
 
     def _build_bottom(self, parent):
@@ -109,8 +135,19 @@ class _GUIBase(_TkBase):
         self._build_extra_buttons(btn)  # subclass hook
 
         # status + progress
-        self.status_label = ttk.Label(parent, text="Status: Ready", font=("TkDefaultFont", 10, "bold"))
-        self.status_label.pack(anchor="w")
+        self.status_label = ttk.Label(parent, text="Status: Ready", font=("TkDefaultFont", 10, "bold"),
+                                      anchor="w", justify="left")
+        self.status_label.pack(fill=tk.X)
+
+        # Wrap long status text (e.g. full filenames) to the available width
+        # instead of clipping it. Guard against the relayout re-triggering us.
+        self._status_wrap_w = None
+
+        def _wrap_status(event):
+            if self._status_wrap_w != event.width:
+                self._status_wrap_w = event.width
+                self.status_label.configure(wraplength=max(event.width - 4, 100))
+        self.status_label.bind("<Configure>", _wrap_status)
         prog = ttk.Frame(parent)
         prog.pack(fill=tk.X, pady=(2, 4))
         self.progress_bar = ttk.Progressbar(prog, orient=tk.HORIZONTAL, mode="determinate")
@@ -142,6 +179,72 @@ class _GUIBase(_TkBase):
     def _build_extra_buttons(self, parent):
         """Override in subclasses to add extra buttons to the button row."""
         pass
+
+    # ---- settings persistence ----
+
+    def _settings_key(self):
+        """Config key namespaced by analysis type so each mode keeps its own
+        settings (their fields and defaults differ)."""
+        atype = "default"
+        if "analysis_type" in getattr(self, "vars", {}):
+            try:
+                atype = self.vars["analysis_type"].get()
+            except Exception:
+                pass
+        return f"settings_{atype}"
+
+    def _collect_settings(self):
+        """Snapshot every tk Variable plus the smoothing spinbox values."""
+        data = {}
+        for key, var in self.vars.items():
+            try:
+                data[key] = var.get()
+            except Exception:
+                pass
+        sm = {}
+        if hasattr(self, "smoothing_widgets"):
+            for ch, (_cb, win, poly) in self.smoothing_widgets.items():
+                try:
+                    sm[ch] = {"window": win.get(), "poly": poly.get()}
+                except Exception:
+                    pass
+        data["_smoothing_spinboxes"] = sm
+        return data
+
+    def _save_all_settings(self):
+        """Persist all current settings for this analysis mode."""
+        if not getattr(self, "vars", None):
+            return
+        try:
+            _save_config({self._settings_key(): self._collect_settings()})
+        except Exception:
+            pass
+
+    def _restore_settings(self):
+        """Apply previously saved settings for this analysis mode, if any.
+
+        Call at the end of __init__, after vars and smoothing widgets exist.
+        """
+        saved = _load_config().get(self._settings_key(), {})
+        if not isinstance(saved, dict):
+            return
+        for key, value in saved.items():
+            if key == "_smoothing_spinboxes":
+                continue
+            if key in self.vars:
+                try:
+                    self.vars[key].set(value)
+                except Exception:
+                    pass
+        sm = saved.get("_smoothing_spinboxes", {})
+        if isinstance(sm, dict) and hasattr(self, "smoothing_widgets"):
+            for ch, vals in sm.items():
+                if ch in self.smoothing_widgets and isinstance(vals, dict):
+                    _cb, win, poly = self.smoothing_widgets[ch]
+                    if "window" in vals:
+                        win.set(vals["window"])
+                    if "poly" in vals:
+                        poly.set(vals["poly"])
 
     # ---- log helpers (unchanged logic) ----
 
@@ -423,6 +526,7 @@ class _GUIBase(_TkBase):
         gc.collect()
 
     def cancel_analysis(self):
+        self._save_all_settings()
         self.destroy()
 
     def stop_analysis(self):
@@ -433,6 +537,7 @@ class _GUIBase(_TkBase):
     def _on_close(self):
         if self._is_running:
             self._stop_requested = True
+        self._save_all_settings()
         self.destroy()
 
     def start_analysis(self):
@@ -469,7 +574,8 @@ class _GUIBase(_TkBase):
                     k: self._resolved_params[k]
                     for k in ("plot_summary_ACFs", "plot_summary_CCFs", "plot_summary_peaks",
                               "plot_indv_ACFs", "plot_indv_CCFs", "plot_indv_peaks",
-                              "plot_heatmaps", "dark_plots")
+                              "plot_heatmaps", "plot_landmark_shifts", "plot_indv_landmark_shifts",
+                              "dark_plots")
                 }
             errs = self._validate_inputs()
             if errs:
@@ -478,7 +584,11 @@ class _GUIBase(_TkBase):
                     self.log_message(f"ERROR: {e}")
                 self.set_status("Fix errors above and try again")
                 return
-            _save_config({"last_folder": original_folder_path})
+            # Don't persist anything for a quick test run -- in particular avoid
+            # remembering the temporary single-file folder it runs from.
+            if test_folder_path is None:
+                _save_config({"last_folder": original_folder_path})
+                self._save_all_settings()
             self._hide_results_buttons()
             self._is_running = True
             self._stop_requested = False
@@ -508,6 +618,10 @@ class BaseGUI(_GUIBase):
         self.title("Wave Analysis")
         self.vars = {
             "analysis_type": tk.StringVar(value="standard"),
+            "Ch1_name": tk.StringVar(value=""),
+            "Ch2_name": tk.StringVar(value=""),
+            "Ch3_name": tk.StringVar(value=""),
+            "Ch4_name": tk.StringVar(value=""),
             "box_size": tk.IntVar(value=20),
             "bin_shift": tk.IntVar(value=20),
             "small_shifts_correction": tk.BooleanVar(value=True),
@@ -518,10 +632,13 @@ class BaseGUI(_GUIBase):
             "plot_indv_CCFs": tk.BooleanVar(value=False),
             "plot_indv_peaks": tk.BooleanVar(value=False),
             "plot_heatmaps": tk.BooleanVar(value=False),
+            "plot_landmark_shifts": tk.BooleanVar(value=False),
+            "plot_indv_landmark_shifts": tk.BooleanVar(value=False),
             "dark_plots": tk.BooleanVar(value=True),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
             "peak_prominence_fraction": tk.DoubleVar(value=0.1),
+            "edge_height_fraction": tk.DoubleVar(value=0.5),
             "group_names": tk.StringVar(value=""),
             "smoothing": tk.BooleanVar(value=True),
             "folder_path": tk.StringVar(value=""),
@@ -559,15 +676,31 @@ class BaseGUI(_GUIBase):
         self._add_entry(opts, 6, 0, self.vars["peak_prominence_fraction"], "Peak prom. frac.")
         self._add_check(opts, 7, 0, self.vars["small_shifts_correction"], "Small shifts correction")
 
-        # right column
-        right = ttk.Frame(top)
-        right.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        # middle column: smoothing + channel names
+        middle = ttk.Frame(top)
+        middle.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
 
         # smoothing
-        sm = ttk.LabelFrame(right, text="Smoothing", padding=4)
+        sm = ttk.LabelFrame(middle, text="Smoothing", padding=4)
         sm.pack(fill=tk.X, pady=(0, 4))
         self._build_smoothing(sm, default_poly=2)
         self._add_check(sm, 5, 0, self.vars["smoothing"], "Enable smoothing")
+
+        # channel display names (used in plot labels only; blank = default ChN)
+        cn = ttk.LabelFrame(middle, text="Channel Names (optional)", padding=4)
+        cn.pack(fill=tk.X, pady=(0, 4))
+        self._add_entry(cn, 0, 0, self.vars["Ch1_name"], "Ch1", width=10)
+        self._add_entry(cn, 1, 0, self.vars["Ch2_name"], "Ch2", width=10)
+        self._add_entry(cn, 0, 2, self.vars["Ch3_name"], "Ch3", width=10)
+        self._add_entry(cn, 1, 2, self.vars["Ch4_name"], "Ch4", width=10)
+
+        # right column: edge-height slider + plot options
+        right = ttk.Frame(top)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+
+        edge = ttk.LabelFrame(right, text="Landmark Edge Height", padding=4)
+        edge.pack(fill=tk.X, pady=(0, 4))
+        self._build_edge_height_slider(edge)
 
         # plot options
         pl = ttk.LabelFrame(right, text="Plot Options", padding=4)
@@ -580,6 +713,8 @@ class BaseGUI(_GUIBase):
         self._add_check(pl, 2, 2, self.vars["plot_indv_peaks"], "Indv peaks")
         self._add_check(pl, 0, 4, self.vars["dark_plots"], "Dark plots")
         self._add_check(pl, 1, 4, self.vars["plot_heatmaps"], "Heatmaps")
+        self._add_check(pl, 3, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
+        self._add_check(pl, 3, 2, self.vars["plot_indv_landmark_shifts"], "Indv landmark")
 
         # ---- separator ----
         ttk.Separator(root, orient="horizontal").pack(fill=tk.X, pady=6)
@@ -593,6 +728,8 @@ class BaseGUI(_GUIBase):
         self._is_running = False
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        self._restore_settings()
+
     def _build_extra_buttons(self, parent):
         ttk.Button(parent, text="Kymograph", command=self.launch_kymograph_analysis).pack(side=tk.RIGHT)
         ttk.Button(parent, text="Rolling", command=self.launch_rolling_analysis).pack(side=tk.RIGHT, padx=(0, 4))
@@ -600,12 +737,14 @@ class BaseGUI(_GUIBase):
     def launch_rolling_analysis(self):
         self.rolling = True
         self.kymograph = False
+        self._save_all_settings()
         self._finalize_vars()
         self.destroy()
 
     def launch_kymograph_analysis(self):
         self.kymograph = True
         self.rolling = False
+        self._save_all_settings()
         self._finalize_vars()
         self.destroy()
 
@@ -621,6 +760,10 @@ class RollingGUI(_GUIBase):
         self.title("Wave Analysis — Rolling")
         self.vars = {
             "analysis_type": tk.StringVar(value="rolling"),
+            "Ch1_name": tk.StringVar(value=""),
+            "Ch2_name": tk.StringVar(value=""),
+            "Ch3_name": tk.StringVar(value=""),
+            "Ch4_name": tk.StringVar(value=""),
             "box_size": tk.IntVar(value=20),
             "bin_shift": tk.IntVar(value=20),
             "subframe_size": tk.IntVar(value=50),
@@ -672,6 +815,13 @@ class RollingGUI(_GUIBase):
         sm.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
         self._build_smoothing(sm, default_poly=3)
 
+        cn = ttk.LabelFrame(top, text="Channel Names (optional)", padding=4)
+        cn.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        self._add_entry(cn, 0, 0, self.vars["Ch1_name"], "Ch1", width=10)
+        self._add_entry(cn, 1, 0, self.vars["Ch2_name"], "Ch2", width=10)
+        self._add_entry(cn, 2, 0, self.vars["Ch3_name"], "Ch3", width=10)
+        self._add_entry(cn, 3, 0, self.vars["Ch4_name"], "Ch4", width=10)
+
         ttk.Separator(root, orient="horizontal").pack(fill=tk.X, pady=6)
         self._bottom = ttk.Frame(root)
         self._bottom.pack(fill=tk.BOTH, expand=True)
@@ -681,11 +831,14 @@ class RollingGUI(_GUIBase):
         self._is_running = False
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        self._restore_settings()
+
     def _build_extra_buttons(self, parent):
         ttk.Button(parent, text="Back to Standard", command=self._go_back).pack(side=tk.RIGHT)
 
     def _go_back(self):
         self._back_to_standard = True
+        self._save_all_settings()
         self._finalize_vars()
         self.destroy()
 
@@ -703,6 +856,10 @@ class KymographGUI(_GUIBase):
         self.title("Wave Analysis — Kymograph")
         self.vars = {
             "analysis_type": tk.StringVar(value="kymograph"),
+            "Ch1_name": tk.StringVar(value=""),
+            "Ch2_name": tk.StringVar(value=""),
+            "Ch3_name": tk.StringVar(value=""),
+            "Ch4_name": tk.StringVar(value=""),
             "line_width": tk.IntVar(value=5),
             "bin_shift": tk.IntVar(value=5),
             "small_shifts_correction": tk.BooleanVar(value=False),
@@ -713,10 +870,13 @@ class KymographGUI(_GUIBase):
             "plot_indv_CCFs": tk.BooleanVar(value=False),
             "plot_indv_peaks": tk.BooleanVar(value=False),
             "plot_heatmaps": tk.BooleanVar(value=False),
+            "plot_landmark_shifts": tk.BooleanVar(value=False),
+            "plot_indv_landmark_shifts": tk.BooleanVar(value=False),
             "dark_plots": tk.BooleanVar(value=False),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
             "peak_prominence_fraction": tk.DoubleVar(value=0.1),
+            "edge_height_fraction": tk.DoubleVar(value=0.5),
             "group_names": tk.StringVar(value=""),
             "smoothing": tk.BooleanVar(value=True),
             "folder_path": tk.StringVar(value=""),
@@ -753,14 +913,30 @@ class KymographGUI(_GUIBase):
         self._add_entry(opts, 6, 0, self.vars["peak_prominence_fraction"], "Peak prom. frac.")
         self._add_check(opts, 7, 0, self.vars["small_shifts_correction"], "Small shifts correction")
 
-        # right column
-        right = ttk.Frame(top)
-        right.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        # middle column: smoothing + channel names
+        middle = ttk.Frame(top)
+        middle.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
 
-        sm = ttk.LabelFrame(right, text="Smoothing", padding=4)
+        sm = ttk.LabelFrame(middle, text="Smoothing", padding=4)
         sm.pack(fill=tk.X, pady=(0, 4))
         self._build_smoothing(sm, default_poly=3)
         self._add_check(sm, 5, 0, self.vars["smoothing"], "Enable smoothing")
+
+        # channel display names (used in plot labels only; blank = default ChN)
+        cn = ttk.LabelFrame(middle, text="Channel Names (optional)", padding=4)
+        cn.pack(fill=tk.X, pady=(0, 4))
+        self._add_entry(cn, 0, 0, self.vars["Ch1_name"], "Ch1", width=10)
+        self._add_entry(cn, 1, 0, self.vars["Ch2_name"], "Ch2", width=10)
+        self._add_entry(cn, 0, 2, self.vars["Ch3_name"], "Ch3", width=10)
+        self._add_entry(cn, 1, 2, self.vars["Ch4_name"], "Ch4", width=10)
+
+        # right column: edge-height slider + plot options
+        right = ttk.Frame(top)
+        right.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+
+        edge = ttk.LabelFrame(right, text="Landmark Edge Height", padding=4)
+        edge.pack(fill=tk.X, pady=(0, 4))
+        self._build_edge_height_slider(edge)
 
         pl = ttk.LabelFrame(right, text="Plot Options", padding=4)
         pl.pack(fill=tk.X)
@@ -772,6 +948,8 @@ class KymographGUI(_GUIBase):
         self._add_check(pl, 2, 2, self.vars["plot_indv_peaks"], "Indv peaks")
         self._add_check(pl, 0, 4, self.vars["dark_plots"], "Dark plots")
         self._add_check(pl, 1, 4, self.vars["plot_heatmaps"], "Heatmaps")
+        self._add_check(pl, 3, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
+        self._add_check(pl, 3, 2, self.vars["plot_indv_landmark_shifts"], "Indv landmark")
 
         ttk.Separator(root, orient="horizontal").pack(fill=tk.X, pady=6)
         self._bottom = ttk.Frame(root)
@@ -782,11 +960,14 @@ class KymographGUI(_GUIBase):
         self._is_running = False
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
+        self._restore_settings()
+
     def _build_extra_buttons(self, parent):
         ttk.Button(parent, text="Back to Standard", command=self._go_back).pack(side=tk.RIGHT)
 
     def _go_back(self):
         self._back_to_standard = True
+        self._save_all_settings()
         self._finalize_vars()
         self.destroy()
 
