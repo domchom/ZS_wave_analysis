@@ -104,6 +104,89 @@ def get_channel_combos(num_channels: int) -> list[list[int]]:
 
     return channel_combos
 
+def get_channel_name(channel_names: list, channel_index: int) -> str:
+    '''
+    Display name for a channel, used in plot titles/legends/axes. Falls back to
+    the default 'Ch{n}' when no custom name is provided for that channel.
+
+    Args:
+        channel_names (list): Optional list of custom names (blanks allowed).
+        channel_index (int): Zero-based channel index.
+    '''
+    if channel_names and channel_index < len(channel_names):
+        channel_name = str(channel_names[channel_index]).strip()
+        if channel_name:
+            return channel_name
+    return f'Ch{channel_index + 1}'
+
+def get_channel_combo_name(channel_names: list, combo: list) -> str:
+    '''
+    Display name for a channel pair, e.g. 'Actin-Myosin' or 'Ch1-Ch2'.
+    '''
+    return f'{get_channel_name(channel_names, combo[0])}-{get_channel_name(channel_names, combo[1])}'
+
+def relabel_channels(text: str, channel_names: list) -> str:
+    '''
+    Substitute default channel tokens ('Ch 1'/'Ch1', etc.) with custom names in a
+    display string (used for group-comparison titles, which derive from CSV
+    column names). Leaves the string untouched for channels with no custom name.
+    '''
+    if not channel_names:
+        return text
+    for i, name in enumerate(channel_names):
+        name = str(name).strip()
+        if name:
+            text = text.replace(f'Ch {i + 1}', name).replace(f'Ch{i + 1}', name)
+    return text
+
+def _metric_display_replacements(edge_height_fraction: float = None) -> tuple:
+    if edge_height_fraction is None:
+        rise_shift = 'rising-edge shift'
+        fall_shift = 'falling-edge shift'
+        rise_time = 'rise duration'
+        fall_time = 'fall duration'
+        rise_fall_time = 'rise duration minus fall duration'
+    else:
+        pct = f'{int(round(float(edge_height_fraction) * 100))}%'
+        rise_shift = f'{pct} rising-edge shift'
+        fall_shift = f'{pct} falling-edge shift'
+        rise_time = f'rise duration ({pct} to apex)'
+        fall_time = f'fall duration (apex to {pct})'
+        rise_fall_time = 'rise duration minus fall duration'
+
+    return (
+    ('% Phase Shift', 'phase shift (% of period)'),
+    ('Rise-Peak Diff', 'rise shift minus peak shift'),
+    ('Fall-Peak Diff', 'fall shift minus peak shift'),
+    ('Peak Rel Amp', 'relative peak amplitude'),
+    ('Peak Amp', 'peak amplitude'),
+    ('Peak Width', 'peak width'),
+    ('Peak Offset', 'peak apex offset'),
+    ('Peak Area', 'peak area'),
+    ('Peak Max', 'peak maximum'),
+    ('Peak Min', 'peak minimum'),
+    ('Peak Shift', 'peak-apex shift'),
+        ('Rise Shift', rise_shift),
+        ('Fall Shift', fall_shift),
+        ('Rise-Fall Time', rise_fall_time),
+        ('Rise Time', rise_time),
+        ('Fall Time', fall_time),
+    ('StdDev', 'SD'),
+    ('Pcnt No', 'percent without'),
+    ('Shift', 'CCF shift'),
+    )
+
+def relabel_metric_text(text: str, channel_names: list = None, edge_height_fraction: float = None) -> str:
+    '''
+    Convert internal metric/column text into display wording for plot labels.
+    This intentionally does not change filenames, dataframe columns, or saved
+    statistics keys.
+    '''
+    text = relabel_channels(text, channel_names)
+    for old, new in _metric_display_replacements(edge_height_fraction):
+        text = text.replace(old, new)
+    return text
+
 def threshold_check(
     threshold: float,
     log_params: dict
