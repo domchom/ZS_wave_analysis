@@ -9,6 +9,10 @@ import math
 import pytest
 from waveanalysis.housekeeping.housekeeping_functions import (
     get_channel_combos,
+    get_channel_combo_name,
+    get_channel_name,
+    relabel_channels,
+    relabel_metric_text,
     match_group_to_file,
     check_frame_interval,
     group_name_error_check,
@@ -37,6 +41,26 @@ def test_get_channel_combos_no_duplicates():
     result = get_channel_combos(4)
     # each pair should appear exactly once
     assert len(result) == len(set(map(tuple, result)))
+
+def test_get_channel_name_uses_custom_name():
+    assert get_channel_name(["Actin", "Myosin"], 1) == "Myosin"
+
+def test_get_channel_name_falls_back_for_blank_or_missing_name():
+    assert get_channel_name(["Actin", "  "], 1) == "Ch2"
+    assert get_channel_name(["Actin"], 2) == "Ch3"
+
+def test_get_channel_combo_name_uses_custom_names_with_fallbacks():
+    assert get_channel_combo_name(["Actin", ""], [0, 1]) == "Actin-Ch2"
+
+def test_relabel_channels_replaces_default_channel_tokens_only_when_named():
+    text = "Ch 1 Mean Shift and Ch2 Mean Shift"
+    assert relabel_channels(text, ["Actin", "Myosin"]) == "Actin Mean Shift and Myosin Mean Shift"
+    assert relabel_channels(text, ["", "  "]) == text
+
+def test_relabel_metric_text_expands_internal_metric_names():
+    text = "Ch1 Mean Rise-Peak Diff and Ch2 StdDev Peak Amp"
+    expected = "Actin Mean rise shift minus peak shift and Ch2 SD peak amplitude"
+    assert relabel_metric_text(text, ["Actin", ""]) == expected
 
 
 # ── match_group_to_file ───────────────────────────────────────────────────────
