@@ -2,7 +2,8 @@ import numpy as np
 from tqdm import tqdm
 import scipy.signal as sig
 import matplotlib.pyplot as plt
-from waveanalysis.signal_processing.correlation_functions import normalize_signal
+from waveanalysis.signal_processing.correlation_functions import normalize_signal, _peak_landmarks
+from waveanalysis.housekeeping.housekeeping_functions import get_channel_name, get_channel_combo_name
 
 def plot_indv_peak_workflow(
 	raw_bin_values: np.ndarray,
@@ -45,7 +46,7 @@ def plot_indv_peak_workflow(
 				indv_peak_figs[f'Ch {channel + 1} Bin {bin + 1} Peak Props'] = _return_indv_peak_prop_figure(
 					bin_signal=to_plot,
 					prop_dict=indv_peak_props[f'Ch {channel} Bin {bin}'],
-					channel_name=f'Ch {channel + 1} Bin {bin + 1}',
+					channel_name=f'{get_channel_name(img_props.get("channel_names"), channel)} Bin {bin + 1}',
 					frame_interval=frame_interval,
 					num_frames=num_frames,
 					dark_plots=dark_plots
@@ -87,8 +88,8 @@ def _return_indv_peak_prop_figure(
             ax.set_facecolor('black')
 
         x_axis = np.arange(0, num_frames) * frame_interval
-        ax.plot(x_axis, bin_signal, color='gray', label='raw signal')
-        ax.plot(x_axis, signal, color='blue' if not dark_plots else 'lightblue', label='smoothed signal')
+        ax.plot(x_axis, bin_signal, color='gray', label='raw intensity')
+        ax.plot(x_axis, signal, color='blue' if not dark_plots else 'lightblue', label='smoothed intensity')
     
         # Plot each peak width and amplitude
         if not np.isnan(peaks).any():
@@ -143,7 +144,7 @@ def _return_indv_peak_prop_figure(
                 rightWidthIndex[0] * frame_interval, 
                 color='olive' if not dark_plots else 'lightgreen', 
                 linestyle='-',
-                label='FWHM'
+                label='peak width (FWHM)'
             )
             ax.vlines(
                 peaks[0] * frame_interval, 
@@ -151,7 +152,7 @@ def _return_indv_peak_prop_figure(
                 signal[peaks[0]], 
                 color='purple' if not dark_plots else 'magenta', 
                 linestyle='-',
-                label='Peak amplitude'
+                label='peak amplitude'
             )
             ax.hlines(
                 heights[0] - 5, 
@@ -159,14 +160,14 @@ def _return_indv_peak_prop_figure(
                 midpoints[0] * frame_interval, 
                 color='orange' if not dark_plots else 'lightcoral', 
                 linestyle='-',
-                label='Peak offset'
+                label='apex offset from midpoint'
             )
         
             ax.legend(loc='upper right', fontsize='small', ncol=1)
 
         ax.set_xlabel('Time (seconds)')
-        ax.set_ylabel('Signal (AU)')
-        ax.set_title(f'{channel_name} peak properties')
+        ax.set_ylabel('Mean bin intensity (AU)')
+        ax.set_title(f'{channel_name}: detected peak measurements')
 
         plt.close(fig)
 
@@ -219,7 +220,7 @@ def plot_indv_acf_workflow(
 					raw_to_plot = raw_to_plot if raw_bin_values is not None else None,
 					signal=to_plot,
 					acf_curve=indv_acfs[channel, bin],
-					channel_name=f'Ch {channel + 1}',
+					channel_name=get_channel_name(img_props.get('channel_names'), channel),
 					period=indv_periods[channel, bin],
 					num_frames=num_frames,
 					frame_interval=frame_interval,
@@ -257,12 +258,12 @@ def _return_indv_acf_figure(
 
         # Plot the signal(s)
         if raw_to_plot is not None:
-            ax1.plot(x_axis, raw_to_plot, color='gray', label='raw signal')
+            ax1.plot(x_axis, raw_to_plot, color='gray', label='raw intensity')
 
-        ax1.plot(x_axis, signal, color='blue' if not dark_plots else 'lightblue', label='smoothed signal')
+        ax1.plot(x_axis, signal, color='blue' if not dark_plots else 'lightblue', label='smoothed intensity')
         ax1.set_xlabel('Time (seconds)')
-        ax1.set_ylabel('Mean bin px value')
-        ax1.set_title(f'{channel_name} signal and ACF')
+        ax1.set_ylabel('Mean bin intensity (AU)')
+        ax1.set_title(f'{channel_name}: signal and autocorrelation')
         ax1.legend(loc='upper right', fontsize='small', ncol=1)
 
         # Plot the autocorrelation curve
@@ -275,7 +276,7 @@ def _return_indv_acf_figure(
             color = 'red'
             ax2.axvline(x=period, alpha=0.5, c=color, linestyle='--')
             ax2.axvline(x=-period, alpha=0.5, c=color, linestyle='--')
-            ax2.set_xlabel(f'Period is {abs(round(period, 2))} seconds')
+            ax2.set_xlabel(f'Detected period: {abs(round(period, 2))} seconds')
         else:
             ax2.set_xlabel('No period identified')
 
@@ -334,8 +335,8 @@ def plot_indv_ccf_workflow(
 					ch1 = normalize_signal(to_plot1),
 					ch2 = normalize_signal(to_plot2),
 					ccf_curve = indv_ccfs[combo_number, bin],
-					ch1_name = f'Ch{combo[0] + 1}',
-					ch2_name = f'Ch{combo[1] + 1}',
+					ch1_name = get_channel_name(img_props.get('channel_names'), combo[0]),
+					ch2_name = get_channel_name(img_props.get('channel_names'), combo[1]),
 					shift = indv_shifts[combo_number, bin],
 					num_frames = num_frames,
 					frame_interval = frame_interval,
@@ -374,14 +375,15 @@ def _return_indv_ccf_figure(
         # Plot the raw signals
         ax1.plot(x_axis, ch1, color='blue' if not dark_plots else 'lightblue', label=ch1_name)
         ax1.plot(x_axis, ch2, color='orange' if not dark_plots else 'lightcoral', label=ch2_name)
-        ax1.set_xlabel('time (seconds)')
-        ax1.set_ylabel('Mean bin px value')
+        ax1.set_xlabel('Time (seconds)')
+        ax1.set_ylabel('Normalized mean bin intensity')
+        ax1.set_title(f'{ch1_name} and {ch2_name}: normalized signals')
         ax1.legend(loc='upper right', fontsize='small', ncol=1)
 
         # Plot the cross-correlation curve
         lags = np.arange(-num_frames + 1, num_frames) * frame_interval
         ax2.plot(lags, ccf_curve, color='lightcoral' if dark_plots else 'blue')
-        ax2.set_ylabel('Crosscorrelation')
+        ax2.set_ylabel('Cross-correlation')
 
         # Annotate the first peak identified as the shift if available
         if not np.isnan(shift):
@@ -390,13 +392,13 @@ def _return_indv_ccf_figure(
 
             # Interpret shift in seconds (already scaled)
             if shift < -frame_interval:
-                ax2.set_xlabel(f'{ch1_name} leads by {abs(round(shift, 2))} seconds')
+                ax2.set_xlabel(f'CCF shift: {ch1_name} leads by {abs(round(shift, 2))} seconds')
             elif shift > frame_interval:
-                ax2.set_xlabel(f'{ch2_name} leads by {abs(round(shift, 2))} seconds')
+                ax2.set_xlabel(f'CCF shift: {ch2_name} leads by {abs(round(shift, 2))} seconds')
             else:
-                ax2.set_xlabel('no shift detected')
+                ax2.set_xlabel('CCF shift: no lag detected')
         else:
-            ax2.set_xlabel('No peaks identified')
+            ax2.set_xlabel('No CCF peak identified')
 
         fig.subplots_adjust(hspace=0.5)
         plt.close(fig)
@@ -404,3 +406,144 @@ def _return_indv_ccf_figure(
     return fig
 
 
+def plot_indv_landmark_shift_workflow(
+	bin_values: np.ndarray,
+	img_metrics: dict,
+	img_props: dict,
+	dark_plots: bool = False
+) -> dict:
+	"""
+	Plot the per-bin landmark-shift diagnostic for every channel combination.
+
+	For each combo/bin both channels are normalized and overlaid, with the peak
+	apex, selected-height rising-edge and selected-height falling-edge crossings marked on each
+	signal. This is the visual companion to the Peak/Rise/Fall shift metrics: it
+	shows directly where the two channels diverge at each part of the wave.
+
+	Parameters:
+	- bin_values (np.ndarray): Array of bin values.
+	- img_metrics (dict): Dictionary of image parameters (uses the landmark shifts).
+	- img_props (dict): Dictionary of image properties.
+
+	Returns:
+	- plots (dict): Dictionary of individual landmark-shift plots.
+	"""
+	channel_combos = img_props['channel_combos']
+	num_bins = img_props['num_bins']
+	num_frames = img_props['num_frames']
+	analysis_type = img_props['analysis_type']
+	frame_interval = img_props['frame_interval']
+	peak_prominence_fraction = img_props.get('peak_prominence_fraction', 0.1)
+	edge_height_fraction = img_props.get('edge_height_fraction', 0.5)
+
+	plots = {}
+	its = len(channel_combos) * num_bins
+	with tqdm(total=its, miniters=its / 100) as pbar:
+		pbar.set_description('ind landmark shifts')
+		for combo_number, combo in enumerate(channel_combos):
+			for bin in range(num_bins):
+				pbar.update(1)
+				if analysis_type == 'standard':
+					to_plot1 = bin_values[:, combo[0], bin]
+					to_plot2 = bin_values[:, combo[1], bin]
+				else:
+					to_plot1 = bin_values[combo[0], bin]
+					to_plot2 = bin_values[combo[1], bin]
+				shifts = {
+					name: img_metrics[name][combo_number, bin]
+					for name in ('Peak Shift', 'Rise Shift', 'Fall Shift')
+					if name in img_metrics
+				}
+				plots[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Bin {bin + 1} Landmark Shift'] = _return_indv_landmark_shift_figure(
+					ch1=normalize_signal(to_plot1),
+					ch2=normalize_signal(to_plot2),
+					ch1_name=get_channel_name(img_props.get('channel_names'), combo[0]),
+					ch2_name=get_channel_name(img_props.get('channel_names'), combo[1]),
+					combo_name=get_channel_combo_name(img_props.get('channel_names'), combo),
+					shifts=shifts,
+					num_frames=num_frames,
+					frame_interval=frame_interval,
+					peak_prominence_fraction=peak_prominence_fraction,
+					edge_height_fraction=edge_height_fraction,
+					dark_plots=dark_plots,
+				)
+
+	return plots
+
+def _mark_landmarks(
+    ax: plt.Axes,
+    signal: np.ndarray,
+    frame_interval: float,
+    peak_prominence_fraction: float,
+    edge_height_fraction: float,
+    color: str
+) -> None:
+    '''
+    Space saving helper: mark each peak's apex, selected-height rise, and selected-height fall on the axes.
+    '''
+    apexes, rise_x, fall_x = _peak_landmarks(signal, peak_prominence_fraction, edge_height_fraction)
+    frames = np.arange(len(signal))
+    marker_kw = dict(color=color, zorder=5, edgecolor='black', linewidths=0.5)
+    if len(apexes):
+        ax.scatter(apexes * frame_interval, signal[apexes.astype(int)], marker='o', **marker_kw)
+    if len(rise_x):
+        ax.scatter(rise_x * frame_interval, np.interp(rise_x, frames, signal), marker='^', **marker_kw)
+    if len(fall_x):
+        ax.scatter(fall_x * frame_interval, np.interp(fall_x, frames, signal), marker='v', **marker_kw)
+
+def _return_indv_landmark_shift_figure(
+    ch1: np.ndarray,
+    ch2: np.ndarray,
+    ch1_name: str,
+    ch2_name: str,
+    combo_name: str,
+    shifts: dict,
+    num_frames: int,
+    frame_interval: float,
+    peak_prominence_fraction: float,
+    edge_height_fraction: float,
+    dark_plots: bool = False
+) -> plt.Figure:
+    '''
+    Space saving function to return individual landmark-shift figures.
+    '''
+    style = 'dark_background' if dark_plots else 'default'
+    x_axis = np.arange(0, num_frames) * frame_interval
+
+    with plt.style.context(style):
+        fig, ax = plt.subplots(figsize=(10, 4))
+
+        if dark_plots:
+            fig.patch.set_facecolor('black')
+            ax.set_facecolor('black')
+
+        c1 = 'lightblue' if dark_plots else 'blue'
+        c2 = 'lightcoral' if dark_plots else 'orange'
+        ax.plot(x_axis, ch1, color=c1, label=ch1_name)
+        ax.plot(x_axis, ch2, color=c2, label=ch2_name)
+
+        _mark_landmarks(ax, ch1, frame_interval, peak_prominence_fraction, edge_height_fraction, c1)
+        _mark_landmarks(ax, ch2, frame_interval, peak_prominence_fraction, edge_height_fraction, c2)
+
+        # Legend entries explaining the marker shapes (drawn off-canvas)
+        edge_pct = int(round(edge_height_fraction * 100))
+        ax.scatter([], [], marker='o', color='gray', edgecolor='black', linewidths=0.5, label='peak apex')
+        ax.scatter([], [], marker='^', color='gray', edgecolor='black', linewidths=0.5, label=f'{edge_pct}% rising edge')
+        ax.scatter([], [], marker='v', color='gray', edgecolor='black', linewidths=0.5, label=f'{edge_pct}% falling edge')
+
+        labels = {
+            'Peak Shift': 'apex',
+            'Rise Shift': f'rise {edge_pct}%',
+            'Fall Shift': f'fall {edge_pct}%',
+        }
+        title = ' | '.join(f'{labels.get(name, name)} shift {value:.2f}s' for name, value in shifts.items())
+        title = f'{combo_name}: landmark timing ({title})' if title else f'{combo_name}: landmark timing'
+        ax.set_title(title)
+        ax.set_xlabel('Time (seconds)')
+        ax.set_ylabel('Normalized mean bin intensity')
+        ax.legend(loc='upper right', fontsize='small', ncol=2)
+
+        fig.tight_layout()
+        plt.close(fig)
+
+    return fig
