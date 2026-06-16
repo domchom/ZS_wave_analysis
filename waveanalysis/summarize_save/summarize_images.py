@@ -2,6 +2,13 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 
+# Landmark-based shift metrics added on top of the original CCF 'Shift'. Handled
+# generically per combo (no "Pcnt No Shifts" column, unlike the CCF shift).
+_LANDMARK_SHIFT_METRICS = ('Peak Shift', 'Rise Shift', 'Fall Shift', 'Rise-Peak Diff', 'Fall-Peak Diff')
+
+# Metrics that are reported per channel-combination rather than per channel.
+_COMBO_METRICS = ('Shift', '% Phase Shift') + _LANDMARK_SHIFT_METRICS
+
 def summarize_image(
     img_metrics: dict,
     img_props: dict
@@ -88,8 +95,8 @@ def _add_stats_for_parameter(
         return [channel_label, meas_mean, meas_median, meas_std, meas_sem] + measurements_subset
 
     if measurement_name not in ['Wave Speed']:
-        for index, item in enumerate(channel_combos if measurement_name in ['Shift', '% Phase Shift'] else range(num_channels)):
-            if measurement_name in ['Shift', '% Phase Shift']:
+        for index, item in enumerate(channel_combos if measurement_name in _COMBO_METRICS else range(num_channels)):
+            if measurement_name in _COMBO_METRICS:
                 measurements_subset = measurements[index]
                 channel_label = f'Ch{channel_combos[index][0]+1}-Ch{channel_combos[index][1]+1} {measurement_name}'
             else:
@@ -149,11 +156,18 @@ def combine_stats_for_image_kymo_standard(
             # Unnecessary for loop to add stats for % Phase Shift after the Shifts
             for ind, stat in enumerate(stats_location):
                 file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} % Phase Shift'] = stats_by_parameter['% Phase Shift'][combo_number][ind + 1]
-           
+
+            # Add stats for the landmark-based shifts (peak apex, rising edge, and their difference)
+            for metric in _LANDMARK_SHIFT_METRICS:
+                if metric not in stats_by_parameter:
+                    continue
+                for ind, stat in enumerate(stats_location):
+                    file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} {metric}'] = stats_by_parameter[metric][combo_number][ind + 1]
+
     # Add stats for each parameter
     for name, measurement in img_metrics.items():
-        # Skip the Shift name since it is handled separately
-        if name in ['Shift', '% Phase Shift']:
+        # Skip the combo-based metrics since they are handled separately above
+        if name in _COMBO_METRICS:
             continue
         # We calculate the number of bins without Period and Peak Amp 
         elif name in ['Period', 'Peak Amp']:

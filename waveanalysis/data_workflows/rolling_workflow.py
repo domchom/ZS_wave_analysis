@@ -27,7 +27,8 @@ def rolling_workflow(
     test: bool = False, # for testing purposes
     smoothing_params: dict = None,
     smoothing: bool = True,
-    dark_plots: bool = False
+    dark_plots: bool = False,
+    channel_names: list = None,
 ) -> pd.DataFrame:      
     '''
     This is the workflow for rolling analysis. It processes the image files in the specified folder 
@@ -94,6 +95,7 @@ def rolling_workflow(
                 img_props['num_bins'] = num_bins
                 img_props['num_x_bins'] = num_x_bins
                 img_props['num_y_bins'] = num_y_bins
+                img_props['channel_names'] = channel_names
 
                 file_stem = file_name.rsplit(".", 1)[0]
 
@@ -233,7 +235,8 @@ def rolling_workflow(
                     num_channels=num_channels,
                     fullmovie_summary=summary_df,
                     channel_combos=channel_combos,
-                    dark_plots=dark_plots
+                    dark_plots=dark_plots,
+                    channel_names=channel_names,
                 )
                 plot_save_path = os.path.join(im_save_path, 'summary_plots')
                 os.makedirs(plot_save_path, exist_ok=True) if not test else None
