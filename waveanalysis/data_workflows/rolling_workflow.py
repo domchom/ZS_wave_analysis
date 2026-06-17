@@ -244,7 +244,7 @@ def rolling_workflow(
                     channel_combos=channel_combos,
                     dark_plots=dark_plots,
                     channel_names=channel_names,
-                    live_injection_dict={"injection_ch1": injection_ch1, "injection_ch2": injection_ch2, "injection_frame": (injection_frame / img_props['frame_interval'])}
+                    live_injection_dict={"injection_ch1": injection_ch1, "injection_ch2": injection_ch2, "injection_frame": (injection_frame / img_props['frame_interval']) if injection_frame is not None else None}
                 )
                 plot_save_path = os.path.join(im_save_path, 'summary_plots')
                 os.makedirs(plot_save_path, exist_ok=True) if not test else None
