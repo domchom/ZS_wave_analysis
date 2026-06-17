@@ -476,14 +476,19 @@ def combined_workflow(
             )
             group_plots_save_path = os.path.join(main_save_path, "group_comparison_graphs")
             os.makedirs(group_plots_save_path, exist_ok=True) if not test else None
-            hf.save_plots(mean_parameter_figs, group_plots_save_path) if not test else None
+            hf.save_plots(mean_parameter_figs, group_plots_save_path, group_by_metric=True) if not test else None
 
-            # save the means each parameter for the attributes to make them easier to work with 
+            # save the means each parameter for the attributes to make them easier to work with
             parameter_tables_dict = save_parameter_means_to_csv(summary_df=summary_df,group_names=group_names)
             mean_measurements_save_path = os.path.join(main_save_path, "mean_parameter_measurements")
             os.makedirs(mean_measurements_save_path, exist_ok=True) if not test else None
             for filename, table in parameter_tables_dict.items():
-                table.to_csv(f"{mean_measurements_save_path}/{filename}", index = False) if not test else None
+                if not test:
+                    # group related metric tables into the same subfolders as the plots
+                    category = hf.categorize_metric(filename)
+                    category_dir = os.path.join(mean_measurements_save_path, category)
+                    os.makedirs(category_dir, exist_ok=True)
+                    table.to_csv(os.path.join(category_dir, filename), index=False)
 
         # performance tracker end
         end = timeit.default_timer()

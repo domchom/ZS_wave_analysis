@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import datetime
 import numpy as np
@@ -66,15 +67,71 @@ def group_name_error_check(
             "\n****** ERROR ******")
         sys.exit()
 
+def sanitize_filename(name: str) -> str:
+    '''
+    Make a metric/plot name safe to use as a filename: replace characters
+    (like '/') that would otherwise be interpreted as path separators, and drop
+    the space between a channel label and its number ('Ch 1' -> 'Ch1') so plot
+    filenames match the combo style ('Ch1-Ch2').
+    '''
+    name = name.replace('/', '-')
+    name = re.sub(r'\bCh (\d)', r'Ch\1', name)
+    return name
+
+
+def categorize_metric(metric_name: str) -> str:
+    '''
+    Map a parameter/metric name to a subfolder name so that related group
+    comparison outputs are grouped together. Order matters: inter-channel
+    shift metrics (e.g. 'Peak Shift') are checked before peak properties so
+    they don't get miscategorized.
+    '''
+    # Normalize so plot titles ('Mean Peak Shift') and csv filenames
+    # ('mean_peak_shift_means.csv') categorize the same way.
+    name = metric_name.lower().replace('_', ' ')
+    # Edge-timing landmarks: rise/fall durations and their difference
+    # (checked before shift/diff so 'Rise minus Fall Duration' lands here).
+    if 'duration' in name:
+        return 'Landmark'
+    # Edge-vs-apex comparisons: rising/falling-edge shift minus the peak shift
+    if 'diff' in name:
+        return 'Edge_vs_Peak_Shifts'
+    # Whole inter-channel offsets: CCF shift, phase shift, and landmark
+    # (peak/rise/fall) shifts between channels
+    if 'shift' in name:
+        return 'Channel_Shifts'
+    # Rising/falling edge steepness: mean/max slopes and their ratio
+    if 'slope' in name:
+        return 'Slope_Properties'
+    # Peak shape properties: width, amplitude, min/max
+    if 'peak' in name:
+        return 'Peak_Properties'
+    if 'period' in name:
+        return 'Period'
+    if 'signal' in name:
+        return 'Signal_Intensity'
+    return 'Other'
+
+
 def save_plots(
-    dict_of_plots: dict, 
-    save_path: str
+    dict_of_plots: dict,
+    save_path: str,
+    group_by_metric: bool = False
 ) -> None:
     '''
-    Save all plots in a dictionary to a specified path
+    Save all plots in a dictionary to a specified path.
+
+    If group_by_metric is True, each plot is saved into a subfolder named after
+    its metric category (see categorize_metric) so related plots group together.
     '''
     for plot_name, plot in dict_of_plots.items():
-        plot.savefig(f'{save_path}/{plot_name}.png')
+        # sanitize plot name so characters like '/' aren't treated as path separators
+        safe_plot_name = sanitize_filename(plot_name)
+        target_dir = save_path
+        if group_by_metric:
+            target_dir = os.path.join(save_path, categorize_metric(plot_name))
+            os.makedirs(target_dir, exist_ok=True)
+        plot.savefig(os.path.join(target_dir, f'{safe_plot_name}.png'))
 
 def match_group_to_file(
     name_wo_ext: str, 

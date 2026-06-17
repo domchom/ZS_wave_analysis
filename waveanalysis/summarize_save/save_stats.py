@@ -28,7 +28,7 @@ def save_parameter_means_to_csv(
     for parameter in parameters_to_extract:
         # create a dataframe to store the mean values for each group
         individual_parameter_table = pd.DataFrame(columns=['Data Type', 'Group Name', 'Value'])
-        filename = f"{parameter.lower().replace(' ', '_')}_means.csv"
+        filename = f"{parameter.lower().replace(' ', '_').replace('/', '-')}_means.csv"
 
         # extract the mean values for each group
         for group_name in group_names:
