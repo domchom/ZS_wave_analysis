@@ -36,8 +36,29 @@ def _add_figure_note(fig: plt.Figure, note: str, dark_plots: bool = False, botto
     Call this instead of fig.tight_layout() so the note is not clipped.
     '''
     color = 'lightgray' if dark_plots else 'dimgray'
-    fig.tight_layout(rect=[0, bottom, 1, 1])
-    fig.text(0.5, bottom * 0.3, note, ha='center', va='bottom', fontsize=8, color=color, wrap=True)
+    width, height = fig.get_size_inches()
+    wrap_width = max(52, int(width * 15))
+    wrapped_note = textwrap.fill(note, width=wrap_width)
+    note_lines = wrapped_note.count('\n') + 1
+
+    # Add physical height for the caption instead of taking it away from the
+    # plot. This keeps group-comparison axes readable when x labels are rotated.
+    note_space = 0.38 + (0.20 * note_lines)
+    fig.set_size_inches(width, height + note_space, forward=True)
+    _, new_height = fig.get_size_inches()
+    bottom_frac = max(note_space / new_height, min(bottom, 0.18))
+
+    fig.tight_layout(rect=[0, bottom_frac, 1, 1])
+    fig.text(
+        0.5,
+        bottom_frac * 0.32,
+        wrapped_note,
+        ha='center',
+        va='bottom',
+        fontsize=8,
+        color=color,
+        linespacing=1.15,
+    )
 
 def _add_panel_notes(fig: plt.Figure, notes: list, dark_plots: bool = False,
                      bottom: float = 0.22, wrap_width: int = 58) -> None:
@@ -50,10 +71,18 @@ def _add_panel_notes(fig: plt.Figure, notes: list, dark_plots: bool = False,
     side-by-side captions stay within their own half of the figure.
     '''
     color = 'lightgray' if dark_plots else 'dimgray'
-    fig.tight_layout(rect=[0, bottom, 1, 1])
-    for x_center, text in notes:
-        fig.text(x_center, bottom * 0.30, textwrap.fill(text, width=wrap_width),
-                 ha='center', va='bottom', fontsize=8, color=color)
+    wrapped_notes = [(x, textwrap.fill(text, width=wrap_width)) for x, text in notes]
+    max_lines = max((text.count('\n') + 1 for _, text in wrapped_notes), default=1)
+    width, height = fig.get_size_inches()
+    note_space = 0.38 + (0.20 * max_lines)
+    fig.set_size_inches(width, height + note_space, forward=True)
+    _, new_height = fig.get_size_inches()
+    bottom_frac = max(note_space / new_height, min(bottom, 0.20))
+
+    fig.tight_layout(rect=[0, bottom_frac, 1, 1])
+    for x_center, text in wrapped_notes:
+        fig.text(x_center, bottom_frac * 0.30, text,
+                 ha='center', va='bottom', fontsize=8, color=color, linespacing=1.15)
 
 def _annotate_lead_direction(
     ax: plt.Axes,
