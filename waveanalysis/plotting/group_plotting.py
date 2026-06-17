@@ -218,3 +218,169 @@ def generate_group_comparison(
             log_params['Plotting errors'].append(f'No data to compare for {param}')
 
     return group_mean_parameter_figs
+
+
+def generate_group_metric_scatter(
+    summary_df: pd.DataFrame,
+    x_param: str,
+    y_param: str,
+    dark_plots: bool = False,
+    channel_names: list = None,
+    edge_height_fraction: float = None,
+) -> plt.Figure:
+    """
+    Generate one grouped scatter plot comparing two summary metrics.
+
+    Each point is one processed image/sample. Groups are overlaid on the same
+    axes and separated by both color and marker.
+    """
+    required = {'Group Name', x_param, y_param}
+    missing = [col for col in required if col not in summary_df.columns]
+    if missing:
+        raise ValueError(f"Missing required column(s): {', '.join(missing)}")
+
+    plot_df = summary_df[['Group Name', x_param, y_param]].copy()
+    plot_df[x_param] = pd.to_numeric(plot_df[x_param], errors='coerce')
+    plot_df[y_param] = pd.to_numeric(plot_df[y_param], errors='coerce')
+    plot_df = plot_df.dropna(subset=[x_param, y_param])
+    if plot_df.empty:
+        raise ValueError("No paired numeric data for the selected metrics")
+
+    order = list(dict.fromkeys(plot_df['Group Name'].astype(str).tolist()))
+    markers = ['o', 's', '^', 'D', 'P', 'X', 'v', '<', '>', '*']
+    marker_map = {group: markers[i % len(markers)] for i, group in enumerate(order)}
+
+    x_label = relabel_metric_text(x_param, channel_names, edge_height_fraction)
+    y_label = relabel_metric_text(y_param, channel_names, edge_height_fraction)
+
+    with style_context(dark_plots):
+        fig, ax = plt.subplots(figsize=(7, 5))
+        apply_dark(fig, ax, dark_plots)
+
+        sns.scatterplot(
+            data=plot_df,
+            x=x_param,
+            y=y_param,
+            hue='Group Name',
+            style='Group Name',
+            hue_order=order,
+            style_order=order,
+            markers=marker_map,
+            palette='colorblind',
+            s=70,
+            edgecolor='black' if not dark_plots else 'white',
+            linewidth=0.5,
+            ax=ax,
+        )
+
+        ax.set_title(f'Group scatter: {x_label} vs {y_label}', fontsize=10)
+        ax.set_xlabel(x_label)
+        ax.set_ylabel(y_label)
+        ax.grid(True, alpha=0.25)
+        ax.legend(title='Group', bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
+        fig.tight_layout()
+        plt.close(fig)
+
+    return fig
+
+
+def generate_group_metric_correlations(
+    summary_df: pd.DataFrame,
+    dark_plots: bool = False,
+    channel_names: list = None,
+    edge_height_fraction: float = None,
+    min_pairs: int = 3,
+) -> dict:
+    """
+    Generate Spearman cross-metric correlation heatmaps from the summary table,
+    separately for each group.
+
+    Each row in the summary table is one processed image/sample, and each metric
+    column is a per-image mean measurement.
+    """
+    if 'Group Name' not in summary_df.columns:
+        raise ValueError("Missing required column: Group Name")
+
+    metric_cols = [
+        col for col in summary_df.columns
+        if 'Mean' in col and pd.to_numeric(summary_df[col], errors='coerce').notna().any()
+    ]
+    if len(metric_cols) < 2:
+        raise ValueError("At least two numeric mean metrics are required")
+
+    work_df = summary_df[['Group Name'] + metric_cols].copy()
+    for col in metric_cols:
+        work_df[col] = pd.to_numeric(work_df[col], errors='coerce')
+
+    figs = {}
+    groups = list(dict.fromkeys(work_df['Group Name'].astype(str).tolist()))
+    for group in groups:
+        group_df = work_df.loc[work_df['Group Name'].astype(str) == group, metric_cols]
+        usable_cols = [
+            col for col in metric_cols
+            if group_df[col].notna().sum() >= min_pairs and group_df[col].nunique(dropna=True) > 1
+        ]
+        if len(usable_cols) < 2:
+            continue
+
+        corr = _spearman_summary_matrix(group_df, usable_cols, min_pairs)
+        off_diag = corr[~np.eye(len(usable_cols), dtype=bool)]
+        if off_diag.size == 0 or np.all(np.isnan(off_diag)):
+            continue
+
+        labels = [relabel_metric_text(col, channel_names, edge_height_fraction) for col in usable_cols]
+        figs[f'{group} Metric Correlations'] = _return_group_correlation_figure(
+            corr,
+            labels=labels,
+            group_name=group,
+            dark_plots=dark_plots,
+        )
+
+    if not figs:
+        raise ValueError("No groups had enough paired metric data for correlations")
+    return figs
+
+
+def _spearman_summary_matrix(group_df: pd.DataFrame, cols: list, min_pairs: int) -> np.ndarray:
+    corr = np.full((len(cols), len(cols)), np.nan)
+    for i, col_a in enumerate(cols):
+        corr[i, i] = 1.0
+        for j, col_b in enumerate(cols[i + 1:], start=i + 1):
+            paired = group_df[[col_a, col_b]].dropna()
+            if len(paired) >= min_pairs and paired[col_a].std() > 0 and paired[col_b].std() > 0:
+                rho, _ = stats.spearmanr(paired[col_a], paired[col_b])
+                corr[i, j] = corr[j, i] = rho
+    return corr
+
+
+def _return_group_correlation_figure(
+    corr: np.ndarray,
+    labels: list,
+    group_name: str,
+    dark_plots: bool = False,
+) -> plt.Figure:
+    n = len(labels)
+    with style_context(dark_plots):
+        size = min(max(0.45 * n + 3, 7), 16)
+        fig, ax = plt.subplots(figsize=(size, size), constrained_layout=True)
+        apply_dark(fig, ax, dark_plots)
+
+        im = ax.imshow(corr, vmin=-1, vmax=1, cmap='RdBu_r')
+        ax.set_xticks(range(n))
+        ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=7)
+        ax.set_yticks(range(n))
+        ax.set_yticklabels(labels, fontsize=7)
+
+        for i in range(n):
+            for j in range(n):
+                value = corr[i, j]
+                if np.isfinite(value):
+                    ax.text(j, i, f'{value:.2f}', ha='center', va='center',
+                            fontsize=6, color='white' if abs(value) > 0.6 else 'black')
+
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label('Spearman rho')
+        ax.set_title(f'{group_name}: metric correlations')
+        plt.close(fig)
+
+    return fig
