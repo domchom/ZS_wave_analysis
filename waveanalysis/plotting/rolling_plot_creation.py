@@ -1,11 +1,13 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+from waveanalysis.housekeeping.housekeeping_functions import relabel_channels, relabel_metric_text
 
 def plot_rolling_summary(
     num_channels: int,
     fullmovie_summary: pd.DataFrame,
     channel_combos: list[tuple[int, int]],
     dark_plots: bool = False,
+    channel_names: list = None,
     live_injection_dict: dict = {}
 ):
     '''
@@ -33,7 +35,7 @@ def plot_rolling_summary(
             independent_variable='Submovie',
             dependent_variable=f'Ch {channel + 1} Mean Period',
             dependent_error=f'Ch {channel + 1} StdDev Period',
-            y_label=f'Ch {channel + 1} Mean ± StdDev Period (seconds)',
+            y_label=relabel_channels(f'Ch {channel + 1}: mean period ± SD (seconds)', channel_names),
             fullmovie_summary=fullmovie_summary,
             dark_plots=dark_plots,
             injection_ch1=live_injection_dict["injection_ch1"],
@@ -51,7 +53,7 @@ def plot_rolling_summary(
                 independent_variable='Submovie',
                 dependent_variable=f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift',
                 dependent_error=f'Ch{combo[0]+1}-Ch{combo[1]+1} StdDev Shift',
-                y_label=f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean ± StdDev Shift (seconds)',
+                y_label=relabel_channels(f'Ch{combo[0]+1}-Ch{combo[1]+1}: mean CCF shift ± SD (seconds)', channel_names),
                 fullmovie_summary=fullmovie_summary,
                 dark_plots=dark_plots,
                 injection_ch1=live_injection_dict["injection_ch1"],
@@ -69,7 +71,7 @@ def plot_rolling_summary(
                 independent_variable='Submovie',
                 dependent_variable=f'Ch {channel+1} Mean Peak {prop_name}',
                 dependent_error=f'Ch {channel+1} StdDev Peak {prop_name}',
-                y_label=f'Ch {channel+1} Mean ± StdDev Peak {prop_name}',
+                y_label=relabel_metric_text(f'Ch {channel+1}: mean ± SD Peak {prop_name}', channel_names),
                 fullmovie_summary=fullmovie_summary,
                 dark_plots=dark_plots,
                 injection_ch1=live_injection_dict["injection_ch1"],
@@ -138,9 +140,9 @@ def _return_mean_periods_shifts_props_plots(
         
 
         # set axis labels
-        ax.set_xlabel('Frame Number')
+        ax.set_xlabel('Rolling submovie index')
         ax.set_ylabel(y_label)
-        ax.set_title(f'{y_label} over time')
+        ax.set_title(f'{y_label} over rolling windows')
         plt.close(fig)
 
     return fig

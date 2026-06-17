@@ -289,6 +289,268 @@ def correct_small_shifts(
     return delay_frames
 
 
+# Default fraction of signal amplitude (max - min) used as peak prominence when
+# detecting the peaks that the landmark-shift offsets are measured from.
+# Overridden by the user-supplied value passed through img_props.
+_LANDMARK_SHIFT_PEAK_PROMINENCE_FRACTION = 0.1
+_EDGE_HEIGHT_FRACTION = 0.5
+
+# Matched peaks must fall within this fraction of the average period of each
+# other, otherwise they are treated as belonging to different cycles and are not
+# paired. Half a period is the largest gap that still unambiguously identifies
+# the same oscillation in both channels.
+_LANDMARK_SHIFT_MATCH_PERIOD_FRACTION = 0.5
+
+def _peak_landmarks(
+    signal: np.ndarray,
+    peak_prominence_fraction: float,
+    edge_height_fraction: float = _EDGE_HEIGHT_FRACTION,
+) -> tuple:
+    '''
+    Locate, for every detected peak, three timing landmarks:
+        - the peak apex (frame index of the maximum)
+        - the rising-edge crossing at edge_height_fraction of that peak's prominence
+        - the falling-edge crossing at edge_height_fraction of that peak's prominence
+
+    Returns (apexes, rise_crossings, fall_crossings) as float arrays, or three
+    empty arrays if no peaks are found.
+    '''
+    amplitude = np.max(signal) - np.min(signal)
+    peaks, _ = sig.find_peaks(signal, prominence=amplitude * peak_prominence_fraction)
+    if len(peaks) == 0:
+        return np.array([]), np.array([]), np.array([])
+
+    edge_height_fraction = float(np.clip(edge_height_fraction, 0.01, 0.99))
+    # scipy's rel_height is measured downward from the peak prominence. A 20%
+    # edge-height crossing is therefore rel_height=0.8; 50% remains 0.5.
+    _, _, left_ips, right_ips = sig.peak_widths(signal, peaks, rel_height=1.0 - edge_height_fraction)
+    return peaks.astype(float), left_ips, right_ips
+
+def calc_indv_landmark_shifts(
+    signal1: np.ndarray,
+    signal2: np.ndarray,
+    period: float,
+    peak_prominence_fraction: float,
+    edge_height_fraction: float = _EDGE_HEIGHT_FRACTION,
+) -> tuple:
+    '''
+    Landmark-based inter-channel timing offsets from matched peaks.
+
+    Where the CCF shift collapses the whole-waveform relationship into a single
+    lag (dominated by the most correlated phase), this measures the offset
+    separately at the peak apex, the rising edge, and the falling edge. When the
+    two channels have different waveform shapes, these offsets disagree, and that
+    disagreement is exactly the quantity of interest.
+
+    Each signal1 peak is matched to the nearest signal2 peak (by apex), provided
+    the two apexes fall within half a period of each other. For every matched
+    pair the apex, rise, and fall offsets are computed as
+    signal1 - signal2, then averaged over all matched pairs.
+
+    Returns (peak_shift, rise_shift, fall_shift) in frames, or (nan, nan, nan) if
+    no peaks match.
+    '''
+    apex1, rise1, fall1 = _peak_landmarks(signal1, peak_prominence_fraction, edge_height_fraction)
+    apex2, rise2, fall2 = _peak_landmarks(signal2, peak_prominence_fraction, edge_height_fraction)
+    if len(apex1) == 0 or len(apex2) == 0:
+        return np.nan, np.nan, np.nan
+
+    # Beyond half a period apart, two apexes belong to different cycles.
+    tol = period * _LANDMARK_SHIFT_MATCH_PERIOD_FRACTION if np.isfinite(period) and period > 0 else np.inf
+
+    peak_diffs, rise_diffs, fall_diffs = [], [], []
+    for a1, r1, f1 in zip(apex1, rise1, fall1):
+        j = int(np.argmin(np.abs(apex2 - a1)))
+        if np.abs(apex2[j] - a1) <= tol:
+            peak_diffs.append(a1 - apex2[j])
+            rise_diffs.append(r1 - rise2[j])
+            fall_diffs.append(f1 - fall2[j])
+
+    if len(peak_diffs) == 0:
+        return np.nan, np.nan, np.nan
+
+    return (
+        float(np.nanmean(peak_diffs)),
+        float(np.nanmean(rise_diffs)),
+        float(np.nanmean(fall_diffs)),
+    )
+
+def calc_indv_landmark_shift_workflow(
+    bin_values: np.ndarray,
+    indv_periods: np.ndarray,
+    img_props: dict,
+) -> dict:
+    '''
+    Calculate the landmark-based shift metrics for every channel combination and bin.
+
+    For each combo/bin this measures the inter-channel offset (signal1 - signal2,
+    in frames) at three waveform landmarks and forms two difference metrics:
+        - 'Peak Shift':     offset at the peak apex (apex-to-apex)
+        - 'Rise Shift':     offset at the selected rising-edge height crossing
+        - 'Fall Shift':     offset at the selected falling-edge height crossing
+        - 'Rise-Peak Diff': rise_shift - peak_shift
+        - 'Fall-Peak Diff': fall_shift - peak_shift
+
+    The difference metrics are the diagnostics: ~0 means the channels are a simple
+    phase-shifted pair (same shape), while a non-zero value means their waveforms
+    rise/fall on different timescales, so the apex shift alone misrepresents the
+    lag at that edge.
+
+    Args:
+        bin_values (np.ndarray): Array of bin values.
+        indv_periods (np.ndarray): Per-channel/bin periods in frames, used to set
+            the peak-matching tolerance.
+        img_props (dict): Dictionary containing image properties.
+
+    Returns:
+        dict: Maps each metric name above to an array shaped (num_combos, num_bins).
+    '''
+    num_combos = img_props['num_combos']
+    num_bins = img_props['num_bins']
+    channel_combos = img_props['channel_combos']
+    analysis_type = img_props['analysis_type']
+    peak_prominence_fraction = img_props.get('peak_prominence_fraction', _LANDMARK_SHIFT_PEAK_PROMINENCE_FRACTION)
+    edge_height_fraction = img_props.get('edge_height_fraction', _EDGE_HEIGHT_FRACTION)
+
+    peak_shifts = np.zeros(shape=(num_combos, num_bins))
+    rise_shifts = np.zeros(shape=(num_combos, num_bins))
+    fall_shifts = np.zeros(shape=(num_combos, num_bins))
+
+    for combo_number, combo in enumerate(channel_combos):
+        for bin in range(num_bins):
+            signal1 = _get_signal(bin_values, combo[0], bin, analysis_type)
+            signal2 = _get_signal(bin_values, combo[1], bin, analysis_type)
+            # Average the two channels' periods for the matching tolerance.
+            combo_period = np.nanmean(indv_periods[[combo[0], combo[1]], bin])
+            peak_shift, rise_shift, fall_shift = calc_indv_landmark_shifts(
+                signal1=signal1,
+                signal2=signal2,
+                period=combo_period,
+                peak_prominence_fraction=peak_prominence_fraction,
+                edge_height_fraction=edge_height_fraction,
+            )
+            peak_shifts[combo_number, bin] = peak_shift
+            rise_shifts[combo_number, bin] = rise_shift
+            fall_shifts[combo_number, bin] = fall_shift
+
+    return {
+        'Peak Shift': peak_shifts,
+        'Rise Shift': rise_shifts,
+        'Fall Shift': fall_shifts,
+        'Rise-Peak Diff': rise_shifts - peak_shifts,
+        'Fall-Peak Diff': fall_shifts - peak_shifts,
+    }
+
+# Amplitude fractions (of each peak's prominence) at which the rising- and
+# falling-edge inter-channel lag is sampled for the lag-vs-threshold profile.
+# 1.0 is the apex (= peak shift).
+_LAG_PROFILE_FRACTIONS = (0.1, 0.25, 0.5, 0.75, 0.9, 1.0)
+
+def calc_indv_edge_lag_profile(
+    signal1: np.ndarray,
+    signal2: np.ndarray,
+    period: float,
+    peak_prominence_fraction: float,
+    fractions: tuple = _LAG_PROFILE_FRACTIONS,
+) -> tuple:
+    '''
+    Inter-channel lag (signal1 - signal2, in frames) sampled at several amplitude
+    fractions along the rising and falling edges of matched peaks.
+
+    For each fraction f the crossing on the rising edge is found via
+    scipy.peak_widths at rel_height = 1 - f (so f = 1.0 is the apex itself), and
+    likewise for the falling edge. Lags are averaged over all matched peak pairs.
+
+    A flat profile across fractions means a pure phase shift; a sloped profile
+    means the channels' edges move at different rates -- the same diagnostic as
+    the rise/fall-peak differences, resolved across the whole edge.
+
+    Returns (fractions, rise_lags, fall_lags) with the lag arrays aligned to
+    `fractions`; lag entries are NaN where no peaks match.
+    '''
+    fractions = np.asarray(fractions, dtype=float)
+    rise_lags = np.full(fractions.shape, np.nan)
+    fall_lags = np.full(fractions.shape, np.nan)
+
+    amp1 = np.max(signal1) - np.min(signal1)
+    amp2 = np.max(signal2) - np.min(signal2)
+    peaks1, _ = sig.find_peaks(signal1, prominence=amp1 * peak_prominence_fraction)
+    peaks2, _ = sig.find_peaks(signal2, prominence=amp2 * peak_prominence_fraction)
+    if len(peaks1) == 0 or len(peaks2) == 0:
+        return fractions, rise_lags, fall_lags
+
+    # Match each signal1 peak to the nearest signal2 peak (same rule as the
+    # landmark shifts) so every fraction uses the same peak pairing.
+    tol = period * _LANDMARK_SHIFT_MATCH_PERIOD_FRACTION if np.isfinite(period) and period > 0 else np.inf
+    pairs = []
+    for i, p1 in enumerate(peaks1):
+        j = int(np.argmin(np.abs(peaks2 - p1)))
+        if np.abs(peaks2[j] - p1) <= tol:
+            pairs.append((i, j))
+    if not pairs:
+        return fractions, rise_lags, fall_lags
+
+    peaks1_f = peaks1.astype(float)
+    peaks2_f = peaks2.astype(float)
+    for k, f in enumerate(fractions):
+        rel = 1.0 - f
+        if rel <= 0:  # apex: both edges collapse onto the peak index
+            left1 = right1 = peaks1_f
+            left2 = right2 = peaks2_f
+        else:
+            _, _, left1, right1 = sig.peak_widths(signal1, peaks1, rel_height=rel)
+            _, _, left2, right2 = sig.peak_widths(signal2, peaks2, rel_height=rel)
+        rise_lags[k] = np.nanmean([left1[i] - left2[j] for i, j in pairs])
+        fall_lags[k] = np.nanmean([right1[i] - right2[j] for i, j in pairs])
+
+    return fractions, rise_lags, fall_lags
+
+def calc_indv_edge_times_workflow(
+    bin_values: np.ndarray,
+    img_props: dict,
+) -> dict:
+    '''
+    Per-channel within-peak edge durations (no inter-channel comparison).
+
+    For each channel/bin this averages, over that signal's peaks:
+        'Rise Time': apex - rising-edge selected-height crossing (upstroke duration)
+        'Fall Time': falling-edge selected-height crossing - apex (decay duration)
+        'Rise-Fall Time': rise time minus fall time for each eligible peak
+
+    These describe the shape of a single channel's own waveform; their sum is the
+    selected-height peak width, while Rise-Fall Time reports waveform asymmetry
+    (positive = slower rise than fall; negative = faster rise than fall). Returns
+    a dict mapping each name to an array shaped (num_channels, num_bins), in frames.
+
+    Args:
+        bin_values (np.ndarray): Array of bin values.
+        img_props (dict): Dictionary containing image properties.
+    '''
+    num_channels = img_props['num_channels']
+    num_bins = img_props['num_bins']
+    analysis_type = img_props['analysis_type']
+    peak_prominence_fraction = img_props.get('peak_prominence_fraction', _LANDMARK_SHIFT_PEAK_PROMINENCE_FRACTION)
+    edge_height_fraction = img_props.get('edge_height_fraction', _EDGE_HEIGHT_FRACTION)
+
+    rise_times = np.full((num_channels, num_bins), np.nan)
+    fall_times = np.full((num_channels, num_bins), np.nan)
+    rise_fall_times = np.full((num_channels, num_bins), np.nan)
+
+    for channel in range(num_channels):
+        for bin in range(num_bins):
+            signal = _get_signal(bin_values, channel, bin, analysis_type)
+            apexes, rises, falls = _peak_landmarks(signal, peak_prominence_fraction, edge_height_fraction)
+            if len(apexes) == 0:
+                continue
+            peak_rise_times = apexes - rises
+            peak_fall_times = falls - apexes
+            rise_times[channel, bin] = np.nanmean(peak_rise_times)
+            fall_times[channel, bin] = np.nanmean(peak_fall_times)
+            rise_fall_times[channel, bin] = np.nanmean(peak_rise_times - peak_fall_times)
+
+    return {'Rise Time': rise_times, 'Fall Time': fall_times, 'Rise-Fall Time': rise_fall_times}
+
+
 def normalize_signal(signal: np.ndarray) -> np.ndarray:
     '''
     Normalize a signal to the range [0, 1].

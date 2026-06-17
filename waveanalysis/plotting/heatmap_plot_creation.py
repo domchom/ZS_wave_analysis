@@ -1,23 +1,39 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from waveanalysis.housekeeping.housekeeping_functions import get_channel_name, get_channel_combo_name
 
 # Per-channel metrics: key in img_metrics -> colorbar label
-_CHANNEL_METRICS = {
-    'Period':       'Period (s)',
-    'Peak Amp':     'Amplitude (AU)',
-    'Peak Rel Amp': 'Rel. Amplitude',
-    'Peak Width':   'Width (s)',
-    'Peak Max':     'Peak Max (AU)',
-    'Peak Min':     'Peak Min (AU)',
-    'Peak Offset':  'Offset (s)',
-    'Peak Area':    'Area (AU)',
-}
+def _edge_percent(edge_height_fraction: float) -> str:
+    return f'{int(round(float(edge_height_fraction) * 100))}%'
+
+def _channel_metric_labels(edge_height_fraction: float) -> dict:
+    pct = _edge_percent(edge_height_fraction)
+    return {
+    'Period':       'Detected period (s)',
+    'Peak Amp':     'Peak amplitude (AU)',
+    'Peak Rel Amp': 'Relative peak amplitude',
+    'Peak Width':   'Peak width, FWHM (s)',
+    'Peak Max':     'Peak maximum intensity (AU)',
+    'Peak Min':     'Peak baseline/minimum intensity (AU)',
+    'Peak Offset':  'Peak apex offset from midpoint (s)',
+    'Peak Area':    'Peak area above local baseline (AU)',
+        'Rise Time':    f'Rise duration, {pct} to apex (s)',
+        'Fall Time':    f'Fall duration, apex to {pct} (s)',
+        'Rise-Fall Time': 'Rise duration minus fall duration (s)',
+    }
 
 # Per channel-combo metrics: key in img_metrics -> colorbar label
-_COMBO_METRICS = {
-    'Shift':         'Shift (s)',
-    '% Phase Shift': 'Phase Shift (%)',
-}
+def _combo_metric_labels(edge_height_fraction: float) -> dict:
+    pct = _edge_percent(edge_height_fraction)
+    return {
+    'Shift':          'CCF shift (s)',
+    '% Phase Shift':  'CCF shift as phase (% of period)',
+    'Peak Shift':     'Peak-apex shift (s)',
+        'Rise Shift':     f'{pct} rising-edge shift (s)',
+        'Fall Shift':     f'{pct} falling-edge shift (s)',
+    'Rise-Peak Diff': 'Rise shift minus peak shift (s)',
+    'Fall-Peak Diff': 'Fall shift minus peak shift (s)',
+    }
 
 
 def plot_metric_heatmaps_workflow(
@@ -37,6 +53,8 @@ def plot_metric_heatmaps_workflow(
     pixel_size     = img_props['pixel_size'][0]   # x-axis pixel size
     pixel_unit     = img_props['pixel_unit']
     channel_combos = img_props.get('channel_combos', [])
+    channel_names  = img_props.get('channel_names')
+    edge_height_fraction = img_props.get('edge_height_fraction', 0.5)
 
     # First frame of each channel as background
     bg_images = {ch: image_array[0, 0, ch, :, :] for ch in range(num_channels)}
@@ -66,7 +84,7 @@ def plot_metric_heatmaps_workflow(
     )
 
     # --- 2. PER-CHANNEL METRICS ---
-    for metric_name, cbar_label in _CHANNEL_METRICS.items():
+    for metric_name, cbar_label in _channel_metric_labels(edge_height_fraction).items():
         if metric_name not in img_metrics:
             continue
         data = img_metrics[metric_name]
@@ -75,7 +93,7 @@ def plot_metric_heatmaps_workflow(
         vmax = float(np.max(valid_all)) if valid_all.size > 0 else 1.0
 
         panels = [
-            (data[ch], bg_images[ch], f'Ch {ch + 1}')
+            (data[ch], bg_images[ch], get_channel_name(channel_names, ch))
             for ch in range(num_channels)
         ]
         heatmap_figs[f'{metric_name} Heatmap'] = _return_metric_figure(
@@ -95,18 +113,19 @@ def plot_metric_heatmaps_workflow(
         )
 
     # --- 3. PER-COMBO METRICS ---
-    for metric_name, cbar_label in _COMBO_METRICS.items():
+    for metric_name, cbar_label in _combo_metric_labels(edge_height_fraction).items():
         if metric_name not in img_metrics:
             continue
         for combo_idx, (ch1, ch2) in enumerate(channel_combos):
             combo_label = f'Ch{ch1 + 1}-Ch{ch2 + 1}'
+            combo_display = get_channel_combo_name(channel_names, [ch1, ch2])
             values = img_metrics[metric_name][combo_idx]
             bg = (bg_images[ch1].astype(float) + bg_images[ch2].astype(float)) / 2
             valid = values[np.isfinite(values)]
             vmin = float(np.min(valid)) if valid.size > 0 else 0.0
             vmax = float(np.max(valid)) if valid.size > 0 else 1.0
 
-            panels = [(values, bg, combo_label)]
+            panels = [(values, bg, combo_display)]
             heatmap_figs[f'{combo_label} {metric_name} Heatmap'] = _return_metric_figure(
                 panels=panels,
                 vmin=vmin,
@@ -115,7 +134,7 @@ def plot_metric_heatmaps_workflow(
                 num_y_bins=num_y_bins,
                 box_size=box_size,
                 step=step,
-                metric_title=f'{combo_label} {metric_name}',
+                metric_title=f'{combo_display} {metric_name}',
                 cbar_label=cbar_label,
                 pixel_size=pixel_size,
                 pixel_unit=pixel_unit,

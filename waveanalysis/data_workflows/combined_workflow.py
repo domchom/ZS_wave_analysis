@@ -33,6 +33,8 @@ def combined_workflow(
     test: bool = False, # for testing purposes
     smoothing_params: dict = None,
     smoothing: bool = False,
+    channel_names: list = None,
+    edge_height_fraction: float = 0.5,
 ) -> pd.DataFrame:
     '''
     This is the combined workflow for kymographs and standard analysis. It processes the image files in the 
@@ -142,6 +144,9 @@ def combined_workflow(
                 # store the number of bins and the bin values in the image properties dictionary
                 img_props['num_bins'] = num_bins
                 img_props['bin_values'] = bin_values
+                # custom channel display names (used in plot labels only; blanks fall back to 'ChN')
+                img_props['channel_names'] = channel_names
+                img_props['edge_height_fraction'] = edge_height_fraction
                 
                 # with open(f'/Users/domchom/Desktop/{file_name}_img_props.json', 'w') as f:
                 #    json.dump(img_props, f, default=str)
@@ -173,15 +178,29 @@ def combined_workflow(
                 if img_props['num_channels'] > 1:
                     indv_ccfs = sp.calc_indv_CCF_workflow(bin_values=bin_values, img_props=img_props, ccf_smoothing=(smoothing_params or {}).get("CCF"))
                     indv_shifts = sp.calc_indv_shift_workflow(indv_ccfs=indv_ccfs, indv_periods=indv_periods, img_props=img_props, small_shifts_correction=small_shifts_correction, ccf_peak_thresh=ccf_peak_thresh)
-                    
+
+                    # Landmark-based shifts: offset at the peak apex vs the rising and
+                    # falling edges, plus their differences (captures waveform-shape
+                    # differences the CCF shift hides). Computed while periods are
+                    # still in frames.
+                    indv_landmark_shifts = sp.calc_indv_landmark_shift_workflow(
+                        bin_values=bin_values, indv_periods=indv_periods, img_props=img_props
+                    )
+
                     # Save individual CCFs to pickle file
                     # with open(f'/Users/domchom/Desktop/{file_name}_indv_ccfs.pkl', 'wb') as f:
                     #    pickle.dump(indv_ccfs, f)
+
+                # Per-channel within-peak edge durations (rise/fall halves of each peak)
+                indv_edge_times = sp.calc_indv_edge_times_workflow(bin_values=bin_values, img_props=img_props)
 
                 # adjust the different waves properties to be the use the frame interval rather than the number of frames
                 indv_periods = indv_periods * img_props['frame_interval']
                 indv_peak_offsets = indv_peak_offsets * img_props['frame_interval']
                 indv_peak_widths = indv_peak_widths * img_props['frame_interval']
+                indv_rise_times = indv_edge_times['Rise Time'] * img_props['frame_interval']
+                indv_fall_times = indv_edge_times['Fall Time'] * img_props['frame_interval']
+                indv_rise_fall_times = indv_edge_times['Rise-Fall Time'] * img_props['frame_interval']
 
                 # same adjustment, use division since rates are in units/time
                 indv_incr_rates /= img_props['frame_interval']
@@ -201,13 +220,16 @@ def combined_workflow(
                                 'Peak Max': indv_peak_maxs,
                                 'Peak Min': indv_peak_mins,
                                 'Peak Offset': indv_peak_offsets,
+                                'Rise Time': indv_rise_times,
+                                'Fall Time': indv_fall_times,
+                                'Rise-Fall Time': indv_rise_fall_times,
                                 'Peak Area': indv_peak_areas,
                                 'Increasing Rate (left side)':indv_incr_rates,
                                 'Decreasing Rate (right side)': indv_dec_rates,
                                 'Max Increasing Rate': indv_ddx_maxs,
                                 'Max Decreasing Rate': indv_ddx_mins,
-                                'Max Incr Rate / Dec Rate': indv_ddx_ratios                                
-                                }    
+                                'Max Incr Rate / Dec Rate': indv_ddx_ratios
+                                }
                 
                 # add shifts to the dictionary if there are multiple channels
                 if img_props['num_channels'] > 1:
@@ -219,7 +241,11 @@ def combined_workflow(
                         combo_period = np.nanmean(indv_periods[[ch1, ch2], :], axis=0)
                         indv_phase_shifts[combo_idx] = (indv_shifts[combo_idx] / combo_period) * 100
                     img_metrics['% Phase Shift'] = indv_phase_shifts
-                    
+
+                    # convert the landmark-based shifts to time units and store them
+                    for metric_name, metric_values in indv_landmark_shifts.items():
+                        img_metrics[metric_name] = metric_values * img_props['frame_interval']
+
                 # create the directory to save the figures and data for the image
                 im_save_path = os.path.join(main_save_path, file_stem)
                 os.makedirs(im_save_path, exist_ok=True) if not test else None
@@ -289,6 +315,31 @@ def combined_workflow(
                 elif plot_flags["plot_summary_CCFs"] and img_props['num_channels'] == 1:
                     log_params['Miscellaneous'] = f'CCF plots were not generated for {file_name} because the image only has one channel'
 
+                # plot the per-channel peak edge-timing distributions (any channel count)
+                if plot_flags.get("plot_landmark_shifts", False):
+                    edge_time_figs = pt.plot_mean_edge_times_workflow(
+                        img_metrics=img_metrics,
+                        img_props=img_props,
+                        dark_plots=plot_flags["dark_plots"]
+                    )
+                    hf.save_plots(edge_time_figs, im_save_path)
+
+                # plot the summary landmark-shift figures (distribution + lag-vs-threshold profile)
+                if plot_flags.get("plot_landmark_shifts", False) and img_props['num_channels'] > 1:
+                    mean_landmark_figs = pt.plot_mean_landmark_shift_workflow(
+                        img_metrics=img_metrics,
+                        img_props=img_props,
+                        dark_plots=plot_flags["dark_plots"]
+                    )
+                    hf.save_plots(mean_landmark_figs, im_save_path)
+                    lag_profile_figs = pt.plot_lag_threshold_profile_workflow(
+                        bin_values=bin_values,
+                        img_metrics=img_metrics,
+                        img_props=img_props,
+                        dark_plots=plot_flags["dark_plots"]
+                    )
+                    hf.save_plots(lag_profile_figs, im_save_path)
+
                 # plot the individual ACF figures for the file
                 if plot_flags["plot_indv_ACFs"]:
                     indv_acf_plots = pt.plot_indv_acf_workflow(
@@ -338,7 +389,19 @@ def combined_workflow(
                     )
                     indv_ccf_val_path = os.path.join(im_save_path, 'Individual_CCF_values')
                     os.makedirs(indv_ccf_val_path, exist_ok=True)
-                    save_ccf_values_to_csv(indv_ccf_values, indv_ccf_val_path)                    
+                    save_ccf_values_to_csv(indv_ccf_values, indv_ccf_val_path)
+
+                # plot the per-bin landmark-shift overlays (apex/rise/fall on both signals)
+                if plot_flags.get("plot_indv_landmark_shifts", False) and img_props['num_channels'] > 1:
+                    indv_landmark_plots = pt.plot_indv_landmark_shift_workflow(
+                        bin_values=bin_values,
+                        img_metrics=img_metrics,
+                        img_props=img_props,
+                        dark_plots=plot_flags["dark_plots"]
+                    )
+                    indv_landmark_path = os.path.join(im_save_path, 'Individual_landmark_shift_plots')
+                    os.makedirs(indv_landmark_path, exist_ok=True)
+                    hf.save_plots(indv_landmark_plots, indv_landmark_path)
 
                 ############################################
                 ############## Saving ######################
@@ -396,7 +459,13 @@ def combined_workflow(
 
         if group_names != ['']:
             # generate comparisons between each group
-            mean_parameter_figs = pt.generate_group_comparison(summary_df = summary_df, log_params = log_params, dark_plots = plot_flags["dark_plots"])
+            mean_parameter_figs = pt.generate_group_comparison(
+                summary_df=summary_df,
+                log_params=log_params,
+                dark_plots=plot_flags["dark_plots"],
+                channel_names=channel_names,
+                edge_height_fraction=edge_height_fraction,
+            )
             group_plots_save_path = os.path.join(main_save_path, "group_comparison_graphs")
             os.makedirs(group_plots_save_path, exist_ok=True) if not test else None
             hf.save_plots(mean_parameter_figs, group_plots_save_path) if not test else None

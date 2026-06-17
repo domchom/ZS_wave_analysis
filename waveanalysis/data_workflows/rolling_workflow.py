@@ -28,10 +28,11 @@ def rolling_workflow(
     smoothing_params: dict = None,
     smoothing: bool = True,
     dark_plots: bool = False,
+    channel_names: list = None,
     injection_ch1: bool = False,
     injection_ch2: bool = False,
     injection_frame: int = None
-) -> pd.DataFrame:      
+) -> pd.DataFrame:
     '''
     This is the workflow for rolling analysis. It processes the image files in the specified folder 
     and saves the summary data and figures to a new folder in the same directory as the image files.
@@ -100,6 +101,7 @@ def rolling_workflow(
                 img_props['num_bins'] = num_bins
                 img_props['num_x_bins'] = num_x_bins
                 img_props['num_y_bins'] = num_y_bins
+                img_props['channel_names'] = channel_names
 
                 file_stem = file_name.rsplit(".", 1)[0]
 
@@ -241,7 +243,8 @@ def rolling_workflow(
                     fullmovie_summary=summary_df,
                     channel_combos=channel_combos,
                     dark_plots=dark_plots,
-                    live_injection_dict={"injection_ch1": injection_ch1, "injection_ch2": injection_ch2, "injection_frame": (injection_frame / img_props['frame_interval'])}
+                    channel_names=channel_names,
+                    live_injection_dict={"injection_ch1": injection_ch1, "injection_ch2": injection_ch2, "injection_frame": (injection_frame / img_props['frame_interval']) if injection_frame is not None else None}
                 )
                 plot_save_path = os.path.join(im_save_path, 'summary_plots')
                 os.makedirs(plot_save_path, exist_ok=True) if not test else None
