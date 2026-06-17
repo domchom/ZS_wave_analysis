@@ -6,6 +6,11 @@ from waveanalysis.housekeeping.housekeeping_functions import (
     get_channel_name,
     get_channel_combo_name,
 )
+from waveanalysis.plotting.style import (
+    style_context,
+    apply_dark,
+    raincloud,
+)
 
 # Explanatory captions added to the bottom of summary plots. Signed pair metrics
 # use first-channel minus second-channel order from the figure title.
@@ -13,7 +18,7 @@ CCF_SHIFT_NOTE = ("CCF shift is the time offset that best aligns the two channel
                   "their cross-correlation), i.e. the overall phase difference between the whole signals.")
 PHASE_SHIFT_NOTE = ("Phase shift is the CCF shift normalized by the channel pair's mean period and reported as percent "
                     "of one cycle.")
-EDGE_TIME_NOTE = ("Each wave's own shape (no comparison between channels). Rise duration = selected-height rising edge "
+EDGE_DURATION_NOTE = ("Each wave's own shape (no comparison between channels). Rise duration = selected-height rising edge "
                   "up to the apex. Fall duration = apex down to the selected-height falling edge. Peak width = full "
                   "width at half maximum. A fall longer than the rise means an asymmetric, slow-decaying wave.")
 EDGE_LAG_NOTE = ("This plots inter-channel lag at multiple heights along the rising and falling edges; 100% is the "
@@ -130,36 +135,26 @@ def _return_mean_acf_figure(
     signal_std = np.nanstd(signal, axis = 0)
     x_axis = np.arange(-num_frames + 1, num_frames) * frame_interval
 
-    style = 'dark_background' if dark_plots else 'default'
-    with plt.style.context(style):
-        # Create the figure with subplots
-        fig, ax = plt.subplot_mosaic(mosaic = '''
-                                                AA
-                                                BC
-                                                ''')
-        
+    with style_context(dark_plots):
+        # Mean curve on top, period distribution (raincloud) below
+        fig, ax = plt.subplot_mosaic('A\nB', figsize=(7, 7), constrained_layout=True)
+        apply_dark(fig, list(ax.values()), dark_plots)
+
         # Plot mean autocorrelation curve with shaded area representing standard deviation
         ax['A'].plot(x_axis, signal_mean, color='blue' if not dark_plots else 'lightblue')
-        ax['A'].fill_between(x_axis, 
-                                signal_mean - signal_std, 
-                                signal_mean + signal_std, 
-                                color='blue' if not dark_plots else 'lightblue', 
+        ax['A'].fill_between(x_axis,
+                                signal_mean - signal_std,
+                                signal_mean + signal_std,
+                                color='blue' if not dark_plots else 'lightblue',
                                 alpha=0.2)
         ax['A'].set_title(f'{channel}: mean autocorrelation curve ± SD')
 
-        # Plot histogram of period values
-        periods = periods[~np.isnan(periods)]
-        ax['B'].hist(periods, color='gray')
-        ax['B'].set_xlabel('Detected period (seconds)')
-        ax['B'].set_ylabel('Bin count')
-        
+        # Period distribution as a single raincloud (shape + summary + n)
+        raincloud(ax['B'], data=[periods], labels=['period'],
+                  colors=['gray'], dark_plots=dark_plots)
+        ax['B'].set_xlabel('Detected period distribution')
+        ax['B'].set_ylabel('Period (seconds)')
 
-        # Plot boxplot of period values
-        ax['C'].boxplot(periods)
-        ax['C'].set_xlabel('Detected period distribution')
-        ax['C'].set_ylabel('Period (seconds)')
-
-        fig.subplots_adjust(hspace=0.25, wspace=0.5)  
         plt.close(fig)
 
     return fig
@@ -218,75 +213,138 @@ def _return_mean_prop_peaks_figure(
     dark_plots: bool = False
 ) -> plt.Figure:
     """
-    Space saving function to return mean peak property figures
+    Space saving function to return mean peak property figures.
+
+    Each metric is shown as a raincloud (box + raw points, with a faint violin
+    when there are enough peaks) so distribution shape, the summary, and the
+    sample size all appear in one panel.
     """
-    style = 'dark_background' if dark_plots else 'default'
-    with plt.style.context(style):
-        # Create subplots for histograms and boxplots INSIDE the style context
-        fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3, 2)
-
-        # Optionally force all backgrounds to black
-        if dark_plots:
-            fig.patch.set_facecolor('black')
-            for ax in (ax1, ax2, ax3, ax4, ax5, ax6):
-                ax.set_facecolor('black')
-
-        # Filter out NaN values from arrays
-        min_array = [val for val in min_array if not np.isnan(val)]
-        max_array = [val for val in max_array if not np.isnan(val)]
-        amp_array = [val for val in amp_array if not np.isnan(val)]
-        width_array = [val for val in width_array if not np.isnan(val)]
-        offsets_array = [val for val in offsets_array if not np.isnan(val)]
-
-        # Define plot parameters for histograms and boxplots
-        plot_params = {
-            'amplitude': (amp_array, 'blue' if not dark_plots else 'lightblue'),
-            'minimum': (min_array, 'purple' if not dark_plots else 'plum'),
-            'maximum': (max_array, 'orange' if not dark_plots else 'lightcoral')
-        }
-
-        # Plot histograms for peak properties
-        for label, (arr, arr_color) in plot_params.items():
-            ax1.hist(arr, color=arr_color, label=label, alpha=0.75)
-
-        # Plot boxplots for peak properties
-        boxes = ax2.boxplot(
-            [val[0] for val in plot_params.values()],
-            patch_artist=True
+    value_color = 'dimgray'
+    amp_min_max_colors = [
+        'blue' if not dark_plots else 'lightblue',
+        'purple' if not dark_plots else 'plum',
+        'orange' if not dark_plots else 'lightcoral',
+    ]
+    with style_context(dark_plots):
+        fig, (ax1, ax2, ax3) = plt.subplots(
+            1, 3, figsize=(15, 5), constrained_layout=True
         )
-        ax2.set_xticklabels(plot_params.keys())
-        for box, box_color in zip(boxes['boxes'], [val[1] for val in plot_params.values()]):
-            box.set_edgecolor(box_color)
-            box.set_facecolor('none')  # or same color if you want filled boxes
+        apply_dark(fig, (ax1, ax2, ax3), dark_plots)
 
-        # Set labels and legends for histograms and boxplots
-        ax1.legend(loc='upper right', fontsize='small', ncol=1)
-        ax1.set_xlabel(f'{channel_name}: peak amplitude, minimum, and maximum (AU)')
-        ax1.set_ylabel('Peak count')
-        ax2.set_xlabel(f'{channel_name}: peak value distributions')
-        ax2.set_ylabel('Intensity (AU)')
+        # Amplitude / minimum / maximum share intensity units -> one panel
+        raincloud(
+            ax1,
+            data=[amp_array, min_array, max_array],
+            labels=['amp', 'min', 'max'],
+            colors=amp_min_max_colors,
+            dark_plots=dark_plots,
+        )
+        ax1.set_xlabel(f'{channel_name}: peak amplitude, minimum, and maximum')
+        ax1.set_ylabel('Intensity (AU)')
 
-        # Peak widths
-        ax3.hist(width_array, color='dimgray', alpha=0.75)
-        ax3.set_xlabel(f'{channel_name}: peak full width at half maximum (seconds)')
-        ax3.set_ylabel('Peak count')
+        # Peak width
+        raincloud(ax2, data=[width_array], labels=['width'],
+                  colors=[value_color], dark_plots=dark_plots)
+        ax2.set_xlabel(f'{channel_name}: peak full width at half maximum')
+        ax2.set_ylabel('Full width at half maximum (seconds)')
 
-        bp = ax4.boxplot(width_array, vert=True, patch_artist=True)
-        bp['boxes'][0].set_facecolor('dimgray')
-        ax4.set_xlabel(f'{channel_name}: peak width distribution')
-        ax4.set_ylabel('Full width at half maximum (seconds)')
+        # Peak apex offset (signed -> reference line at 0)
+        raincloud(ax3, data=[offsets_array], labels=['apex offset'],
+                  colors=[value_color], dark_plots=dark_plots, zero_line=True)
+        ax3.set_xlabel(f'{channel_name}: peak apex offset from waveform midpoint')
+        ax3.set_ylabel('Apex offset from midpoint (seconds)')
 
-        # Peak offsets
-        ax5.hist(offsets_array, color='dimgray', alpha=0.75)
-        ax5.set_xlabel(f'{channel_name}: peak apex offset from waveform midpoint (seconds)')
-        ax5.set_ylabel('Peak count')
+        plt.close(fig)
 
-        bp1 = ax6.boxplot(offsets_array, vert=True, patch_artist=True)
-        bp1['boxes'][0].set_facecolor('dimgray')
-        ax6.set_xlabel(f'{channel_name}: peak apex offset distribution')
-        ax6.set_ylabel('Apex offset from midpoint (seconds)')
+    return fig
 
-        fig.subplots_adjust(hspace=0.6, wspace=0.6)
+
+def plot_mean_slope_props_workflow(
+    img_metrics: dict,
+    img_props: dict,
+    dark_plots: bool = False
+) -> dict:
+    '''
+    Plot mean edge-slope (steepness) figures for each channel.
+
+    Builds, per channel, a summary of the rising/falling edge slope metrics:
+    Rising Slope, Falling Slope, Max Rising Slope, Max Falling Slope (all AU/s)
+    and the dimensionless Rising/Falling Slope Ratio.
+
+    Parameters:
+    - img_metrics (dict): A dictionary containing the image metrics for each channel.
+    - img_props (dict): A dictionary containing the image properties.
+
+    Returns:
+    - mean_slope_figs (dict): A dictionary of mean slope figures for each channel.
+    '''
+    indv_rising_slopes = img_metrics['Rising Slope']
+    indv_falling_slopes = img_metrics['Falling Slope']
+    indv_max_rising_slopes = img_metrics['Max Rising Slope']
+    indv_max_falling_slopes = img_metrics['Max Falling Slope']
+    indv_slope_ratios = img_metrics['Rising/Falling Slope Ratio']
+    num_channels = img_props['num_channels']
+
+    mean_slope_figs = {}
+    for channel in range(num_channels):
+        mean_slope_figs[f'Ch {channel + 1} Slope Props'] = _return_mean_slope_figure(
+            rising_array=indv_rising_slopes[channel],
+            falling_array=indv_falling_slopes[channel],
+            max_rising_array=indv_max_rising_slopes[channel],
+            max_falling_array=indv_max_falling_slopes[channel],
+            ratio_array=indv_slope_ratios[channel],
+            channel_name=get_channel_name(img_props.get('channel_names'), channel),
+            dark_plots=dark_plots
+        )
+
+    return mean_slope_figs
+
+
+def _return_mean_slope_figure(
+    rising_array: np.ndarray,
+    falling_array: np.ndarray,
+    max_rising_array: np.ndarray,
+    max_falling_array: np.ndarray,
+    ratio_array: np.ndarray,
+    channel_name: str,
+    dark_plots: bool = False
+) -> plt.Figure:
+    """
+    Space saving function to return mean edge-slope figures. The four slope
+    metrics share units (AU/s) so they appear together as rainclouds; the
+    dimensionless slope ratio gets its own panel.
+    """
+    slope_colors = [
+        'blue' if not dark_plots else 'lightblue',
+        'purple' if not dark_plots else 'plum',
+        'green' if not dark_plots else 'lightgreen',
+        'orange' if not dark_plots else 'lightcoral',
+    ]
+    with style_context(dark_plots):
+        fig, (ax1, ax2) = plt.subplots(
+            1, 2, figsize=(13, 5), constrained_layout=True
+        )
+        apply_dark(fig, (ax1, ax2), dark_plots)
+
+        # The four slope metrics share units (AU/s) -> one panel
+        raincloud(
+            ax1,
+            data=[rising_array, falling_array, max_rising_array, max_falling_array],
+            labels=['rising', 'falling', 'max rising', 'max falling'],
+            colors=slope_colors,
+            dark_plots=dark_plots,
+            zero_line=True,
+            rotation=20,
+        )
+        ax1.set_xlabel(f'{channel_name}: rising, falling, and max edge slopes')
+        ax1.set_ylabel('Rate of change (AU/s)')
+
+        # Rising/falling slope ratio (dimensionless)
+        raincloud(ax2, data=[ratio_array], labels=['ratio'],
+                  colors=['dimgray'], dark_plots=dark_plots)
+        ax2.set_xlabel(f'{channel_name}: rising / falling slope ratio')
+        ax2.set_ylabel('Max rising / max falling slope')
+
         plt.close(fig)
 
     return fig
@@ -350,35 +408,28 @@ def _return_mean_ccf_figure(
     arr_std = np.nanstd(signal, axis = 0)
     x_axis = np.arange(-num_frames + 1, num_frames) * frame_interval
 
-    style = 'dark_background' if dark_plots else 'default'
-    with plt.style.context(style):
-        # Calculate mean and standard deviation of cross-correlation curves
-        fig, ax = plt.subplot_mosaic(mosaic = '''
-                                                AA
-                                                BC
-                                                ''')
-        
+    with style_context(dark_plots):
+        # Mean curve on top, shift distribution (raincloud) below. No
+        # constrained_layout here: _add_figure_note() manages spacing via
+        # tight_layout to reserve room for the caption.
+        fig, ax = plt.subplot_mosaic('A\nB', figsize=(7, 7))
+        apply_dark(fig, list(ax.values()), dark_plots)
+
         # Plot mean cross-correlation curve with shaded area representing standard deviation
         ax['A'].plot(x_axis, arr_mean, color='blue' if not dark_plots else 'lightblue')
-        ax['A'].fill_between(x_axis, 
-                                arr_mean - arr_std, 
-                                arr_mean + arr_std, 
-                                color='blue' if not dark_plots else 'lightblue', 
+        ax['A'].fill_between(x_axis,
+                                arr_mean - arr_std,
+                                arr_mean + arr_std,
+                                color='blue' if not dark_plots else 'lightblue',
                                 alpha=0.2)
         ax['A'].set_title(f'{channel_combo}: mean cross-correlation curve ± SD')
 
-        # Plot histogram of period values
-        ax['B'].hist(shifts, color='gray')
-        shifts = [val for val in shifts if not np.isnan(val)]
-        ax['B'].set_xlabel('CCF shift per bin (seconds)')
-        ax['B'].set_ylabel('Bin count')
-        _annotate_lead_direction(ax['B'], ch1_name, ch2_name, axis='x', dark_plots=dark_plots)
-
-        # Plot boxplot of period values
-        ax['C'].boxplot(shifts)
-        ax['C'].set_xlabel('CCF shift distribution')
-        ax['C'].set_ylabel('CCF shift (seconds)')
-        _annotate_lead_direction(ax['C'], ch1_name, ch2_name, axis='y', dark_plots=dark_plots)
+        # CCF shift distribution as a single raincloud (signed -> zero line)
+        raincloud(ax['B'], data=[shifts], labels=['CCF shift'],
+                  colors=['gray'], dark_plots=dark_plots, zero_line=True)
+        ax['B'].set_xlabel('CCF shift distribution')
+        ax['B'].set_ylabel('CCF shift (seconds)')
+        _annotate_lead_direction(ax['B'], ch1_name, ch2_name, axis='y', dark_plots=dark_plots)
 
         _add_figure_note(fig, f'{CCF_SHIFT_NOTE}', dark_plots, bottom=0.20)
         plt.close(fig)
@@ -477,20 +528,14 @@ def _boxplot_with_points(
     dark_plots: bool = False
 ) -> None:
     '''
-    Space saving helper: boxplot of each group with the raw points jittered on top.
+    Thin wrapper over style.raincloud for the signed landmark / edge-duration
+    panels: box + jittered points + zero reference line, with labels rotated.
     '''
-    clean = [np.asarray(group, dtype=float)[np.isfinite(group)] for group in data]
-    ax.boxplot(clean, showfliers=False)
-    point_color = 'lightblue' if dark_plots else 'gray'
-    for position, values in enumerate(clean, start=1):
-        if values.size == 0:
-            continue
-        jitter = (np.random.rand(values.size) - 0.5) * 0.15
-        ax.scatter(np.full(values.size, position) + jitter, values,
-                   color=point_color, alpha=0.5, s=12, zorder=3)
-    ax.axhline(0, color='gray', linewidth=0.8, linestyle='--')
-    ax.set_xticks(range(1, len(labels) + 1))
-    ax.set_xticklabels(labels, rotation=20, ha='right')
+    raincloud(
+        ax, data=data, labels=labels, dark_plots=dark_plots,
+        point_color='lightblue' if dark_plots else 'gray',
+        zero_line=True, annotate_n=False, rotation=20,
+    )
 
 def _return_landmark_shift_figure(
     edge_data: list,
@@ -505,14 +550,10 @@ def _return_landmark_shift_figure(
     '''
     Space saving function to return the landmark-shift distribution figure.
     '''
-    style = 'dark_background' if dark_plots else 'default'
-    with plt.style.context(style):
+    with style_context(dark_plots):
+        # _add_panel_notes() manages layout (tight_layout), so no constrained_layout.
         fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
-
-        if dark_plots:
-            fig.patch.set_facecolor('black')
-            ax1.set_facecolor('black')
-            ax2.set_facecolor('black')
+        apply_dark(fig, (ax1, ax2), dark_plots)
 
         labels = _landmark_labels(edge_height_fraction)
         _boxplot_with_points(ax1, edge_data, [labels[m] for m in _LANDMARK_EDGE_METRICS], dark_plots)
@@ -594,13 +635,10 @@ def _return_edge_times_figure(
     '''
     Space saving function to return the per-channel edge-time distribution figure.
     '''
-    style = 'dark_background' if dark_plots else 'default'
-    with plt.style.context(style):
+    with style_context(dark_plots):
+        # _add_figure_note() manages layout (tight_layout), so no constrained_layout.
         fig, ax = plt.subplots(figsize=(6, 5))
-
-        if dark_plots:
-            fig.patch.set_facecolor('black')
-            ax.set_facecolor('black')
+        apply_dark(fig, ax, dark_plots)
 
         _boxplot_with_points(ax, data, labels, dark_plots)
         ax.set_ylabel('Duration / asymmetry within each peak (seconds)')
@@ -694,13 +732,10 @@ def _return_lag_profile_figure(
     fall_std = np.nanstd(fall_per_bin, axis=0)
     pct = fractions * 100
 
-    style = 'dark_background' if dark_plots else 'default'
-    with plt.style.context(style):
+    with style_context(dark_plots):
+        # _add_figure_note() manages layout (tight_layout), so no constrained_layout.
         fig, ax = plt.subplots(figsize=(8, 5))
-
-        if dark_plots:
-            fig.patch.set_facecolor('black')
-            ax.set_facecolor('black')
+        apply_dark(fig, ax, dark_plots)
 
         rise_color = 'lightblue' if dark_plots else 'tab:blue'
         fall_color = 'lightcoral' if dark_plots else 'tab:orange'
@@ -735,35 +770,17 @@ def return_mean_wave_speeds_figure(
     Returns:
         plt.Figure: A matplotlib Figure object containing the histogram and boxplot.
     """
-    style = 'dark_background' if dark_plots else 'default'
+    with style_context(dark_plots):
+        fig, ax = plt.subplots(figsize=(5, 5), constrained_layout=True)
+        apply_dark(fig, ax, dark_plots)
 
-    with plt.style.context(style):
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 4))
+        raincloud(ax, data=[wave_speeds], labels=['wave speed'],
+                  colors=['blue' if not dark_plots else 'lightblue'],
+                  dark_plots=dark_plots)
+        ax.set_xlabel('Wave speeds')
+        ax.set_ylabel('Wave speed (µm/s)')
+        ax.set_title('Wave speed distribution')
 
-        # Force backgrounds to black in dark mode
-        if dark_plots:
-            fig.patch.set_facecolor('black')
-            ax1.set_facecolor('black')
-            ax2.set_facecolor('black')
-
-        # Histogram of wave speeds
-        ax1.hist(wave_speeds, bins=10, color='blue' if not dark_plots else 'lightblue', alpha=0.75)
-        ax1.set_xlabel('Wave speed (µm/s)')
-        ax1.set_ylabel('Occurrences')
-        ax1.set_title('Wave speeds histogram')
-
-        # Boxplot of wave speeds
-        boxes = ax2.boxplot(wave_speeds, vert=True, patch_artist=True)
-        # Optional: color the box to show up on dark background
-        for box in boxes['boxes']:
-            box.set_facecolor('dimgray')
-            box.set_edgecolor('white' if dark_plots else 'black')
-
-        ax2.set_xlabel('Wave speeds')
-        ax2.set_ylabel('Wave speed (µm/s)')
-        ax2.set_title('Wave speeds boxplot')
-
-        fig.tight_layout()
         plt.close(fig)
 
     return fig

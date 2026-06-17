@@ -1,6 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from waveanalysis.plotting.style import apply_dark
 
 def plot_fft_workflow(
     bin_values: np.ndarray,
@@ -87,44 +88,48 @@ def return_fft_figure(
     periods = periods[sort_idx]
     fft_power = fft_power[sort_idx]
 
-    # Find dominant peak
-    if len(fft_power) > 0:
-        peak_idx = np.argmax(fft_power)
+    # Find dominant peak among finite power values (a bin whose signal contains
+    # NaNs yields NaN power; ignore those so a real peak is still found).
+    finite = np.isfinite(fft_power)
+    if finite.any():
+        peak_idx = np.argmax(np.where(finite, fft_power, -np.inf))
         peak_period = periods[peak_idx]
         peak_power = fft_power[peak_idx]
     else:
         peak_period = np.nan
         peak_power = np.nan
 
-    # Create the figure
-    fig, ax = plt.subplots()
+    # Create the figure. This plot uses explicit colors (not the dark_background
+    # style), so set the black backgrounds via apply_dark and pick white-on-black
+    # vs black-on-white for the line/text.
+    fig, ax = plt.subplots(constrained_layout=True)
+    apply_dark(fig, ax, dark_plots)
 
-    if dark_plots:
-        fig.patch.set_facecolor('black')
-        ax.set_facecolor('black')
-
-        text_color = 'white'
-        line_color = 'white'
-        peak_color = 'white'
-    else:
-        text_color = 'black'
-        line_color = 'black'
-        peak_color = 'black'
+    text_color = 'white' if dark_plots else 'black'
+    line_color = text_color
+    peak_color = text_color
 
     ax.plot(periods, fft_power, color=line_color)
 
-    # Plot dominant peak
-    if not np.isnan(peak_period):
+    # Plot dominant peak. Guard on both values being finite: a bin whose signal
+    # contains NaNs produces NaN power, and a NaN/Inf y-limit raises.
+    if np.isfinite(peak_period) and np.isfinite(peak_power):
         ax.scatter(peak_period, peak_power, color=peak_color, zorder=3)
-        ax.text(
-            peak_period,
-            peak_power * 1.08,
+        # Add headroom above the tallest point so the label sits inside the
+        # axes instead of colliding with the title.
+        if peak_power > 0:
+            ax.set_ylim(top=peak_power * 1.18)
+        ax.annotate(
             f'{peak_period:.1f} s',
+            xy=(peak_period, peak_power),
+            xytext=(0, 6),
+            textcoords='offset points',
             ha='center',
-            va='bottom'
+            va='bottom',
+            color=text_color
         )
 
-    ax.set_xlim(0, 300)    
+    ax.set_xlim(0, 300)
 
     ax.set_xlabel('1/f (s)', color=text_color)
     ax.set_ylabel('Power', color=text_color)

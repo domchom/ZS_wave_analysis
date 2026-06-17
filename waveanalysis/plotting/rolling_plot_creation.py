@@ -1,6 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 from waveanalysis.housekeeping.housekeeping_functions import relabel_channels, relabel_metric_text
+from waveanalysis.plotting.style import style_context, apply_dark
 
 def plot_rolling_summary(
     num_channels: int,
@@ -98,9 +99,9 @@ def _return_mean_periods_shifts_props_plots(
     '''
     Space saving function to generate the rolling summary plots
     '''      
-    style = 'dark_background' if dark_plots else 'default'
-    with plt.style.context(style):
+    with style_context(dark_plots):
         fig, ax = plt.subplots()
+        apply_dark(fig, ax, dark_plots)
 
         # plot the dataframe
         ax.plot(fullmovie_summary[independent_variable], 

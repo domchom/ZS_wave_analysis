@@ -1,6 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from waveanalysis.housekeeping.housekeeping_functions import get_channel_name, get_channel_combo_name
+from waveanalysis.plotting.style import style_context
 
 # Per-channel metrics: key in img_metrics -> colorbar label
 def _edge_percent(edge_height_fraction: float) -> str:
@@ -258,8 +259,7 @@ def _return_kymo_metric_figure(
     cmap = plt.cm.inferno.copy()
     cmap.set_bad(alpha=0)
 
-    style = 'dark_background' if dark_plots else 'default'
-    with plt.style.context(style):
+    with style_context(dark_plots):
         fig = plt.figure(figsize=figsize)
         gs = fig.add_gridspec(
             2, n_panels,
@@ -376,8 +376,7 @@ def _return_metric_figure(
     cmap = plt.cm.inferno.copy()
     cmap.set_bad(alpha=0)
 
-    style = 'dark_background' if dark_plots else 'default'
-    with plt.style.context(style):
+    with style_context(dark_plots):
         fig = plt.figure(figsize=figsize)
         gs  = fig.add_gridspec(
             2, n_panels,

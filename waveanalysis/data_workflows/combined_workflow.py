@@ -273,6 +273,22 @@ def combined_workflow(
                     )
                     hf.save_plots(mean_peak_figs, im_save_path)
 
+                    # plot the mean edge-slope (steepness) figures for the file
+                    mean_slope_figs = pt.plot_mean_slope_props_workflow(
+                        img_metrics=img_metrics,
+                        img_props=img_props,
+                        dark_plots=plot_flags["dark_plots"]
+                    )
+                    hf.save_plots(mean_slope_figs, im_save_path)
+
+                    # plot the per-bin cross-metric correlation heatmaps
+                    corr_figs = pt.plot_metric_correlation_workflow(
+                        img_metrics=img_metrics,
+                        img_props=img_props,
+                        dark_plots=plot_flags["dark_plots"]
+                    )
+                    hf.save_plots(corr_figs, im_save_path)
+
                 # plot spatial metric heatmaps
                 if plot_flags["plot_heatmaps"]:
                     if analysis_type == 'standard':
@@ -462,6 +478,13 @@ def combined_workflow(
 
         # create dataframe from summary list, then sort and save the summary to a csv file
         summary_df = pd.DataFrame(summary_list, columns=col_headers)
+        if summary_df.empty:
+            # Every file failed or was skipped: nothing to summarize. Surface a
+            # clear message instead of a cryptic 'File Name' KeyError downstream.
+            print('****** ERROR ******\nNo files were successfully processed; '
+                  'see the log for per-file errors.\n****** ERROR ******')
+            log_params['Errors'].append('No files were successfully processed.')
+            return summary_df
         summary_df = summary_df.sort_values('File Name', ascending=True)
         summary_df.to_csv(f"{main_save_path}/!{now.strftime('%Y%m%d%H%M')}_summary.csv", index = False) if not test else None
 
