@@ -513,12 +513,12 @@ def calc_indv_edge_times_workflow(
     Per-channel within-peak edge durations (no inter-channel comparison).
 
     For each channel/bin this averages, over that signal's peaks:
-        'Rise Time': apex - rising-edge selected-height crossing (upstroke duration)
-        'Fall Time': falling-edge selected-height crossing - apex (decay duration)
-        'Rise-Fall Time': rise time minus fall time for each eligible peak
+        'Rise Duration': apex - rising-edge selected-height crossing (upstroke duration)
+        'Fall Duration': falling-edge selected-height crossing - apex (decay duration)
+        'Rise minus Fall Duration': rise time minus fall time for each eligible peak
 
     These describe the shape of a single channel's own waveform; their sum is the
-    selected-height peak width, while Rise-Fall Time reports waveform asymmetry
+    selected-height peak width, while Rise minus Fall Duration reports waveform asymmetry
     (positive = slower rise than fall; negative = faster rise than fall). Returns
     a dict mapping each name to an array shaped (num_channels, num_bins), in frames.
 
@@ -532,9 +532,9 @@ def calc_indv_edge_times_workflow(
     peak_prominence_fraction = img_props.get('peak_prominence_fraction', _LANDMARK_SHIFT_PEAK_PROMINENCE_FRACTION)
     edge_height_fraction = img_props.get('edge_height_fraction', _EDGE_HEIGHT_FRACTION)
 
-    rise_times = np.full((num_channels, num_bins), np.nan)
-    fall_times = np.full((num_channels, num_bins), np.nan)
-    rise_fall_times = np.full((num_channels, num_bins), np.nan)
+    rise_durations = np.full((num_channels, num_bins), np.nan)
+    fall_durations = np.full((num_channels, num_bins), np.nan)
+    rise_minus_fall_durations = np.full((num_channels, num_bins), np.nan)
 
     for channel in range(num_channels):
         for bin in range(num_bins):
@@ -542,13 +542,13 @@ def calc_indv_edge_times_workflow(
             apexes, rises, falls = _peak_landmarks(signal, peak_prominence_fraction, edge_height_fraction)
             if len(apexes) == 0:
                 continue
-            peak_rise_times = apexes - rises
-            peak_fall_times = falls - apexes
-            rise_times[channel, bin] = np.nanmean(peak_rise_times)
-            fall_times[channel, bin] = np.nanmean(peak_fall_times)
-            rise_fall_times[channel, bin] = np.nanmean(peak_rise_times - peak_fall_times)
+            peak_rise_durations = apexes - rises
+            peak_fall_durations = falls - apexes
+            rise_durations[channel, bin] = np.nanmean(peak_rise_durations)
+            fall_durations[channel, bin] = np.nanmean(peak_fall_durations)
+            rise_minus_fall_durations[channel, bin] = np.nanmean(peak_rise_durations - peak_fall_durations)
 
-    return {'Rise Time': rise_times, 'Fall Time': fall_times, 'Rise-Fall Time': rise_fall_times}
+    return {'Rise Duration': rise_durations, 'Fall Duration': fall_durations, 'Rise minus Fall Duration': rise_minus_fall_durations}
 
 
 def normalize_signal(signal: np.ndarray) -> np.ndarray:

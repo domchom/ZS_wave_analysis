@@ -184,9 +184,9 @@ def rolling_workflow(
                                     indv_shifts[submovie, combo_number, bin] = shift
 
                 # Per-channel within-peak edge durations (rise/fall halves of each peak)
-                indv_rise_times = np.zeros(shape=(num_submovies, num_channels, num_bins))
-                indv_fall_times = np.zeros(shape=(num_submovies, num_channels, num_bins))
-                indv_rise_fall_times = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_rise_durations = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_fall_durations = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_rise_minus_fall_durations = np.zeros(shape=(num_submovies, num_channels, num_bins))
                 its = num_submovies * num_channels * num_bins
                 with tqdm(total=its, miniters=its/100) as pbar:
                     pbar.set_description('Edge Times: ')
@@ -197,15 +197,15 @@ def rolling_workflow(
                                 signal = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, channel, bin]
                                 apexes, rises, falls = _peak_landmarks(signal, img_props['peak_prominence_fraction'], edge_height_fraction)
                                 if len(apexes) == 0:
-                                    indv_rise_times[submovie, channel, bin] = np.nan
-                                    indv_fall_times[submovie, channel, bin] = np.nan
-                                    indv_rise_fall_times[submovie, channel, bin] = np.nan
+                                    indv_rise_durations[submovie, channel, bin] = np.nan
+                                    indv_fall_durations[submovie, channel, bin] = np.nan
+                                    indv_rise_minus_fall_durations[submovie, channel, bin] = np.nan
                                 else:
-                                    peak_rise = apexes - rises
-                                    peak_fall = falls - apexes
-                                    indv_rise_times[submovie, channel, bin] = np.nanmean(peak_rise)
-                                    indv_fall_times[submovie, channel, bin] = np.nanmean(peak_fall)
-                                    indv_rise_fall_times[submovie, channel, bin] = np.nanmean(peak_rise - peak_fall)
+                                    peak_rise_durations = apexes - rises
+                                    peak_fall_durations = falls - apexes
+                                    indv_rise_durations[submovie, channel, bin] = np.nanmean(peak_rise_durations)
+                                    indv_fall_durations[submovie, channel, bin] = np.nanmean(peak_fall_durations)
+                                    indv_rise_minus_fall_durations[submovie, channel, bin] = np.nanmean(peak_rise_durations - peak_fall_durations)
 
                 # Landmark-based shifts (per channel combo, per submovie)
                 if num_channels > 1:
@@ -240,9 +240,9 @@ def rolling_workflow(
                 indv_periods = indv_periods * img_props['frame_interval']
                 indv_peak_offsets = indv_peak_offsets * img_props['frame_interval']
                 indv_peak_widths = indv_peak_widths * img_props['frame_interval']
-                indv_rise_times = indv_rise_times * img_props['frame_interval']
-                indv_fall_times = indv_fall_times * img_props['frame_interval']
-                indv_rise_fall_times = indv_rise_fall_times * img_props['frame_interval']
+                indv_rise_durations = indv_rise_durations * img_props['frame_interval']
+                indv_fall_durations = indv_fall_durations * img_props['frame_interval']
+                indv_rise_minus_fall_durations = indv_rise_minus_fall_durations * img_props['frame_interval']
 
                 img_metrics = {
                                 'Period': indv_periods,
@@ -253,9 +253,9 @@ def rolling_workflow(
                                 'Peak Min': indv_peak_mins,
                                 'Peak Offset': indv_peak_offsets,
                                 'Peak Area': indv_peak_areas,
-                                'Rise Time': indv_rise_times,
-                                'Fall Time': indv_fall_times,
-                                'Rise-Fall Time': indv_rise_fall_times,
+                                'Rise Duration': indv_rise_durations,
+                                'Fall Duration': indv_fall_durations,
+                                'Rise minus Fall Duration': indv_rise_minus_fall_durations,
                 }
 
                 # add shifts to the dictionary if there are multiple channels

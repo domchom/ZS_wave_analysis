@@ -540,13 +540,13 @@ def _return_landmark_shift_figure(
     return fig
 
 # Per-channel peak-shape durations shown together (Rise + Fall sum to the width).
-_EDGE_TIME_METRICS = ['Rise Time', 'Fall Time', 'Rise-Fall Time', 'Peak Width']
+_EDGE_DURATION_METRICS = ['Rise Duration', 'Fall Duration', 'Rise minus Fall Duration', 'Peak Width']
 def _edge_time_labels(edge_height_fraction: float) -> dict:
     pct = _edge_percent(edge_height_fraction)
     return {
-        'Rise Time': f'Rise duration ({pct} to apex)',
-        'Fall Time': f'Fall duration (apex to {pct})',
-        'Rise-Fall Time': 'Rise duration - fall duration',
+        'Rise Duration': f'Rise duration ({pct} to apex)',
+        'Fall Duration': f'Fall duration (apex to {pct})',
+        'Rise minus Fall Duration': 'Rise duration - fall duration',
         'Peak Width': 'Peak width (full half-max)',
     }
 
@@ -566,12 +566,12 @@ def plot_mean_edge_times_workflow(
     num_channels = img_props['num_channels']
     edge_time_figs = {}
 
-    if not all(metric in img_metrics for metric in ('Rise Time', 'Fall Time')):
+    if not all(metric in img_metrics for metric in ('Rise Duration', 'Fall Duration')):
         return edge_time_figs
 
     edge_height_fraction = img_props.get('edge_height_fraction', 0.5)
     label_map = _edge_time_labels(edge_height_fraction)
-    metrics = [m for m in _EDGE_TIME_METRICS if m in img_metrics]
+    metrics = [m for m in _EDGE_DURATION_METRICS if m in img_metrics]
     for channel in range(num_channels):
         data = [img_metrics[m][channel] for m in metrics]
         edge_time_figs[f'Ch{channel + 1} Edge Times'] = _return_edge_times_figure(

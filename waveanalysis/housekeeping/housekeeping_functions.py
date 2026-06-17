@@ -143,16 +143,16 @@ def _metric_display_replacements(edge_height_fraction: float = None) -> tuple:
     if edge_height_fraction is None:
         rise_shift = 'rising-edge shift'
         fall_shift = 'falling-edge shift'
-        rise_time = 'rise duration'
-        fall_time = 'fall duration'
-        rise_fall_time = 'rise duration minus fall duration'
+        rise_duration = 'rise duration'
+        fall_duration = 'fall duration'
+        rise_minus_fall_duration = 'rise duration minus fall duration'
     else:
         pct = f'{int(round(float(edge_height_fraction) * 100))}%'
         rise_shift = f'{pct} rising-edge shift'
         fall_shift = f'{pct} falling-edge shift'
-        rise_time = f'rise duration ({pct} to apex)'
-        fall_time = f'fall duration (apex to {pct})'
-        rise_fall_time = 'rise duration minus fall duration'
+        rise_duration = f'rise duration ({pct} to apex)'
+        fall_duration = f'fall duration (apex to {pct})'
+        rise_minus_fall_duration = 'rise duration minus fall duration'
 
     return (
     ('% Phase Shift', 'phase shift (% of period)'),
@@ -168,9 +168,9 @@ def _metric_display_replacements(edge_height_fraction: float = None) -> tuple:
     ('Peak Shift', 'peak-apex shift'),
         ('Rise Shift', rise_shift),
         ('Fall Shift', fall_shift),
-        ('Rise-Fall Time', rise_fall_time),
-        ('Rise Time', rise_time),
-        ('Fall Time', fall_time),
+        ('Rise minus Fall Duration', rise_minus_fall_duration),
+        ('Rise Duration', rise_duration),
+        ('Fall Duration', fall_duration),
     ('StdDev', 'SD'),
     ('Pcnt No', 'percent without'),
     ('Shift', 'CCF shift'),

@@ -166,7 +166,7 @@ def combined_workflow(
                 indv_periods = sp.calc_indv_period_workflow(acf_curve=indv_acfs, img_props=img_props)
 
                 # Calculate the peak properties
-                indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas, indv_incr_rates, indv_dec_rates, indv_ddx_maxs, indv_ddx_mins = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props)
+                indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas, indv_rising_slopes, indv_falling_slopes, indv_max_rising_slopes, indv_max_falling_slopes = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props)
                 
                 # with open(f'/Users/domchom/Desktop/{file_name}_peak_props.pkl', 'wb') as f:
                 #    pickle.dump(indv_peak_props, f)
@@ -198,18 +198,18 @@ def combined_workflow(
                 indv_periods = indv_periods * img_props['frame_interval']
                 indv_peak_offsets = indv_peak_offsets * img_props['frame_interval']
                 indv_peak_widths = indv_peak_widths * img_props['frame_interval']
-                indv_rise_times = indv_edge_times['Rise Time'] * img_props['frame_interval']
-                indv_fall_times = indv_edge_times['Fall Time'] * img_props['frame_interval']
-                indv_rise_fall_times = indv_edge_times['Rise-Fall Time'] * img_props['frame_interval']
+                indv_rise_durations = indv_edge_times['Rise Duration'] * img_props['frame_interval']
+                indv_fall_durations = indv_edge_times['Fall Duration'] * img_props['frame_interval']
+                indv_rise_minus_fall_durations = indv_edge_times['Rise minus Fall Duration'] * img_props['frame_interval']
 
                 # same adjustment, use division since rates are in units/time
-                indv_incr_rates /= img_props['frame_interval']
-                indv_dec_rates /= img_props['frame_interval']
-                indv_ddx_maxs /= img_props['frame_interval']
-                indv_ddx_mins /= img_props['frame_interval']
+                indv_rising_slopes /= img_props['frame_interval']
+                indv_falling_slopes /= img_props['frame_interval']
+                indv_max_rising_slopes /= img_props['frame_interval']
+                indv_max_falling_slopes /= img_props['frame_interval']
 
                 # calculate ratio between the rate max and min
-                indv_ddx_ratios = -1 * (indv_ddx_maxs / indv_ddx_mins)
+                indv_max_slope_ratios = -1 * (indv_max_rising_slopes / indv_max_falling_slopes)
 
                 # create dictionary of image parameters and their values for later use
                 img_metrics = {
@@ -220,15 +220,15 @@ def combined_workflow(
                                 'Peak Max': indv_peak_maxs,
                                 'Peak Min': indv_peak_mins,
                                 'Peak Offset': indv_peak_offsets,
-                                'Rise Time': indv_rise_times,
-                                'Fall Time': indv_fall_times,
-                                'Rise-Fall Time': indv_rise_fall_times,
+                                'Rise Duration': indv_rise_durations,
+                                'Fall Duration': indv_fall_durations,
+                                'Rise minus Fall Duration': indv_rise_minus_fall_durations,
                                 'Peak Area': indv_peak_areas,
-                                'Increasing Rate (left side)':indv_incr_rates,
-                                'Decreasing Rate (right side)': indv_dec_rates,
-                                'Max Increasing Rate': indv_ddx_maxs,
-                                'Max Decreasing Rate': indv_ddx_mins,
-                                'Max Incr Rate / Dec Rate': indv_ddx_ratios
+                                'Rising Slope': indv_rising_slopes,
+                                'Falling Slope': indv_falling_slopes,
+                                'Max Rising Slope': indv_max_rising_slopes,
+                                'Max Falling Slope': indv_max_falling_slopes,
+                                'Rising/Falling Slope Ratio': indv_max_slope_ratios
                                 }
                 
                 # add shifts to the dictionary if there are multiple channels

@@ -17,9 +17,9 @@ def _channel_metric_labels(edge_height_fraction: float) -> dict:
     'Peak Min':     'Peak baseline/minimum intensity (AU)',
     'Peak Offset':  'Peak apex offset from midpoint (s)',
     'Peak Area':    'Peak area above local baseline (AU)',
-        'Rise Time':    f'Rise duration, {pct} to apex (s)',
-        'Fall Time':    f'Fall duration, apex to {pct} (s)',
-        'Rise-Fall Time': 'Rise duration minus fall duration (s)',
+        'Rise Duration':    f'Rise duration, {pct} to apex (s)',
+        'Fall Duration':    f'Fall duration, apex to {pct} (s)',
+        'Rise minus Fall Duration': 'Rise duration minus fall duration (s)',
     }
 
 # Per channel-combo metrics: key in img_metrics -> colorbar label
