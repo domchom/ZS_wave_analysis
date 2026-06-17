@@ -123,6 +123,7 @@ def _build_log_params(params, analysis_type):
             "Submovies Used": [],
             "Plotting errors": [],
             "Rise/Fall Landmark Height": params.get("edge_height_fraction", 0.5),
+            "Dark Plots": params["dark_plots"],
         })
     elif analysis_type == "kymograph":
         log_params.update({

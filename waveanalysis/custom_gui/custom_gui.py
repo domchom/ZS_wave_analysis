@@ -7,7 +7,7 @@ import sys as _sys
 import time
 import tkinter as tk
 import tkinter.font as tkfont
-from tkinter import ttk, scrolledtext
+from tkinter import ttk, scrolledtext, messagebox
 from tkinter.filedialog import askdirectory
 
 try:
@@ -129,6 +129,7 @@ class _GUIBase(_TkBase):
         ttk.Button(btn, text="Test File", command=self._test_first_file).pack(side=tk.LEFT, padx=4)
         self.stop_button = ttk.Button(btn, text="Stop", command=self.stop_analysis, state="disabled")
         self.stop_button.pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn, text="Load Results", command=self._load_existing_results).pack(side=tk.LEFT, padx=4)
         ttk.Button(btn, text="Close Window", command=self.cancel_analysis).pack(side=tk.LEFT)
         self.elapsed_label = ttk.Label(btn, text="")
         self.elapsed_label.pack(side=tk.RIGHT)
@@ -448,6 +449,42 @@ class _GUIBase(_TkBase):
 
     def _open_summary_viewer(self):
         _SummaryViewer(self, self._results_path)
+
+    def _load_existing_results(self):
+        selected = askdirectory(title="Select analysis results folder")
+        if not selected:
+            return
+
+        results_path = self._resolve_results_path(selected)
+        if results_path is None:
+            self.log_message(
+                "ERROR: No analysis results found. Select a 0_signalProcessing-* folder "
+                "or a folder containing one."
+            )
+            self.set_status("No existing results found")
+            return
+
+        self.show_results_buttons(results_path)
+        self.set_status(f"Loaded existing results: {os.path.basename(results_path)}")
+        self.log_message(f"Loaded existing results folder: {results_path}")
+
+    @staticmethod
+    def _resolve_results_path(path):
+        if not os.path.isdir(path):
+            return None
+
+        has_outputs = (
+            glob.glob(os.path.join(path, "!*_summary.csv"))
+            or glob.glob(os.path.join(path, "**", "*.png"), recursive=True)
+        )
+        if os.path.basename(path).startswith("0_signalProcessing-") or has_outputs:
+            return path
+
+        results_dirs = sorted(
+            glob.glob(os.path.join(path, "0_signalProcessing-*")),
+            key=os.path.getmtime,
+        )
+        return results_dirs[-1] if results_dirs else None
 
     def _rerun_different_folder(self):
         new = askdirectory()
@@ -1061,17 +1098,13 @@ class _PlotViewer(tk.Toplevel):
         self.title("Plot Viewer")
         self.geometry("1100x750")
         self.results_path = results_path
+        self.default_dark_plots = self._infer_dark_plots(parent, results_path)
+        self._summary_df = None
+        self._metric_labels = []
+        self._metric_lookup = {}
+        self._load_summary_metrics()
 
-        self.image_files = []
-        for root, dirs, files in os.walk(results_path):
-            dirs[:] = sorted([d for d in dirs if not d.startswith(".")], key=_natural_sort_key)
-            for f in sorted(files, key=_natural_sort_key):
-                if f.lower().endswith(".png") and not f.startswith("."):
-                    self.image_files.append(os.path.join(root, f))
-
-        if not self.image_files:
-            ttk.Label(self, text="No plot images found.").pack(padx=20, pady=20)
-            return
+        self.image_files = self._scan_image_files()
 
         self.current_index = 0
         self._photo = None
@@ -1099,13 +1132,134 @@ class _PlotViewer(tk.Toplevel):
         nav.pack(fill=tk.X, padx=10, pady=(0, 6))
         ttk.Button(nav, text="< Prev", command=self._prev).pack(side=tk.LEFT)
         ttk.Button(nav, text="Next >", command=self._next).pack(side=tk.LEFT, padx=4)
+        ttk.Button(nav, text="Group Correlations", command=self._make_group_correlations).pack(side=tk.LEFT, padx=(0, 4))
         self.file_label = ttk.Label(nav, text="", wraplength=650)
         self.file_label.pack(side=tk.LEFT, padx=10)
-        ttk.Label(nav, text=f"{len(self.image_files)} plots").pack(side=tk.RIGHT)
+        self.count_label = ttk.Label(nav, text=f"{len(self.image_files)} plots")
+        self.count_label.pack(side=tk.RIGHT)
 
         self.bind("<Left>", lambda e: self._prev())
         self.bind("<Right>", lambda e: self._next())
-        self.after(100, lambda: self._show_image(0))
+        if self.image_files:
+            self.after(100, lambda: self._show_image(0))
+        else:
+            self.after(100, self._show_empty)
+
+        scatter = ttk.LabelFrame(self, text="Group Scatter", padding=4)
+        scatter.pack(fill=tk.X, padx=10, pady=(0, 6))
+        scatter.columnconfigure(1, weight=1)
+        scatter.columnconfigure(3, weight=1)
+
+        ttk.Label(scatter, text="X").grid(row=0, column=0, sticky="w", padx=(0, 4))
+        self.scatter_x_var = tk.StringVar(value=self._metric_labels[0] if self._metric_labels else "")
+        self.scatter_x_combo = ttk.Combobox(
+            scatter,
+            textvariable=self.scatter_x_var,
+            values=self._metric_labels,
+            state="readonly",
+            width=28,
+        )
+        self.scatter_x_combo.grid(row=0, column=1, sticky="ew", padx=(0, 8))
+
+        ttk.Label(scatter, text="Y").grid(row=0, column=2, sticky="w", padx=(0, 4))
+        self.scatter_y_var = tk.StringVar(value=self._default_scatter_y_metric())
+        self.scatter_y_combo = ttk.Combobox(
+            scatter,
+            textvariable=self.scatter_y_var,
+            values=self._metric_labels,
+            state="readonly",
+            width=28,
+        )
+        self.scatter_y_combo.grid(row=0, column=3, sticky="ew", padx=(0, 8))
+
+        self.scatter_dark_var = tk.BooleanVar(value=self.default_dark_plots)
+        ttk.Checkbutton(scatter, variable=self.scatter_dark_var, text="Dark").grid(row=0, column=4, padx=(0, 8))
+        ttk.Button(scatter, text="Compute Plot", command=self._make_group_scatter).grid(row=0, column=5)
+        self.scatter_status = ttk.Label(scatter, text="", wraplength=900)
+        self.scatter_status.grid(row=1, column=0, columnspan=6, sticky="w", pady=(4, 0))
+
+        if not self._metric_labels:
+            self.scatter_x_combo.configure(state="disabled")
+            self.scatter_y_combo.configure(state="disabled")
+            self.scatter_status.configure(
+                text="No summary metrics with numeric mean values were found.",
+                foreground="red",
+            )
+
+    def _scan_image_files(self):
+        image_files = []
+        for root, dirs, files in os.walk(self.results_path):
+            dirs[:] = sorted([d for d in dirs if not d.startswith(".")], key=_natural_sort_key)
+            for f in sorted(files, key=_natural_sort_key):
+                if f.lower().endswith(".png") and not f.startswith("."):
+                    image_files.append(os.path.join(root, f))
+        return image_files
+
+    @staticmethod
+    def _infer_dark_plots(parent, results_path):
+        log_files = sorted(glob.glob(os.path.join(results_path, "!log-*.txt")))
+        if log_files:
+            try:
+                with open(log_files[-1]) as f:
+                    for line in f:
+                        if line.startswith("Dark Plots:"):
+                            return line.split(":", 1)[1].strip().lower() == "true"
+            except OSError:
+                pass
+
+        try:
+            if "dark_plots" in getattr(parent, "vars", {}):
+                return bool(parent.vars["dark_plots"].get())
+        except Exception:
+            pass
+        return False
+
+    def _load_summary_metrics(self):
+        csv_files = glob.glob(os.path.join(self.results_path, "!*_summary.csv"))
+        if not csv_files:
+            return
+
+        import pandas as pd
+        from waveanalysis.housekeeping.housekeeping_functions import relabel_metric_text
+
+        self._summary_df = pd.read_csv(sorted(csv_files)[-1])
+        metric_cols = [
+            col for col in self._summary_df.columns
+            if 'Mean' in col and pd.to_numeric(self._summary_df[col], errors='coerce').notna().any()
+        ]
+        metric_cols = sorted(metric_cols, key=self._metric_sort_key)
+        for col in metric_cols:
+            label = relabel_metric_text(col)
+            self._metric_labels.append(label)
+            self._metric_lookup[label] = col
+
+    def _default_scatter_y_metric(self):
+        if not self._metric_labels:
+            return ""
+        if len(self._metric_labels) == 1:
+            return self._metric_labels[0]
+        for label in self._metric_labels[1:]:
+            col = self._metric_lookup[label]
+            if 'Shift' in col:
+                return label
+        return self._metric_labels[1]
+
+    @staticmethod
+    def _metric_sort_key(col):
+        metric_order = [
+            'Period',
+            'Peak Amp', 'Peak Rel Amp', 'Peak Max', 'Peak Min', 'Peak Width',
+            'Peak Area', 'Peak Offset',
+            'Rise Duration', 'Fall Duration', 'Rise minus Fall Duration',
+            'Rising Slope', 'Falling Slope', 'Max Rising Slope', 'Max Falling Slope',
+            'Rising/Falling Slope Ratio',
+            '% Phase Shift', 'Peak Shift', 'Rise Shift', 'Fall Shift', 'Shift',
+            'Rise-Peak Diff', 'Fall-Peak Diff',
+        ]
+        for idx, metric in enumerate(metric_order):
+            if metric in col:
+                return idx, col
+        return len(metric_order), col
 
     def _populate_tree(self):
         added = {}
@@ -1155,6 +1309,18 @@ class _PlotViewer(tk.Toplevel):
     def _show_current(self):
         if self.image_files:
             self._show_image(self.current_index)
+        else:
+            self._show_empty()
+
+    def _show_empty(self):
+        self.canvas.delete("all")
+        self.file_label.configure(text="No plot images found.")
+        cw, ch = self.canvas.winfo_width(), self.canvas.winfo_height()
+        if cw < 50 or ch < 50:
+            cw, ch = 700, 600
+        self.canvas.create_text(cw // 2, ch // 2, fill="white",
+                                text="No plot images found.\nUse Group Scatter to compute one from the summary CSV.",
+                                font=("TkDefaultFont", 14), justify="center")
 
     def _prev(self):
         if self.image_files:
@@ -1163,6 +1329,77 @@ class _PlotViewer(tk.Toplevel):
     def _next(self):
         if self.image_files:
             self._show_image(self.current_index + 1)
+
+    def _make_group_scatter(self):
+        x_label = self.scatter_x_var.get()
+        y_label = self.scatter_y_var.get()
+        if x_label not in self._metric_lookup or y_label not in self._metric_lookup:
+            self.scatter_status.configure(text="Select metrics for both axes first.", foreground="red")
+            return
+        if x_label == y_label:
+            self.scatter_status.configure(text="Select two different metrics.", foreground="red")
+            return
+
+        import waveanalysis.plotting as pt
+        import waveanalysis.housekeeping.housekeeping_functions as hf
+
+        x_col = self._metric_lookup[x_label]
+        y_col = self._metric_lookup[y_label]
+        try:
+            fig = pt.generate_group_metric_scatter(
+                summary_df=self._summary_df,
+                x_param=x_col,
+                y_param=y_col,
+                dark_plots=self.scatter_dark_var.get(),
+            )
+            out_dir = os.path.join(self.results_path, "group_scatter_graphs")
+            os.makedirs(out_dir, exist_ok=True)
+            output_path = os.path.join(out_dir, hf.sanitize_filename(f"{x_col} vs {y_col}.png"))
+            fig.savefig(output_path)
+            self.scatter_status.configure(text=f"Saved: {os.path.basename(output_path)}", foreground="green")
+            self._show_generated_plot(output_path)
+        except Exception as e:
+            self.scatter_status.configure(text=f"Could not create plot: {e}", foreground="red")
+
+    def _make_group_correlations(self):
+        try:
+            import pandas as pd
+            import waveanalysis.plotting as pt
+            import waveanalysis.housekeeping.housekeeping_functions as hf
+
+            csv_files = glob.glob(os.path.join(self.results_path, "!*_summary.csv"))
+            if not csv_files:
+                raise ValueError("No summary CSV found.")
+
+            summary_df = pd.read_csv(sorted(csv_files)[-1])
+            figs = pt.generate_group_metric_correlations(
+                summary_df=summary_df,
+                dark_plots=self.default_dark_plots,
+            )
+
+            out_dir = os.path.join(self.results_path, "group_metric_correlations")
+            os.makedirs(out_dir, exist_ok=True)
+            first_path = None
+            for name, fig in figs.items():
+                output_path = os.path.join(out_dir, f"{hf.sanitize_filename(name)}.png")
+                fig.savefig(output_path)
+                if first_path is None:
+                    first_path = output_path
+            if first_path:
+                self._show_generated_plot(first_path)
+        except Exception as e:
+            messagebox.showerror("Group Correlations", f"Could not create group correlations:\n{e}")
+
+    def _show_generated_plot(self, output_path):
+        self.image_files = self._scan_image_files()
+        self.tree.delete(*self.tree.get_children(""))
+        self._populate_tree()
+        self.count_label.configure(text=f"{len(self.image_files)} plots")
+        try:
+            idx = self.image_files.index(output_path)
+        except ValueError:
+            idx = len(self.image_files) - 1
+        self._show_image(idx)
 
 
 # ---------------------------------------------------------------------------
