@@ -295,7 +295,7 @@ def generate_group_metric_scatter(
         legend = ax.legend(title='Group', bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
         legend.set_in_layout(False)
         if stats_text:
-            fig.subplots_adjust(left=0.14, right=0.75, top=0.84, bottom=0.14)
+            fig.subplots_adjust(left=0.14, right=0.72, top=0.84, bottom=0.14)
             _add_scatter_stats_text(ax, stats_text, dark_plots)
         else:
             fig.tight_layout()

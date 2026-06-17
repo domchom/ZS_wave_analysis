@@ -127,6 +127,7 @@ class _GUIBase(_TkBase):
         self.start_button = ttk.Button(btn, text="Start Analysis", command=self.start_analysis)
         self.start_button.pack(side=tk.LEFT)
         ttk.Button(btn, text="Test File", command=self._test_first_file).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn, text="Preview Bins", command=self._preview_bins).pack(side=tk.LEFT, padx=4)
         self.stop_button = ttk.Button(btn, text="Stop", command=self.stop_analysis, state="disabled")
         self.stop_button.pack(side=tk.LEFT, padx=4)
         ttk.Button(btn, text="Load Results", command=self._load_existing_results).pack(side=tk.LEFT, padx=4)
@@ -542,6 +543,133 @@ class _GUIBase(_TkBase):
         self._test_folder_path_once = tmp
         self._ignore_group_names_once = self._has_group_names
         self.start_analysis()
+
+    def _preview_bins(self):
+        """Show the current box/line bin geometry over one image from the folder."""
+        folder = self.vars["folder_path"].get()
+        if not folder or not os.path.isdir(folder):
+            self.log_message("ERROR: Select a valid folder first")
+            return
+
+        tifs = sorted(
+            (f for f in os.listdir(folder) if f.endswith(".tif") and not f.startswith(".")),
+            key=_natural_sort_key,
+        )
+        if not tifs:
+            self.log_message("ERROR: No .tif files found in the selected folder")
+            return
+
+        if len(tifs) == 1:
+            chosen = tifs[0]
+        else:
+            chosen = _FilePickerDialog(self, tifs, title="Select an image to preview bins").result
+            if chosen is None:
+                return
+
+        try:
+            preview_image, overlay_info = self._create_bin_preview(os.path.join(folder, chosen))
+            _ImagePreviewWindow(self, preview_image, f"Bin Preview - {chosen}", overlay_info)
+        except Exception as e:
+            self.log_message(f"ERROR: Could not preview bins: {e}")
+
+    def _create_bin_preview(self, image_path):
+        from PIL import Image, ImageDraw
+        import numpy as np
+        from waveanalysis.image_props.image_to_np_arrays import (
+            tiff_to_np_array_multi_frame,
+            tiff_to_np_array_single_frame,
+        )
+
+        analysis_type = self.vars["analysis_type"].get()
+        step = int(self.vars["bin_shift"].get())
+        if step <= 0:
+            raise ValueError("Bin shift must be > 0")
+
+        if analysis_type == "kymograph":
+            line_width = int(self.vars["line_width"].get())
+            if line_width <= 0:
+                raise ValueError("Line width must be > 0")
+            image = tiff_to_np_array_single_frame(image_path)
+            channel_images = []
+            display_shape = np.asarray(image[0], dtype=float).shape
+            height, width = display_shape
+            count = 0
+            for channel in range(min(image.shape[0], 2)):
+                display = np.asarray(image[channel], dtype=float)
+                preview = self._normalize_preview_image(display)
+                channel_image = Image.fromarray(preview).convert("RGB")
+                draw = ImageDraw.Draw(channel_image, "RGBA")
+                channel_count = 0
+                for x0 in range(0, width, step):
+                    x1 = x0 + line_width
+                    if x1 <= width:
+                        draw.rectangle((x0, 0, x1 - 1, height - 1), outline=(245, 245, 245, 150), width=1)
+                        channel_count += 1
+                count = max(count, channel_count)
+                channel_images.append(channel_image)
+            pil_image = self._join_preview_channels(channel_images)
+            info = f"Kymograph bins: line width {line_width}px, shift {step}px, {count} bins"
+        else:
+            box_size = int(self.vars["box_size"].get())
+            if box_size <= 0:
+                raise ValueError("Box size must be > 0")
+            image = tiff_to_np_array_multi_frame(image_path)
+            channel_images = []
+            display_shape = np.asarray(image[0, 0, 0], dtype=float).shape
+            height, width = display_shape
+            half = box_size // 2
+            count = 0
+            for channel in range(min(image.shape[2], 2)):
+                display = np.asarray(image[0, 0, channel], dtype=float)
+                preview = self._normalize_preview_image(display)
+                channel_image = Image.fromarray(preview).convert("RGB")
+                draw = ImageDraw.Draw(channel_image, "RGBA")
+                channel_count = 0
+                for y_center in range(half, height - half, step):
+                    for x_center in range(half, width - half, step):
+                        x0 = x_center - half
+                        y0 = y_center - half
+                        x1 = x0 + box_size - 1
+                        y1 = y0 + box_size - 1
+                        draw.rectangle((x0, y0, x1, y1), outline=(245, 245, 245, 150), width=1)
+                        channel_count += 1
+                count = max(count, channel_count)
+                channel_images.append(channel_image)
+            pil_image = self._join_preview_channels(channel_images)
+            info = f"Box bins: box size {box_size}px, shift {step}px, {count} bins"
+
+        return pil_image, info
+
+    @staticmethod
+    def _join_preview_channels(channel_images):
+        from PIL import Image
+
+        if len(channel_images) <= 1:
+            return channel_images[0]
+        gap = 8
+        width = sum(img.width for img in channel_images) + gap * (len(channel_images) - 1)
+        height = max(img.height for img in channel_images)
+        joined = Image.new("RGB", (width, height), (24, 24, 24))
+        x = 0
+        for img in channel_images:
+            joined.paste(img, (x, 0))
+            x += img.width + gap
+        return joined
+
+    @staticmethod
+    def _normalize_preview_image(image):
+        import numpy as np
+
+        finite = image[np.isfinite(image)]
+        if finite.size == 0:
+            return np.zeros(image.shape, dtype=np.uint8)
+        lo, hi = np.percentile(finite, [1, 99])
+        if hi <= lo:
+            lo, hi = np.nanmin(finite), np.nanmax(finite)
+        if hi <= lo:
+            return np.zeros(image.shape, dtype=np.uint8)
+        scaled = np.clip((image - lo) / (hi - lo), 0, 1)
+        return (scaled * 255).astype(np.uint8)
 
     def _finalize_vars(self):
         """Release this GUI's tk Variables on the main thread while the Tcl
@@ -1036,9 +1164,9 @@ class KymographGUI(_GUIBase):
 class _FilePickerDialog(tk.Toplevel):
     """Modal dialog that lets the user pick one file from a list."""
 
-    def __init__(self, parent, file_list):
+    def __init__(self, parent, file_list, title="Select a file to test"):
         super().__init__(parent)
-        self.title("Select a file to test")
+        self.title(title)
         self.result = None
         self.transient(parent)
         self.grab_set()
@@ -1085,6 +1213,41 @@ class _FilePickerDialog(tk.Toplevel):
     def _cancel(self):
         self.result = None
         self.destroy()
+
+
+class _ImagePreviewWindow(tk.Toplevel):
+    """Display a generated PIL image preview scaled to fit the screen."""
+
+    def __init__(self, parent, pil_image, title, info_text):
+        super().__init__(parent)
+        self.title(title)
+        self._source_image = pil_image
+        self._photo = None
+
+        max_w = max(parent.winfo_screenwidth() - 180, 400)
+        max_h = max(parent.winfo_screenheight() - 220, 300)
+        start_w = min(pil_image.width + 24, max_w)
+        start_h = min(pil_image.height + 78, max_h)
+        self.geometry(f"{start_w}x{start_h}")
+
+        ttk.Label(self, text=info_text).pack(fill=tk.X, padx=10, pady=(8, 4), anchor="w")
+        self.canvas = tk.Canvas(self, bg="#202020", highlightthickness=0)
+        self.canvas.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        self.canvas.bind("<Configure>", lambda _e: self._draw())
+        self.after(50, self._draw)
+
+    def _draw(self):
+        from PIL import ImageTk
+
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        if cw < 20 or ch < 20:
+            return
+        image = self._source_image.copy()
+        image.thumbnail((cw - 8, ch - 8))
+        self._photo = ImageTk.PhotoImage(image)
+        self.canvas.delete("all")
+        self.canvas.create_image(cw // 2, ch // 2, image=self._photo)
 
 
 # ---------------------------------------------------------------------------
