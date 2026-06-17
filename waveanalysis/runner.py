@@ -50,6 +50,7 @@ def main():
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
             "Plot Heatmaps": params["plot_flags"]["plot_heatmaps"],
+            "Plot FTs": params["plot_flags"]["plot_fts"],
             "Dark Plots": params["plot_flags"]["dark_plots"],
         })
     elif analysis_type == "rolling":
@@ -122,6 +123,9 @@ def main():
             smoothing_params=params["smoothing_params"],
             smoothing=params["smoothing"],
             dark_plots=params["dark_plots"],
+            injection_ch1=params["injection_ch1"],
+            injection_ch2=params["injection_ch2"],
+            injection_frame=params["injection_frame"]
         )
 
     elif analysis_type == "kymograph":

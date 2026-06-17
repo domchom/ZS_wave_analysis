@@ -87,7 +87,8 @@ class _GUIBase(tk.Tk):
                 "plot_indv_CCFs": self.vars["plot_indv_CCFs"],
                 "plot_indv_peaks": self.vars["plot_indv_peaks"],
                 "plot_heatmaps": self.vars["plot_heatmaps"],
-                "dark_plots": self.vars["dark_plots"],
+                "plot_fts": self.vars["plot_fts"],
+                "dark_plots": self.vars["dark_plots"]
             }
         self.destroy()
 
@@ -116,6 +117,7 @@ class BaseGUI(_GUIBase):
             "plot_indv_CCFs": tk.BooleanVar(value=False),
             "plot_indv_peaks": tk.BooleanVar(value=False),
             "plot_heatmaps": tk.BooleanVar(value=False),
+            "plot_fts":tk.BooleanVar(value=False),
             "dark_plots": tk.BooleanVar(value=True),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
@@ -170,6 +172,7 @@ class BaseGUI(_GUIBase):
         self._add_checkbutton(13, 2, self.vars["plot_indv_peaks"], "Plot individual peaks")
         self._add_checkbutton(11, 4, self.vars["dark_plots"], "Dark plots")
         self._add_checkbutton(12, 4, self.vars["plot_heatmaps"], "Plot heatmaps")
+        self._add_checkbutton(13, 4, self.vars["plot_fts"], "Plot Fourier transforms")
 
         # ---- SMOOTHING OPTIONS ----
         self._build_smoothing_section(default_poly=2)
@@ -222,6 +225,9 @@ class RollingGUI(_GUIBase):
             "Ch3_smoothing": tk.BooleanVar(value=True),
             "Ch4_smoothing": tk.BooleanVar(value=True),
             "CCF_smoothing": tk.BooleanVar(value=True),
+            "injection_frame": tk.IntVar(value=0),
+            "injection_ch1": tk.BooleanVar(value=False),
+            "injection_ch2": tk.BooleanVar(value=False),
         }
 
         self.kymograph = False
@@ -248,10 +254,28 @@ class RollingGUI(_GUIBase):
 
         # ---- SEPARATORS ----
         ttk.Separator(self, orient="vertical").grid(row=0, column=2, rowspan=12, sticky="ns", pady=10)
+        ttk.Separator(self, orient="horizontal").grid(row=6, column=4, columnspan=4, sticky="ew", pady=10)
 
         # ---- SMOOTHING OPTIONS ----
-        self._build_smoothing_section(default_poly=3)
+        self._build_smoothing_section(default_poly=2)
 
+        # ---- LIVE-INJECTION OPTIONS ----
+        ttk.Label(self, text="LIVE INJECTION OPTIONS", font=("TkDefaultFont", 16, "bold"),
+                  # padx used to be 10
+                  anchor="center").grid(row=7, column=3,columnspan=3, padx=10, pady=(0, 10), sticky="ew")
+        
+        # injection frame number text and number entry box
+        ttk.Label(self, text="Injection frame number").grid(row=8, column=5, padx=10, sticky="W")
+        ttk.Entry(self, width=3, textvariable=self.vars["injection_frame"]).grid(row=8, column=6, padx=10, sticky="W")
+        ttk.Label(self, text="(leave at 0 to ignore)").grid(row=8, column=7, padx=0, sticky="W")
+
+        # option for injection to be selected as channel 1 or 2
+        ttk.Label(self, text="Injection signal").grid(row=9, column=5, padx=10, sticky="W")
+        ttk.Label(self, text="Ch1").grid(row=9, column=5, padx=10, sticky="E")
+        ttk.Label(self, text="Ch2").grid(row=10, column=5, padx=10, sticky="E")
+        ttk.Checkbutton(self, variable=self.vars["injection_ch1"]).grid(row=9, column=6, padx=10, sticky="W")
+        ttk.Checkbutton(self, variable=self.vars["injection_ch2"]).grid(row=10, column=6, padx=10, sticky="W")
+    
         # ---- BUTTONS ----
         ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=12, column=7, columnspan=2, padx=10, sticky="E")
         ttk.Button(self, text="Cancel", command=self.cancel_analysis).grid(row=11, column=7, columnspan=2, padx=10, sticky="E")
