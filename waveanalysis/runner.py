@@ -123,8 +123,8 @@ def main():
             smoothing_params=params["smoothing_params"],
             smoothing=params["smoothing"],
             dark_plots=params["dark_plots"],
-            dextran_ch1=params["dextran_ch1"],
-            dextran_ch2=params["dextran_ch2"],
+            injection_ch1=params["injection_ch1"],
+            injection_ch2=params["injection_ch2"],
             injection_frame=params["injection_frame"]
         )
 

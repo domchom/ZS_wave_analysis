@@ -226,8 +226,8 @@ class RollingGUI(_GUIBase):
             "Ch4_smoothing": tk.BooleanVar(value=True),
             "CCF_smoothing": tk.BooleanVar(value=True),
             "injection_frame": tk.IntVar(value=0),
-            "dextran_ch1": tk.BooleanVar(value=False),
-            "dextran_ch2": tk.BooleanVar(value=False),
+            "injection_ch1": tk.BooleanVar(value=False),
+            "injection_ch2": tk.BooleanVar(value=False),
         }
 
         self.kymograph = False
@@ -269,12 +269,12 @@ class RollingGUI(_GUIBase):
         ttk.Entry(self, width=3, textvariable=self.vars["injection_frame"]).grid(row=8, column=6, padx=10, sticky="W")
         ttk.Label(self, text="(leave at 0 to ignore)").grid(row=8, column=7, padx=0, sticky="W")
 
-        # option for dextran to be selected as channel 1 or 2
-        ttk.Label(self, text="Dextran signal").grid(row=9, column=5, padx=10, sticky="W")
+        # option for injection to be selected as channel 1 or 2
+        ttk.Label(self, text="Injection signal").grid(row=9, column=5, padx=10, sticky="W")
         ttk.Label(self, text="Ch1").grid(row=9, column=5, padx=10, sticky="E")
         ttk.Label(self, text="Ch2").grid(row=10, column=5, padx=10, sticky="E")
-        ttk.Checkbutton(self, variable=self.vars["dextran_ch1"]).grid(row=9, column=6, padx=10, sticky="W")
-        ttk.Checkbutton(self, variable=self.vars["dextran_ch2"]).grid(row=10, column=6, padx=10, sticky="W")
+        ttk.Checkbutton(self, variable=self.vars["injection_ch1"]).grid(row=9, column=6, padx=10, sticky="W")
+        ttk.Checkbutton(self, variable=self.vars["injection_ch2"]).grid(row=10, column=6, padx=10, sticky="W")
     
         # ---- BUTTONS ----
         ttk.Button(self, text="Start analysis", command=self.start_analysis).grid(row=12, column=7, columnspan=2, padx=10, sticky="E")

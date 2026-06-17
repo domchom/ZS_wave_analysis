@@ -28,8 +28,8 @@ def rolling_workflow(
     smoothing_params: dict = None,
     smoothing: bool = True,
     dark_plots: bool = False,
-    dextran_ch1: bool = False,
-    dextran_ch2: bool = False,
+    injection_ch1: bool = False,
+    injection_ch2: bool = False,
     injection_frame: int = None
 ) -> pd.DataFrame:      
     '''
@@ -241,7 +241,7 @@ def rolling_workflow(
                     fullmovie_summary=summary_df,
                     channel_combos=channel_combos,
                     dark_plots=dark_plots,
-                    live_injection_dict={"dextran_ch1": dextran_ch1, "dextran_ch2": dextran_ch2, "injection_frame": (injection_frame / img_props['frame_interval'])}
+                    live_injection_dict={"injection_ch1": injection_ch1, "injection_ch2": injection_ch2, "injection_frame": (injection_frame / img_props['frame_interval'])}
                 )
                 plot_save_path = os.path.join(im_save_path, 'summary_plots')
                 os.makedirs(plot_save_path, exist_ok=True) if not test else None

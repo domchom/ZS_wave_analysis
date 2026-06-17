@@ -36,8 +36,8 @@ def plot_rolling_summary(
             y_label=f'Ch {channel + 1} Mean ± StdDev Period (seconds)',
             fullmovie_summary=fullmovie_summary,
             dark_plots=dark_plots,
-            dextran_ch1=live_injection_dict["dextran_ch1"],
-            dextran_ch2=live_injection_dict["dextran_ch2"],
+            injection_ch1=live_injection_dict["injection_ch1"],
+            injection_ch2=live_injection_dict["injection_ch2"],
             injection_frame=live_injection_dict["injection_frame"]
             )
             
@@ -54,8 +54,8 @@ def plot_rolling_summary(
                 y_label=f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean ± StdDev Shift (seconds)',
                 fullmovie_summary=fullmovie_summary,
                 dark_plots=dark_plots,
-                dextran_ch1=live_injection_dict["dextran_ch1"],
-                dextran_ch2=live_injection_dict["dextran_ch2"],
+                injection_ch1=live_injection_dict["injection_ch1"],
+                injection_ch2=live_injection_dict["injection_ch2"],
                 injection_frame=live_injection_dict["injection_frame"]
                 )
             
@@ -72,8 +72,8 @@ def plot_rolling_summary(
                 y_label=f'Ch {channel+1} Mean ± StdDev Peak {prop_name}',
                 fullmovie_summary=fullmovie_summary,
                 dark_plots=dark_plots,
-                dextran_ch1=live_injection_dict["dextran_ch1"],
-                dextran_ch2=live_injection_dict["dextran_ch2"],
+                injection_ch1=live_injection_dict["injection_ch1"],
+                injection_ch2=live_injection_dict["injection_ch2"],
                 injection_frame=live_injection_dict["injection_frame"]
                 )
                     
@@ -89,8 +89,8 @@ def _return_mean_periods_shifts_props_plots(
     y_label: str,
     fullmovie_summary: pd.DataFrame,
     dark_plots: bool = False,
-    dextran_ch1: bool = False,
-    dextran_ch2: bool = False,
+    injection_ch1: bool = False,
+    injection_ch2: bool = False,
     injection_frame: int = None
 ) -> plt.Figure:    
     '''
@@ -112,10 +112,10 @@ def _return_mean_periods_shifts_props_plots(
                         color = 'blue' if not dark_plots else 'lightblue',
                         alpha = 0.25)
         
-        # plot average signal of dextran channel over all the frames
-        if (dextran_ch1 != dextran_ch2):
-            dextran_channel = 1 if dextran_ch1 else 2
-            overlay_signal = fullmovie_summary[f'Ch {dextran_channel} Mean Signal']
+        # plot average signal of injection channel over all the frames
+        if (injection_ch1 != injection_ch2):
+            injection_channel = 1 if injection_ch1 else 2
+            overlay_signal = fullmovie_summary[f'Ch {injection_channel} Mean Signal']
             ymin = (fullmovie_summary[dependent_variable] - fullmovie_summary[dependent_error]).min()
 
             ymax = (fullmovie_summary[dependent_variable] + fullmovie_summary[dependent_error]).max()
