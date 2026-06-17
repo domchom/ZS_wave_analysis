@@ -34,6 +34,11 @@ def calc_indv_peak_props_workflow(
             - indv_peak_mins (np.ndarray): Array of mean peak minimums for each channel and bin.
             - indv_peak_offsets (np.ndarray): Array of mean peak offsets for each channel and bin.
             - indv_peak_props (dict): A dictionary containing individual peak properties for each channel and bin.
+            - indv_peak_areas (np.ndarray): Array of mean area under the curve for each channel and bin.
+            - indv_incr_rates (np.ndarray): Array of mean rate of signal increase from left base to peak for each channel and bin.
+            - indv_dec_rates (np.ndarray): Array of mean rate of signal decrease from peak to right base for each channel and bin.
+            - indv_ddx_maxs (np.ndarray): Array of maximum first derivatives (d(signal)/dt) for each channel and bin.
+            - indv_ddx_mins (np.ndarray): Array of minimum first derivatives (d(signal)/dt) for each channel and bin.
     '''
     # Extract image properties from the dictionary
     num_channels = img_props['num_channels']
@@ -47,6 +52,10 @@ def calc_indv_peak_props_workflow(
     indv_peak_mins = np.zeros(shape=(num_channels, num_bins))
     indv_peak_offsets = np.zeros(shape=(num_channels, num_bins))
     indv_peak_areas = np.zeros(shape=(num_channels, num_bins))
+    indv_incr_rates = np.zeros(shape=(num_channels, num_bins))
+    indv_dec_rates = np.zeros(shape=(num_channels, num_bins))
+    indv_ddx_maxs = np.zeros(shape=(num_channels, num_bins))
+    indv_ddx_mins = np.zeros(shape=(num_channels, num_bins))
     indv_peak_props = {}
 
     # Loop through each channel and bin
@@ -56,16 +65,39 @@ def calc_indv_peak_props_workflow(
             signal = _get_signal(bin_values, channel, bin, analysis_type)
             peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*peak_prominence_fraction)
 
+            # Find the first derivatve for this signal function
+            signal_ddx = np.gradient(signal)
+            signal_ddx = sig.savgol_filter(signal_ddx, window_length = 11, polyorder = 2)    
+
+            # Add a constant (mean signal) to the derivate values to put it on a similar y-axis value for plotting
+            avg_sig = np.mean(signal)
+            signal_ddx_corr = signal_ddx * 2 + avg_sig
+
+
             # If peaks detected, calculate properties, otherwise return NaNs
             if len(peaks) > 0:
                 # Calculate the peak properties
                 widths, heights, leftWidthIndex, rightWidthIndex = sig.peak_widths(signal, peaks, rel_height=0.5)
-                proms, _, _ = sig.peak_prominences(signal, peaks)
+                proms, leftTrough, rightTrough = sig.peak_prominences(signal, peaks)
 
                 # calculate the left and right bases of the peaks, then midpoints and peak offsets
                 _, _, left_bases, right_bases = sig.peak_widths(signal, peaks, rel_height=_PEAK_BASE_REL_HEIGHT)
                 midpoints = (leftWidthIndex + rightWidthIndex) / 2
                 peak_offsets = peaks - midpoints
+
+                # Helper method that calculates the extrema for the derivative of the signal plot
+                # (ddx is used as a shorthand to refer to the derivative plot)
+                ddx_maxs, ddx_mins = compute_derivative_props(signal_ddx, peaks, leftTrough, rightTrough)
+                
+                # For each peak, calculate the differences in signal and time between the left trough, peak, and right trough
+                left_signal_difference = signal[peaks] - signal[leftTrough]
+                right_signal_difference = signal[peaks] - signal[rightTrough]
+                left_trough_to_peak_distances = peaks - leftTrough
+                peaks_to_right_trough_distances = peaks - rightTrough
+
+                # Calculate the average rate of signal change by dividing the "rise" (change in signal) by the "run" (change in time)
+                incr_rates = left_signal_difference / left_trough_to_peak_distances
+                dec_rates = right_signal_difference / peaks_to_right_trough_distances
 
                 # Check if one peak entirely encompasses another. If so, the encompassed peak is not fully resolved and should be excluded from offset calculations.
                 for i in range(len(peaks)):
@@ -112,9 +144,21 @@ def calc_indv_peak_props_workflow(
                 # Drop NaN values because it will mess up the mean calculation
                 valid_indices = ~np.isnan(peak_offsets)
                 valid_offsets = peak_offsets[valid_indices]
+                valid_indices = ~np.isnan(ddx_maxs)
+                valid_ddx_maxs = ddx_maxs[valid_indices]
+                valid_indices = ~np.isnan(ddx_mins)
+                valid_ddx_mins = ddx_mins[valid_indices]
 
                 # Calculate the mean of valid peak offsets
                 mean_offset = np.nanmean(valid_offsets)
+
+                # Calculate the mean of valid peak to base values
+                mean_incr_rate = np.nanmean(incr_rates)
+                mean_dec_rate = np.nanmean(dec_rates)
+
+                # Calculate the mean of valid rate extrema
+                mean_ddx_max = np.nanmean(valid_ddx_maxs)
+                mean_ddx_min = np.nanmean(valid_ddx_mins)
                 
                 # --- Calculate peak areas relative to local baseline (trough) ---
                 peak_areas = []
@@ -142,6 +186,10 @@ def calc_indv_peak_props_workflow(
                 mean_max = np.nan
                 mean_min = np.nan
                 mean_offset = np.nan
+                mean_incr_rate = np.nan
+                mean_dec_rate = np.nan
+                mean_ddx_max = np.nan
+                mean_ddx_min = np.nan
                 peaks = np.nan
                 proms = np.nan 
                 heights = np.nan
@@ -159,7 +207,11 @@ def calc_indv_peak_props_workflow(
             indv_peak_maxs[channel, bin] = mean_max
             indv_peak_mins[channel, bin] = mean_min
             indv_peak_offsets[channel, bin] = mean_offset
-            indv_peak_areas[channel, bin] = mean_area  
+            indv_peak_areas[channel, bin] = mean_area
+            indv_incr_rates[channel, bin] = mean_incr_rate
+            indv_dec_rates[channel, bin] = mean_dec_rate
+            indv_ddx_maxs[channel, bin] = mean_ddx_max
+            indv_ddx_mins[channel, bin] = mean_ddx_min
 
             # Store the individual peak properties in the dictionary
             indv_peak_props[f'Ch {channel} Bin {bin}'] = {'signal': signal,
@@ -172,12 +224,14 @@ def calc_indv_peak_props_workflow(
                                                                 'peak_offsets': peak_offsets,
                                                                 'left_bases': left_bases,
                                                                 'right_bases': right_bases,
-                                                                'peak_areas': peak_areas
+                                                                'peak_areas': peak_areas,
+                                                                'derivative': signal_ddx_corr,
+                                                                'average_signal': avg_sig
                                                                 }
                         
                         # TODO: rename the keys to be more descriptive
     
-    return indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas
+    return indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas, indv_incr_rates, indv_dec_rates, indv_ddx_maxs, indv_ddx_mins
 
 def calc_indv_peak_props_rolling(signal: np.ndarray, peak_prominence_fraction: float = _DEFAULT_PEAK_PROMINENCE_FRACTION) -> tuple:
     '''
@@ -252,3 +306,29 @@ def calc_indv_peak_props_rolling(signal: np.ndarray, peak_prominence_fraction: f
         mean_area = np.nan
 
     return mean_width, mean_max, mean_min, mean_offset, mean_area
+
+def compute_derivative_props(signal_ddx, peaks, left_troughs, right_troughs):
+    """
+    Compute peak derivative extrema for all peaks.
+
+    Returns:
+        ddx_maxs (np.ndarray): Max d(signal)/dt from left trough to peak
+        ddx_mins (np.ndarray): Min d(signal)/dt from peak to right trough
+    """
+
+    ddx_mins = np.full(peaks.shape, np.nan)
+    ddx_maxs = np.full(peaks.shape, np.nan)
+
+    len_of_peaks = len(peaks)
+
+    for i in range(1, len_of_peaks - 1):
+        left_segment = signal_ddx[int(left_troughs[i]):int(peaks[i])]
+        right_segment = signal_ddx[int(peaks[i]):int(right_troughs[i])]
+        left_segment = left_segment[~np.isnan(left_segment)]
+        right_segment = right_segment[~np.isnan(right_segment)]
+
+        if left_segment.size > 0 and right_segment.size > 0:
+            ddx_maxs[i] = np.max(left_segment)
+            ddx_mins[i] = np.min(right_segment)
+
+    return ddx_maxs, ddx_mins

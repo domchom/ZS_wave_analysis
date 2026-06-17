@@ -575,7 +575,8 @@ class _GUIBase(_TkBase):
                     for k in ("plot_summary_ACFs", "plot_summary_CCFs", "plot_summary_peaks",
                               "plot_indv_ACFs", "plot_indv_CCFs", "plot_indv_peaks",
                               "plot_heatmaps", "plot_landmark_shifts", "plot_indv_landmark_shifts",
-                              "dark_plots")
+                              "plot_fts", "dark_plots")
+                    if k in self._resolved_params
                 }
             errs = self._validate_inputs()
             if errs:
@@ -634,6 +635,7 @@ class BaseGUI(_GUIBase):
             "plot_heatmaps": tk.BooleanVar(value=False),
             "plot_landmark_shifts": tk.BooleanVar(value=False),
             "plot_indv_landmark_shifts": tk.BooleanVar(value=False),
+            "plot_fts": tk.BooleanVar(value=False),
             "dark_plots": tk.BooleanVar(value=True),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
@@ -713,6 +715,7 @@ class BaseGUI(_GUIBase):
         self._add_check(pl, 2, 2, self.vars["plot_indv_peaks"], "Indv peaks")
         self._add_check(pl, 0, 4, self.vars["dark_plots"], "Dark plots")
         self._add_check(pl, 1, 4, self.vars["plot_heatmaps"], "Heatmaps")
+        self._add_check(pl, 2, 4, self.vars["plot_fts"], "Fourier transforms")
         self._add_check(pl, 3, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
         self._add_check(pl, 3, 2, self.vars["plot_indv_landmark_shifts"], "Indv landmark")
 
@@ -783,6 +786,9 @@ class RollingGUI(_GUIBase):
             "Ch3_smoothing": tk.BooleanVar(value=True),
             "Ch4_smoothing": tk.BooleanVar(value=True),
             "CCF_smoothing": tk.BooleanVar(value=True),
+            "injection_frame": tk.IntVar(value=0),
+            "injection_ch1": tk.BooleanVar(value=False),
+            "injection_ch2": tk.BooleanVar(value=False),
         }
         self.kymograph = False
         self._back_to_standard = False
@@ -821,6 +827,13 @@ class RollingGUI(_GUIBase):
         self._add_entry(cn, 1, 0, self.vars["Ch2_name"], "Ch2", width=10)
         self._add_entry(cn, 2, 0, self.vars["Ch3_name"], "Ch3", width=10)
         self._add_entry(cn, 3, 0, self.vars["Ch4_name"], "Ch4", width=10)
+
+        # live-injection options (leave injection frame at 0 to ignore)
+        inj = ttk.LabelFrame(top, text="Live Injection (optional)", padding=4)
+        inj.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        self._add_entry(inj, 0, 0, self.vars["injection_frame"], "Injection frame", width=6)
+        self._add_check(inj, 1, 0, self.vars["injection_ch1"], "Injection signal Ch1")
+        self._add_check(inj, 2, 0, self.vars["injection_ch2"], "Injection signal Ch2")
 
         ttk.Separator(root, orient="horizontal").pack(fill=tk.X, pady=6)
         self._bottom = ttk.Frame(root)

@@ -110,6 +110,7 @@ def _build_log_params(params, analysis_type):
             "Plot Heatmaps": params["plot_flags"]["plot_heatmaps"],
             "Plot Landmark Shifts": params["plot_flags"].get("plot_landmark_shifts", False),
             "Plot Individual Landmark Shifts": params["plot_flags"].get("plot_indv_landmark_shifts", False),
+            "Plot FTs": params["plot_flags"].get("plot_fts", False),
             "Dark Plots": params["plot_flags"]["dark_plots"],
         })
     elif analysis_type == "rolling":
@@ -221,6 +222,9 @@ def _run_analysis(gui):
                 smoothing=params["smoothing"],
                 dark_plots=params["dark_plots"],
                 channel_names=channel_names,
+                injection_ch1=params.get("injection_ch1", False),
+                injection_ch2=params.get("injection_ch2", False),
+                injection_frame=params.get("injection_frame", None),
             )
 
         elif analysis_type == "kymograph":

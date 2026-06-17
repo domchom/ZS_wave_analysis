@@ -97,8 +97,8 @@ def _base_log_params(base_dir, group_names):
         'Smoothing': True,
         'smoothing_params': SMOOTHING_PARAMS,
         'plot_flags': {k: False for k in [
-            'plot_summary_ACFs', 'plot_summary_CCFs', 'plot_summary_peaks',
-            'plot_indv_ACFs', 'plot_indv_CCFs', 'plot_indv_peaks', 'plot_heatmaps', 'dark_plots',
+            'plot_summary_ACFs', 'plot_summary_CCFs', 'plot_summary_peaks', 'plot_indv_ACFs',
+            'plot_indv_CCFs', 'plot_indv_peaks', 'plot_heatmaps', 'plot_fts', 'dark_plots'
         ]},
         'Files Processed': [],
         'Files Not Processed': [],
@@ -179,7 +179,7 @@ def regenerate_standard():
         with open(pkl_dir / f'{group}_indv_ccfs.pkl', 'wb') as f:
             pickle.dump(indv_ccfs, f)
 
-        _, _, _, _, peak_props, _ = calc_indv_peak_props_workflow(
+        _, _, _, _, peak_props, _, _, _, _, _ = calc_indv_peak_props_workflow(
             bin_values_smoothed.astype(np.uint16), img_props_smoothed
         )
         with open(pkl_dir / f'{group}_peak_props.pkl', 'wb') as f:
