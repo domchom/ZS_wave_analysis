@@ -1174,9 +1174,11 @@ class _PlotViewer(tk.Toplevel):
 
         self.scatter_dark_var = tk.BooleanVar(value=self.default_dark_plots)
         ttk.Checkbutton(scatter, variable=self.scatter_dark_var, text="Dark").grid(row=0, column=4, padx=(0, 8))
-        ttk.Button(scatter, text="Compute Plot", command=self._make_group_scatter).grid(row=0, column=5)
+        self.scatter_stats_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(scatter, variable=self.scatter_stats_var, text="Stats/trends").grid(row=0, column=5, padx=(0, 8))
+        ttk.Button(scatter, text="Compute Plot", command=self._make_group_scatter).grid(row=0, column=6)
         self.scatter_status = ttk.Label(scatter, text="", wraplength=900)
-        self.scatter_status.grid(row=1, column=0, columnspan=6, sticky="w", pady=(4, 0))
+        self.scatter_status.grid(row=1, column=0, columnspan=7, sticky="w", pady=(4, 0))
 
         if not self._metric_labels:
             self.scatter_x_combo.configure(state="disabled")
@@ -1351,10 +1353,12 @@ class _PlotViewer(tk.Toplevel):
                 x_param=x_col,
                 y_param=y_col,
                 dark_plots=self.scatter_dark_var.get(),
+                add_stats=self.scatter_stats_var.get(),
             )
             out_dir = os.path.join(self.results_path, "group_scatter_graphs")
             os.makedirs(out_dir, exist_ok=True)
-            output_path = os.path.join(out_dir, hf.sanitize_filename(f"{x_col} vs {y_col}.png"))
+            suffix = " with stats" if self.scatter_stats_var.get() else ""
+            output_path = os.path.join(out_dir, hf.sanitize_filename(f"{x_col} vs {y_col}{suffix}.png"))
             fig.savefig(output_path)
             self.scatter_status.configure(text=f"Saved: {os.path.basename(output_path)}", foreground="green")
             self._show_generated_plot(output_path)

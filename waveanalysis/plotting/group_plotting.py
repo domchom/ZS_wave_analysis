@@ -227,6 +227,7 @@ def generate_group_metric_scatter(
     dark_plots: bool = False,
     channel_names: list = None,
     edge_height_fraction: float = None,
+    add_stats: bool = False,
 ) -> plt.Figure:
     """
     Generate one grouped scatter plot comparing two summary metrics.
@@ -249,12 +250,13 @@ def generate_group_metric_scatter(
     order = list(dict.fromkeys(plot_df['Group Name'].astype(str).tolist()))
     markers = ['o', 's', '^', 'D', 'P', 'X', 'v', '<', '>', '*']
     marker_map = {group: markers[i % len(markers)] for i, group in enumerate(order)}
+    palette = dict(zip(order, sns.color_palette('colorblind', n_colors=len(order))))
 
     x_label = relabel_metric_text(x_param, channel_names, edge_height_fraction)
     y_label = relabel_metric_text(y_param, channel_names, edge_height_fraction)
 
     with style_context(dark_plots):
-        fig, ax = plt.subplots(figsize=(7, 5))
+        fig, ax = plt.subplots(figsize=(6.2, 5) if add_stats else (7, 5))
         apply_dark(fig, ax, dark_plots)
 
         sns.scatterplot(
@@ -266,22 +268,126 @@ def generate_group_metric_scatter(
             hue_order=order,
             style_order=order,
             markers=marker_map,
-            palette='colorblind',
+            palette=palette,
             s=70,
             edgecolor='black' if not dark_plots else 'white',
             linewidth=0.5,
             ax=ax,
         )
 
-        ax.set_title(f'Group scatter: {x_label} vs {y_label}', fontsize=10)
+        ax.set_title(f'Group scatter:\n{x_label} vs {y_label}', fontsize=10)
         ax.set_xlabel(x_label)
         ax.set_ylabel(y_label)
         ax.grid(True, alpha=0.25)
-        ax.legend(title='Group', bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
-        fig.tight_layout()
+
+        stats_text = None
+        if add_stats:
+            stats_text = _add_scatter_fit_stats(
+                ax,
+                plot_df,
+                x_param=x_param,
+                y_param=y_param,
+                group_order=order,
+                palette=palette,
+                dark_plots=dark_plots,
+            )
+
+        legend = ax.legend(title='Group', bbox_to_anchor=(1.02, 1), loc='upper left', borderaxespad=0)
+        legend.set_in_layout(False)
+        if stats_text:
+            fig.subplots_adjust(left=0.14, right=0.75, top=0.84, bottom=0.14)
+            _add_scatter_stats_text(ax, stats_text, dark_plots)
+        else:
+            fig.tight_layout()
         plt.close(fig)
 
     return fig
+
+
+def _add_scatter_fit_stats(
+    ax,
+    plot_df: pd.DataFrame,
+    x_param: str,
+    y_param: str,
+    group_order: list,
+    palette: dict,
+    dark_plots: bool = False,
+) -> str:
+    """
+    Add an overall linear fit and correlation summary to a scatter axis.
+
+    R² comes from ordinary least-squares linear regression. Pearson describes
+    linear association; Spearman describes monotonic association and is less
+    sensitive to non-linear scaling/outliers.
+    """
+    x_values = np.asarray(plot_df[x_param].values, dtype=float)
+    y_values = np.asarray(plot_df[y_param].values, dtype=float)
+    mask = np.isfinite(x_values) & np.isfinite(y_values)
+    x_values = x_values[mask]
+    y_values = y_values[mask]
+    if len(x_values) < 3 or np.std(x_values) == 0 or np.std(y_values) == 0:
+        return f'n={len(x_values)}\nNot enough variation for fit'
+
+    lin = stats.linregress(x_values, y_values)
+    r_squared = lin.rvalue ** 2
+    rho, spearman_p = stats.spearmanr(x_values, y_values)
+
+    x_fit = np.linspace(np.nanmin(x_values), np.nanmax(x_values), 100)
+    fit_color = 'white' if dark_plots else 'black'
+    ax.plot(x_fit, lin.intercept + lin.slope * x_fit, color=fit_color, linewidth=1.7,
+            linestyle='--', alpha=0.85, label='Overall fit')
+
+    group_lines = []
+    for group in group_order:
+        group_df = plot_df.loc[plot_df['Group Name'].astype(str) == str(group)]
+        gx = pd.to_numeric(group_df[x_param], errors='coerce').values
+        gy = pd.to_numeric(group_df[y_param], errors='coerce').values
+        gmask = np.isfinite(gx) & np.isfinite(gy)
+        gx = gx[gmask]
+        gy = gy[gmask]
+        if len(gx) < 3 or np.std(gx) == 0 or np.std(gy) == 0:
+            group_lines.append(f'{group}: R² n/a')
+            continue
+        glin = stats.linregress(gx, gy)
+        gx_fit = np.linspace(np.nanmin(gx), np.nanmax(gx), 100)
+        ax.plot(
+            gx_fit,
+            glin.intercept + glin.slope * gx_fit,
+            color=palette.get(group, fit_color),
+            linewidth=1.3,
+            linestyle=':',
+            alpha=0.9,
+            label=f'{group} fit',
+        )
+        group_lines.append(f'{group}: R²={glin.rvalue ** 2:.2f}')
+
+    text_color = 'lightgray' if dark_plots else 'dimgray'
+    box_face = 'black' if dark_plots else 'white'
+    stat_text = (
+        f'n={len(x_values)}\n'
+        f'Overall R²={r_squared:.2f}\n'
+        f'Pearson r={lin.rvalue:.2f}, p={lin.pvalue:.3g}\n'
+        f'Spearman ρ={rho:.2f}, p={spearman_p:.3g}'
+    )
+    if group_lines:
+        stat_text += '\n' + '\n'.join(group_lines)
+    return stat_text
+
+
+def _add_scatter_stats_text(ax: plt.Axes, stat_text: str, dark_plots: bool = False) -> None:
+    text_color = 'lightgray' if dark_plots else 'dimgray'
+    box_face = 'black' if dark_plots else 'white'
+    ax.text(
+        1.02,
+        0.40,
+        stat_text,
+        transform=ax.transAxes,
+        ha='left',
+        va='top',
+        fontsize=8,
+        color=text_color,
+        bbox=dict(boxstyle='round,pad=0.3', facecolor=box_face, alpha=0.65, edgecolor='none'),
+    )
 
 
 def generate_group_metric_correlations(
