@@ -273,20 +273,28 @@ def combined_workflow(
                     )
                     hf.save_plots(mean_peak_figs, im_save_path)
 
-                # plot spatial metric heatmaps (standard analysis only)
-                if plot_flags["plot_heatmaps"] and analysis_type == 'standard':
-                    heatmap_figs = pt.plot_metric_heatmaps_workflow(
-                        img_metrics=img_metrics,
-                        img_props=img_props,
-                        image_array=image_array,
-                        dark_plots=plot_flags["dark_plots"],
-                    )
+                # plot spatial metric heatmaps
+                if plot_flags["plot_heatmaps"]:
+                    if analysis_type == 'standard':
+                        heatmap_figs = pt.plot_metric_heatmaps_workflow(
+                            img_metrics=img_metrics,
+                            img_props=img_props,
+                            image_array=image_array,
+                            dark_plots=plot_flags["dark_plots"],
+                        )
+                    else:
+                        heatmap_figs = pt.plot_metric_heatmaps_kymo_workflow(
+                            img_metrics=img_metrics,
+                            img_props=img_props,
+                            image_array=image_array,
+                            dark_plots=plot_flags["dark_plots"],
+                        )
                     heatmap_path = os.path.join(im_save_path, 'Metric_Heatmaps')
                     os.makedirs(heatmap_path, exist_ok=True)
                     hf.save_plots(heatmap_figs, heatmap_path)
 
                 # plot Fourier transforms
-                if plot_flags["plot_fts"] and analysis_type == 'standard':
+                if plot_flags.get("plot_fts", False):
                     fft_figs = pt.plot_fft_workflow(
                         bin_values=bin_values,
                         img_props=img_props,

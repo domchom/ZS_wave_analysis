@@ -11,6 +11,7 @@ import waveanalysis.housekeeping.housekeeping_functions as hf
 from waveanalysis.data_workflows._helpers import _setup_workflow, _load_image_props, _smooth_bin_values_inplace
 from waveanalysis.image_props.image_bin_calc import create_multi_frame_bin_array
 from waveanalysis.image_props.image_to_np_arrays import tiff_to_np_array_multi_frame
+from waveanalysis.signal_processing.correlation_functions import _peak_landmarks
 from waveanalysis.summarize_save.summarize_images import summarize_image, combine_stats_rolling
 
 def rolling_workflow(
@@ -31,7 +32,8 @@ def rolling_workflow(
     channel_names: list = None,
     injection_ch1: bool = False,
     injection_ch2: bool = False,
-    injection_frame: int = None
+    injection_frame: int = None,
+    edge_height_fraction: float = 0.5,
 ) -> pd.DataFrame:
     '''
     This is the workflow for rolling analysis. It processes the image files in the specified folder 
@@ -102,6 +104,7 @@ def rolling_workflow(
                 img_props['num_x_bins'] = num_x_bins
                 img_props['num_y_bins'] = num_y_bins
                 img_props['channel_names'] = channel_names
+                img_props['edge_height_fraction'] = edge_height_fraction
 
                 file_stem = file_name.rsplit(".", 1)[0]
 
@@ -180,6 +183,55 @@ def rolling_workflow(
                                         shift = sp.correct_small_shifts(delay_frames=shift, average_period=average_period)
                                     indv_shifts[submovie, combo_number, bin] = shift
 
+                # Per-channel within-peak edge durations (rise/fall halves of each peak)
+                indv_rise_times = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_fall_times = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_rise_fall_times = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                its = num_submovies * num_channels * num_bins
+                with tqdm(total=its, miniters=its/100) as pbar:
+                    pbar.set_description('Edge Times: ')
+                    for submovie in range(num_submovies):
+                        for channel in range(num_channels):
+                            for bin in range(num_bins):
+                                pbar.update(1)
+                                signal = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, channel, bin]
+                                apexes, rises, falls = _peak_landmarks(signal, img_props['peak_prominence_fraction'], edge_height_fraction)
+                                if len(apexes) == 0:
+                                    indv_rise_times[submovie, channel, bin] = np.nan
+                                    indv_fall_times[submovie, channel, bin] = np.nan
+                                    indv_rise_fall_times[submovie, channel, bin] = np.nan
+                                else:
+                                    peak_rise = apexes - rises
+                                    peak_fall = falls - apexes
+                                    indv_rise_times[submovie, channel, bin] = np.nanmean(peak_rise)
+                                    indv_fall_times[submovie, channel, bin] = np.nanmean(peak_fall)
+                                    indv_rise_fall_times[submovie, channel, bin] = np.nanmean(peak_rise - peak_fall)
+
+                # Landmark-based shifts (per channel combo, per submovie)
+                if num_channels > 1:
+                    indv_landmark_peak_shifts = np.zeros(shape=(num_submovies, num_combos, num_bins))
+                    indv_landmark_rise_shifts = np.zeros(shape=(num_submovies, num_combos, num_bins))
+                    indv_landmark_fall_shifts = np.zeros(shape=(num_submovies, num_combos, num_bins))
+                    its = num_submovies * num_combos * num_bins
+                    with tqdm(total=its, miniters=its/100) as pbar:
+                        pbar.set_description('Landmark Shifts: ')
+                        for submovie in range(num_submovies):
+                            for combo_number, combo in enumerate(channel_combos):
+                                for bin in range(num_bins):
+                                    pbar.update(1)
+                                    signal1 = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, combo[0], bin]
+                                    signal2 = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, combo[1], bin]
+                                    combo_period = np.nanmean(indv_periods[submovie, [combo[0], combo[1]], bin])
+                                    peak_shift, rise_shift, fall_shift = sp.calc_indv_landmark_shifts(
+                                        signal1=signal1, signal2=signal2,
+                                        period=combo_period,
+                                        peak_prominence_fraction=img_props['peak_prominence_fraction'],
+                                        edge_height_fraction=edge_height_fraction,
+                                    )
+                                    indv_landmark_peak_shifts[submovie, combo_number, bin] = peak_shift
+                                    indv_landmark_rise_shifts[submovie, combo_number, bin] = rise_shift
+                                    indv_landmark_fall_shifts[submovie, combo_number, bin] = fall_shift
+
                 # create a subfolder within the main save path with the same name as the image file
                 im_save_path = os.path.join(main_save_path, file_stem)
                 os.makedirs(im_save_path, exist_ok=True) if not test else None
@@ -188,6 +240,9 @@ def rolling_workflow(
                 indv_periods = indv_periods * img_props['frame_interval']
                 indv_peak_offsets = indv_peak_offsets * img_props['frame_interval']
                 indv_peak_widths = indv_peak_widths * img_props['frame_interval']
+                indv_rise_times = indv_rise_times * img_props['frame_interval']
+                indv_fall_times = indv_fall_times * img_props['frame_interval']
+                indv_rise_fall_times = indv_rise_fall_times * img_props['frame_interval']
 
                 img_metrics = {
                                 'Period': indv_periods,
@@ -197,7 +252,10 @@ def rolling_workflow(
                                 'Peak Max': indv_peak_maxs,
                                 'Peak Min': indv_peak_mins,
                                 'Peak Offset': indv_peak_offsets,
-                                'Peak Area': indv_peak_areas
+                                'Peak Area': indv_peak_areas,
+                                'Rise Time': indv_rise_times,
+                                'Fall Time': indv_fall_times,
+                                'Rise-Fall Time': indv_rise_fall_times,
                 }
 
                 # add shifts to the dictionary if there are multiple channels
@@ -209,6 +267,16 @@ def rolling_workflow(
                         combo_period = np.nanmean(indv_periods[:, [ch1, ch2], :], axis=1)
                         indv_phase_shifts[:, combo_idx, :] = (indv_shifts[:, combo_idx, :] / combo_period) * 100
                     img_metrics['% Phase Shift'] = indv_phase_shifts
+
+                    # convert landmark shifts to time units and store them
+                    indv_landmark_peak_shifts *= img_props['frame_interval']
+                    indv_landmark_rise_shifts *= img_props['frame_interval']
+                    indv_landmark_fall_shifts *= img_props['frame_interval']
+                    img_metrics['Peak Shift'] = indv_landmark_peak_shifts
+                    img_metrics['Rise Shift'] = indv_landmark_rise_shifts
+                    img_metrics['Fall Shift'] = indv_landmark_fall_shifts
+                    img_metrics['Rise-Peak Diff'] = indv_landmark_rise_shifts - indv_landmark_peak_shifts
+                    img_metrics['Fall-Peak Diff'] = indv_landmark_fall_shifts - indv_landmark_peak_shifts
 
                 # calculate the number of subframes used
                 log_params['Submovies Used'].append(num_submovies)

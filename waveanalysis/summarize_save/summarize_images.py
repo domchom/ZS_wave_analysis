@@ -269,11 +269,20 @@ def combine_stats_rolling(
             pcnt_no_peaks = np.count_nonzero(np.isnan(indv_peak_widths[submovie, channel])) / num_bins * 100
             submovie_summary[f'Ch {channel + 1} Pcnt No Peaks'] = pcnt_no_peaks
             
-            # Calculate statistics for other parameters excluding Shift and Period
+            # Calculate statistics for other parameters excluding combo-based metrics
             for name, measurements in img_metrics.items():
-                if name not in ('Shift', '% Phase Shift'):
+                if name not in _COMBO_METRICS:
                     for stat_name, func in stat_name_and_func.items():
                         submovie_summary[f'Ch {channel + 1} {stat_name} {name}'] = func(measurements[submovie, channel])
+
+        # Calculate statistics for landmark-based shift metrics (per combo)
+        if num_channels > 1:
+            for metric in _LANDMARK_SHIFT_METRICS:
+                if metric not in img_metrics:
+                    continue
+                for combo_number, combo in enumerate(channel_combos):
+                    for stat_name, func in stat_name_and_func.items():
+                        submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat_name} {metric}'] = func(img_metrics[metric][submovie, combo_number])
 
         all_submovie_summary.append(submovie_summary)
     

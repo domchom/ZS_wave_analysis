@@ -786,6 +786,7 @@ class RollingGUI(_GUIBase):
             "Ch3_smoothing": tk.BooleanVar(value=True),
             "Ch4_smoothing": tk.BooleanVar(value=True),
             "CCF_smoothing": tk.BooleanVar(value=True),
+            "edge_height_fraction": tk.DoubleVar(value=0.5),
             "injection_frame": tk.IntVar(value=0),
             "injection_ch1": tk.BooleanVar(value=False),
             "injection_ch2": tk.BooleanVar(value=False),
@@ -827,6 +828,10 @@ class RollingGUI(_GUIBase):
         self._add_entry(cn, 1, 0, self.vars["Ch2_name"], "Ch2", width=10)
         self._add_entry(cn, 2, 0, self.vars["Ch3_name"], "Ch3", width=10)
         self._add_entry(cn, 3, 0, self.vars["Ch4_name"], "Ch4", width=10)
+
+        edge = ttk.LabelFrame(top, text="Landmark Edge Height", padding=4)
+        edge.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        self._build_edge_height_slider(edge)
 
         # live-injection options (leave injection frame at 0 to ignore)
         inj = ttk.LabelFrame(top, text="Live Injection (optional)", padding=4)
@@ -885,6 +890,7 @@ class KymographGUI(_GUIBase):
             "plot_heatmaps": tk.BooleanVar(value=False),
             "plot_landmark_shifts": tk.BooleanVar(value=False),
             "plot_indv_landmark_shifts": tk.BooleanVar(value=False),
+            "plot_fts": tk.BooleanVar(value=False),
             "dark_plots": tk.BooleanVar(value=False),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
@@ -961,6 +967,7 @@ class KymographGUI(_GUIBase):
         self._add_check(pl, 2, 2, self.vars["plot_indv_peaks"], "Indv peaks")
         self._add_check(pl, 0, 4, self.vars["dark_plots"], "Dark plots")
         self._add_check(pl, 1, 4, self.vars["plot_heatmaps"], "Heatmaps")
+        self._add_check(pl, 2, 4, self.vars["plot_fts"], "Fourier transforms")
         self._add_check(pl, 3, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
         self._add_check(pl, 3, 2, self.vars["plot_indv_landmark_shifts"], "Indv landmark")
 
