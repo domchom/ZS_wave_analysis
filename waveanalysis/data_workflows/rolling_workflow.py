@@ -243,6 +243,8 @@ def rolling_workflow(
                 indv_rise_durations = indv_rise_durations * img_props['frame_interval']
                 indv_fall_durations = indv_fall_durations * img_props['frame_interval']
                 indv_rise_minus_fall_durations = indv_rise_minus_fall_durations * img_props['frame_interval']
+                # peak area is integrated over the frame index (AU*frames), so scale to AU*s
+                indv_peak_areas = indv_peak_areas * img_props['frame_interval']
 
                 img_metrics = {
                                 'Period': indv_periods,

@@ -201,6 +201,8 @@ def combined_workflow(
                 indv_rise_durations = indv_edge_times['Rise Duration'] * img_props['frame_interval']
                 indv_fall_durations = indv_edge_times['Fall Duration'] * img_props['frame_interval']
                 indv_rise_minus_fall_durations = indv_edge_times['Rise minus Fall Duration'] * img_props['frame_interval']
+                # peak area is integrated over the frame index (AU*frames), so scale to AU*s
+                indv_peak_areas = indv_peak_areas * img_props['frame_interval']
 
                 # same adjustment, use division since rates are in units/time
                 indv_rising_slopes /= img_props['frame_interval']

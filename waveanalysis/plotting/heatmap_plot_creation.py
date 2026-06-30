@@ -17,7 +17,7 @@ def _channel_metric_labels(edge_height_fraction: float) -> dict:
     'Peak Max':     'Peak maximum intensity (AU)',
     'Peak Min':     'Peak baseline/minimum intensity (AU)',
     'Peak Offset':  'Peak apex offset from midpoint (s)',
-    'Peak Area':    'Peak area above local baseline (AU)',
+    'Peak Area':    'Peak area above local baseline (AU·s)',
         'Rise Duration':    f'Rise duration, {pct} to apex (s)',
         'Fall Duration':    f'Fall duration, apex to {pct} (s)',
         'Rise minus Fall Duration': 'Rise duration minus fall duration (s)',
