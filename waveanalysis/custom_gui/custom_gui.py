@@ -70,7 +70,6 @@ _RETRO_LIGHT = {
     "header_shadow": "#b9b5ad",
     "header_sub": "#6a6a6a",
     "header_pin": "#a8a49c",
-    "shimmer": "#f8f6f1",
 }
 
 _RETRO_DARK = {
@@ -92,7 +91,6 @@ _RETRO_DARK = {
     "header_shadow": "#262522",
     "header_sub": "#9a978d",
     "header_pin": "#5a5852",
-    "shimmer": "#8c887e",
 }
 
 # Active palette, mutated in place so every runtime _RETRO[...] lookup follows
@@ -526,8 +524,6 @@ class _GUIBase(_TkBase):
         canvas.bind("<Configure>", lambda _e, c=canvas: self._draw_header(c))
         self.after(60, lambda c=canvas: self._draw_header(c))
         self._header_canvas = canvas
-        self._pin_region = None
-        self._start_shimmer()
         return canvas
 
     def _draw_header(self, canvas):
@@ -570,10 +566,6 @@ class _GUIBase(_TkBase):
             for i in range(6):
                 yy = cy - 16 + i * 6
                 canvas.create_line(ps_x0, yy, ps_x1, yy, fill=_RETRO["header_pin"])
-            # Region the idle shimmer sweeps across.
-            self._pin_region = (ps_x0, ps_x1, cy - 18, cy + 18)
-        else:
-            self._pin_region = None
 
         # Beveled divider under the banner.
         canvas.create_line(0, h - 2, w, h - 2, fill=_RETRO["dark"])
@@ -861,36 +853,6 @@ class _GUIBase(_TkBase):
         except Exception:
             return
         self.after(110, self._run_anim_tick)
-
-    def _start_shimmer(self):
-        """Drive the idle light-sweep across the header pinstripes."""
-        self._shimmer_phase = 0
-        self.after(500, self._shimmer_tick)
-
-    def _shimmer_tick(self):
-        try:
-            if not self.winfo_exists():
-                return
-        except tk.TclError:
-            return
-        canvas = getattr(self, "_header_canvas", None)
-        if canvas is not None:
-            try:
-                canvas.delete("shimmer")
-                pin = getattr(self, "_pin_region", None)
-                self._shimmer_phase = (self._shimmer_phase + 1) % 150
-                sweep_steps = 22
-                if pin and not getattr(self, "_is_running", False) and self._shimmer_phase < sweep_steps:
-                    x0, x1, y0, y1 = pin
-                    frac = self._shimmer_phase / sweep_steps
-                    sx = x0 - 12 + (x1 - x0 + 24) * frac
-                    glint = _RETRO["shimmer"]
-                    for off in (-3, 0, 3):
-                        canvas.create_line(sx + off, y0, sx + off, y1,
-                                           fill=glint, tags="shimmer")
-            except tk.TclError:
-                pass
-        self.after(55, self._shimmer_tick)
 
     # ---- settings persistence ----
 
