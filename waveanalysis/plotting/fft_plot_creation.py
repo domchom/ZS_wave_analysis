@@ -1,6 +1,7 @@
 import numpy as np
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from typing import Optional
 from waveanalysis.plotting.style import apply_dark
 
 def plot_fft_workflow(
@@ -8,6 +9,7 @@ def plot_fft_workflow(
     img_props: dict,
     indv_peak_props: dict,
     num_frames: int,
+    indv_periods: np.ndarray = None,
     dark_plots: bool = False
 ) -> dict:
     """
@@ -18,6 +20,7 @@ def plot_fft_workflow(
         img_prop_dict (dict): Dictionary containing image properties.
         indv_peak_props (dict): Dictionary containing individual peak properties.
         num_frames (int): Number of frames.
+        indv_periods (np.ndarray): ACF-detected periods in seconds.
 
     Returns:
         dict: Dictionary containing the generated FFT plots.
@@ -41,6 +44,7 @@ def plot_fft_workflow(
 
                 # Extract the bin values for the current channel and bin
                 to_plot = bin_values[:, channel, bin] if analysis_type == 'standard' else bin_values[channel, bin]
+                acf_period = indv_periods[channel, bin] if indv_periods is not None else np.nan
 
                 # Generate and store the figure for the current channel and bin
                 fft_figs[f'Ch{channel + 1} Bin {bin + 1} FFT Plot'] = return_fft_figure(
@@ -49,6 +53,7 @@ def plot_fft_workflow(
                     Ch_name=f'Ch{channel + 1} Bin {bin + 1}',
                     frame_interval=frame_interval,
                     num_frames=num_frames,
+                    acf_period=acf_period,
                     dark_plots=dark_plots
                 )
 
@@ -60,6 +65,7 @@ def return_fft_figure(
     Ch_name: str,
     frame_interval: float,
     num_frames: int,
+    acf_period: float = np.nan,
     dark_plots: bool = False
 ) -> plt.Figure:
     '''
@@ -99,6 +105,9 @@ def return_fft_figure(
         peak_period = np.nan
         peak_power = np.nan
 
+    top_peak_idxs = _top_fft_peak_indices(fft_power, n_peaks=3)
+    acf_guided_idx = _acf_guided_fft_peak_index(periods, fft_power, acf_period)
+
     # Create the figure. This plot uses explicit colors (not the dark_background
     # style), so set the black backgrounds via apply_dark and pick white-on-black
     # vs black-on-white for the line/text.
@@ -108,26 +117,38 @@ def return_fft_figure(
     text_color = 'white' if dark_plots else 'black'
     line_color = text_color
     peak_color = text_color
+    acf_color = '#4cc9f0' if dark_plots else '#006d77'
+    guided_color = '#ffb703' if dark_plots else '#d97706'
 
     ax.plot(periods, fft_power, color=line_color)
 
-    # Plot dominant peak. Guard on both values being finite: a bin whose signal
+    # Plot top FFT peaks. Guard on finite values: a bin whose signal
     # contains NaNs produces NaN power, and a NaN/Inf y-limit raises.
     if np.isfinite(peak_period) and np.isfinite(peak_power):
-        ax.scatter(peak_period, peak_power, color=peak_color, zorder=3)
+        for rank, idx in enumerate(top_peak_idxs, start=1):
+            ax.scatter(periods[idx], fft_power[idx], color=peak_color, zorder=3)
+            ax.annotate(
+                f'#{rank}: {periods[idx]:.1f}s',
+                xy=(periods[idx], fft_power[idx]),
+                xytext=(0, 6 + (rank - 1) * 10),
+                textcoords='offset points',
+                ha='center',
+                va='bottom',
+                color=text_color,
+                fontsize=8,
+            )
         # Add headroom above the tallest point so the label sits inside the
         # axes instead of colliding with the title.
         if peak_power > 0:
-            ax.set_ylim(top=peak_power * 1.18)
-        ax.annotate(
-            f'{peak_period:.1f} s',
-            xy=(peak_period, peak_power),
-            xytext=(0, 6),
-            textcoords='offset points',
-            ha='center',
-            va='bottom',
-            color=text_color
-        )
+            ax.set_ylim(top=peak_power * 1.30)
+
+    if np.isfinite(acf_period) and acf_period > 0:
+        ax.axvline(acf_period, color=acf_color, linestyle=':', linewidth=1.5, label=f'ACF period {acf_period:.1f}s')
+        if acf_guided_idx is not None:
+            guided_period = periods[acf_guided_idx]
+            guided_power = fft_power[acf_guided_idx]
+            ax.scatter(guided_period, guided_power, color=guided_color, marker='D', zorder=4,
+                       label=f'FFT near ACF {guided_period:.1f}s')
 
     ax.set_xlim(0, 300)
 
@@ -141,6 +162,33 @@ def return_fft_figure(
     for spine in ax.spines.values():
         spine.set_color(text_color)
 
+    if np.isfinite(acf_period) and acf_period > 0:
+        ax.legend(loc='upper right', fontsize=8)
+
     plt.close(fig)
 
     return fig
+
+
+def _top_fft_peak_indices(fft_power: np.ndarray, n_peaks: int = 3) -> list:
+    finite_idxs = np.where(np.isfinite(fft_power))[0]
+    if finite_idxs.size == 0:
+        return []
+    ranked = finite_idxs[np.argsort(fft_power[finite_idxs])[::-1]]
+    return ranked[:n_peaks].tolist()
+
+
+def _acf_guided_fft_peak_index(
+    periods: np.ndarray,
+    fft_power: np.ndarray,
+    acf_period: float,
+    tolerance_fraction: float = 0.25,
+) -> Optional[int]:
+    if not np.isfinite(acf_period) or acf_period <= 0:
+        return None
+    finite = np.isfinite(periods) & np.isfinite(fft_power)
+    near_acf = finite & (periods >= acf_period * (1 - tolerance_fraction)) & (periods <= acf_period * (1 + tolerance_fraction))
+    if not near_acf.any():
+        return None
+    candidate_idxs = np.where(near_acf)[0]
+    return candidate_idxs[np.argmax(fft_power[candidate_idxs])]
