@@ -244,7 +244,12 @@ class _SegmentedProgress(tk.Canvas):
         self._marching = False
         self._phase = 0
         self._anim_id = None
+        self._interval = 180  # ms per step; slow while idle, faster during runs
         self.bind("<Configure>", lambda _e: self._redraw())
+
+    def set_speed(self, fast):
+        """Faster sweep while analysis runs, slower gentle drift while idle."""
+        self._interval = 90 if fast else 180
 
     def configure(self, cnf=None, **kw):
         if "maximum" in kw:
@@ -282,7 +287,7 @@ class _SegmentedProgress(tk.Canvas):
                 return
             self._phase += 1
             self._redraw()
-            self._anim_id = self.after(90, self._step)
+            self._anim_id = self.after(self._interval, self._step)
         except tk.TclError:
             self._marching = False
 
@@ -779,6 +784,7 @@ class _GUIBase(_TkBase):
         self._flavor_idx = 0
         self._flavor_ctr = 0
         try:
+            self.progress_bar.set_speed(True)
             self.progress_bar.start()
         except Exception:
             pass
@@ -796,6 +802,7 @@ class _GUIBase(_TkBase):
             try:
                 self.flavor_label.configure(text="")
                 self.subprogress_label.configure(text="")
+                self.progress_bar.set_speed(False)  # back to gentle idle drift
             except Exception:
                 pass
             return
