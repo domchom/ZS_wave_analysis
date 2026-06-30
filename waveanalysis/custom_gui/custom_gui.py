@@ -228,6 +228,46 @@ def _apply_retro_theme(root, palette="light"):
               background=[("selected", p["field"]), ("active", p["active"])])
 
 
+def _add_popup_header(toplevel, gui, title, subtitle=None, height=56):
+    """Compact header banner (rainbow logo + serif wordmark + beveled divider)
+    matching the main window, for Toplevel popups. *gui* supplies the cached
+    logo image and font helpers."""
+    canvas = tk.Canvas(toplevel, height=height, highlightthickness=0,
+                       bg=_RETRO["bg"], bd=0)
+    canvas.pack(fill=tk.X)
+
+    def _draw(_e=None):
+        try:
+            if not canvas.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        w = canvas.winfo_width()
+        h = canvas.winfo_height()
+        if w < 10:
+            return
+        canvas.delete("all")
+        size = max(h - 16, 18)
+        logo_right = gui._draw_logo(canvas, 9, 8, size)
+        fam = gui._header_font_family()
+        tx = logo_right + 14
+        cy = h // 2
+        tf = tkfont.Font(family=fam, size=19, weight="bold")
+        canvas.create_text(tx + 1, cy - 7, text=title, anchor="w",
+                           font=tf, fill=_RETRO["header_shadow"])
+        canvas.create_text(tx, cy - 8, text=title, anchor="w",
+                           font=tf, fill=_RETRO["header_title"])
+        if subtitle:
+            canvas.create_text(tx + 2, cy + 13, text="  ".join(subtitle.upper()),
+                               anchor="w", font=(fam, 8), fill=_RETRO["header_sub"])
+        canvas.create_line(0, h - 2, w, h - 2, fill=_RETRO["dark"])
+        canvas.create_line(0, h - 1, w, h - 1, fill=_RETRO["light"])
+
+    canvas.bind("<Configure>", _draw)
+    toplevel.after(40, _draw)
+    return canvas
+
+
 class _SegmentedProgress(tk.Canvas):
     """Classic segmented progress bar: discrete blue blocks marching across a
     sunken gray trough. Drop-in for the bits of ttk.Progressbar we use --
@@ -440,8 +480,11 @@ class _GUIBase(_TkBase):
                 bg = Image.new("RGBA", (ss, ss), self._bg_rgb() + (255,))
                 composed = (Image.composite(disc, bg, outer_mask)
                             .resize((size, size), Image.LANCZOS).convert("RGB"))
-                self._logo_photo = ImageTk.PhotoImage(composed)
-                canvas.create_image(x, y, anchor="nw", image=self._logo_photo)
+                # Keep the PhotoImage alive on the canvas itself, so reusing this
+                # for multiple windows (header + popups) doesn't clobber a shared
+                # reference and let an image get garbage-collected.
+                canvas._wa_logo_photo = ImageTk.PhotoImage(composed)
+                canvas.create_image(x, y, anchor="nw", image=canvas._wa_logo_photo)
                 return x + size
             except Exception:
                 pass
@@ -2061,6 +2104,8 @@ class _PlotViewer(tk.Toplevel):
         self.current_index = 0
         self._photo = None
 
+        _add_popup_header(self, parent, "Plot Viewer", "Results")
+
         pane = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
         pane.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
@@ -2426,6 +2471,8 @@ class _SummaryViewer(tk.Toplevel):
         self._sort_col = None
         self._sort_rev = False
 
+        _add_popup_header(self, parent, "Summary Table", "Results")
+
         csv_files = glob.glob(os.path.join(results_path, "!*_summary.csv"))
         if not csv_files:
             ttk.Label(self, text="No summary CSV found.").pack(padx=20, pady=20)
@@ -2678,10 +2725,9 @@ class _InfoPanel(tk.Toplevel):
         self.geometry("840x640")
         self.transient(parent)
 
-        ttk.Label(self, text="Wave Analysis — Info & Glossary",
-                  font=("TkDefaultFont", 13, "bold")).pack(anchor="w", padx=12, pady=(10, 0))
+        _add_popup_header(self, parent, "Info & Glossary", "Reference")
         ttk.Label(self, text="What each control, plot, and metric means.",
-                  foreground=_RETRO["header_sub"]).pack(anchor="w", padx=12, pady=(0, 6))
+                  foreground=_RETRO["header_sub"]).pack(anchor="w", padx=12, pady=(6, 6))
 
         nb = ttk.Notebook(self)
         nb.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 6))
