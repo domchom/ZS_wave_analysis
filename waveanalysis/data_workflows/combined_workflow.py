@@ -283,7 +283,8 @@ def combined_workflow(
                     )
                     hf.save_plots(mean_slope_figs, im_save_path)
 
-                    # plot the per-bin cross-metric correlation heatmaps
+                # plot the per-bin cross-metric correlation heatmaps
+                if plot_flags.get("plot_metric_correlations", plot_flags.get("plot_summary_peaks", False)):
                     corr_figs = pt.plot_metric_correlation_workflow(
                         img_metrics=img_metrics,
                         img_props=img_props,

@@ -738,6 +738,7 @@ class _GUIBase(_TkBase):
                 self._resolved_params["plot_flags"] = {
                     k: self._resolved_params[k]
                     for k in ("plot_summary_ACFs", "plot_summary_CCFs", "plot_summary_peaks",
+                              "plot_metric_correlations",
                               "plot_indv_ACFs", "plot_indv_CCFs", "plot_indv_peaks",
                               "plot_heatmaps", "plot_landmark_shifts", "plot_indv_landmark_shifts",
                               "plot_fts", "dark_plots")
@@ -794,6 +795,7 @@ class BaseGUI(_GUIBase):
             "plot_summary_ACFs": tk.BooleanVar(value=True),
             "plot_summary_CCFs": tk.BooleanVar(value=True),
             "plot_summary_peaks": tk.BooleanVar(value=True),
+            "plot_metric_correlations": tk.BooleanVar(value=True),
             "plot_indv_ACFs": tk.BooleanVar(value=False),
             "plot_indv_CCFs": tk.BooleanVar(value=False),
             "plot_indv_peaks": tk.BooleanVar(value=False),
@@ -875,13 +877,14 @@ class BaseGUI(_GUIBase):
         self._add_check(pl, 0, 0, self.vars["plot_summary_ACFs"], "Summary ACFs")
         self._add_check(pl, 1, 0, self.vars["plot_summary_CCFs"], "Summary CCFs")
         self._add_check(pl, 2, 0, self.vars["plot_summary_peaks"], "Summary peaks")
+        self._add_check(pl, 3, 0, self.vars["plot_metric_correlations"], "Metric correlations")
         self._add_check(pl, 0, 2, self.vars["plot_indv_ACFs"], "Indv ACFs")
         self._add_check(pl, 1, 2, self.vars["plot_indv_CCFs"], "Indv CCFs")
         self._add_check(pl, 2, 2, self.vars["plot_indv_peaks"], "Indv peaks")
         self._add_check(pl, 0, 4, self.vars["dark_plots"], "Dark plots")
         self._add_check(pl, 1, 4, self.vars["plot_heatmaps"], "Heatmaps")
         self._add_check(pl, 2, 4, self.vars["plot_fts"], "Fourier transforms")
-        self._add_check(pl, 3, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
+        self._add_check(pl, 4, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
         self._add_check(pl, 3, 2, self.vars["plot_indv_landmark_shifts"], "Indv landmark")
 
         # ---- separator ----
@@ -1049,6 +1052,7 @@ class KymographGUI(_GUIBase):
             "plot_summary_ACFs": tk.BooleanVar(value=True),
             "plot_summary_CCFs": tk.BooleanVar(value=True),
             "plot_summary_peaks": tk.BooleanVar(value=True),
+            "plot_metric_correlations": tk.BooleanVar(value=True),
             "plot_indv_ACFs": tk.BooleanVar(value=False),
             "plot_indv_CCFs": tk.BooleanVar(value=False),
             "plot_indv_peaks": tk.BooleanVar(value=False),
@@ -1127,13 +1131,14 @@ class KymographGUI(_GUIBase):
         self._add_check(pl, 0, 0, self.vars["plot_summary_ACFs"], "Summary ACFs")
         self._add_check(pl, 1, 0, self.vars["plot_summary_CCFs"], "Summary CCFs")
         self._add_check(pl, 2, 0, self.vars["plot_summary_peaks"], "Summary peaks")
+        self._add_check(pl, 3, 0, self.vars["plot_metric_correlations"], "Metric correlations")
         self._add_check(pl, 0, 2, self.vars["plot_indv_ACFs"], "Indv ACFs")
         self._add_check(pl, 1, 2, self.vars["plot_indv_CCFs"], "Indv CCFs")
         self._add_check(pl, 2, 2, self.vars["plot_indv_peaks"], "Indv peaks")
         self._add_check(pl, 0, 4, self.vars["dark_plots"], "Dark plots")
         self._add_check(pl, 1, 4, self.vars["plot_heatmaps"], "Heatmaps")
         self._add_check(pl, 2, 4, self.vars["plot_fts"], "Fourier transforms")
-        self._add_check(pl, 3, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
+        self._add_check(pl, 4, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
         self._add_check(pl, 3, 2, self.vars["plot_indv_landmark_shifts"], "Indv landmark")
 
         ttk.Separator(root, orient="horizontal").pack(fill=tk.X, pady=6)
