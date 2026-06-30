@@ -49,8 +49,9 @@ def _save_config(data):
 # Retro theme
 # ---------------------------------------------------------------------------
 
-# Classic beveled light-gray palette (Win2k / Motif look) shared by every window.
-_RETRO = {
+# Classic beveled palette (Win2k / Motif look). Two variants share every key so
+# the GUI can flip between a warm light gray and a dark gray at runtime.
+_RETRO_LIGHT = {
     "bg": "#d4d0c8",       # warm panel gray
     "field": "#ffffff",    # entry / list / text field background
     "text": "#1a1a1a",
@@ -61,14 +62,55 @@ _RETRO = {
     "select": "#4a6b8a",   # muted steel-blue selection
     "active": "#e3e0d9",   # hovered button face
     "pressed": "#bdb9b1",  # pressed button face
+    "log_bg": "#f3eede",   # parchment log field
+    "log_fg": "#2a2a2a",
+    "error": "#b00000",
+    "accent_text": "#3f6088",
+    "header_title": "#2a2a2a",
+    "header_shadow": "#b9b5ad",
+    "header_sub": "#6a6a6a",
+    "header_pin": "#a8a49c",
+    "shimmer": "#f8f6f1",
 }
 
+_RETRO_DARK = {
+    "bg": "#3a3936",       # dark warm gray panel
+    "field": "#262521",    # sunken dark field
+    "text": "#e6e3da",
+    "disabled": "#7d7a72",
+    "light": "#56544e",    # top-left bevel highlight (lighter than bg)
+    "dark": "#1c1b19",     # bottom-right bevel shadow (darker than bg)
+    "trough": "#2a2926",
+    "select": "#5a82ab",
+    "active": "#4a4843",
+    "pressed": "#2c2b28",
+    "log_bg": "#22211d",   # near-black warm terminal
+    "log_fg": "#d8d4c6",
+    "error": "#ff7a7a",
+    "accent_text": "#9bbbe0",
+    "header_title": "#ececdf",
+    "header_shadow": "#262522",
+    "header_sub": "#9a978d",
+    "header_pin": "#5a5852",
+    "shimmer": "#8c887e",
+}
 
-def _apply_retro_theme(root):
+# Active palette, mutated in place so every runtime _RETRO[...] lookup follows
+# the current choice. Start light; _set_palette / saved config can switch it.
+_RETRO = dict(_RETRO_LIGHT)
+
+
+def _set_palette(name):
+    _RETRO.clear()
+    _RETRO.update(_RETRO_DARK if name == "dark" else _RETRO_LIGHT)
+
+
+def _apply_retro_theme(root, palette="light"):
     """Give *root* -- and every child/Toplevel sharing its interpreter -- the
     classic beveled light-gray look: grooved panels, raised buttons, white
     sunken fields, steel-blue selection. Call once per Tk interpreter; failures
     are swallowed so a missing theme never blocks the GUI."""
+    _set_palette(palette)
     p = _RETRO
     try:
         style = ttk.Style(root)
@@ -129,8 +171,9 @@ def _apply_retro_theme(root):
               foreground=[("disabled", p["disabled"])],
               relief=[("pressed", "sunken")])
     # Primary action button: bold, with a pale-blue raised face so it reads as
-    # the default action while staying an obviously filled, beveled button.
-    style.configure("Retro.Accent.TButton", font=bold_font, foreground=p["text"],
+    # the default action while staying an obviously filled, beveled button. Its
+    # text stays dark in both themes for contrast on the light-blue face.
+    style.configure("Retro.Accent.TButton", font=bold_font, foreground="#15233a",
                     relief="raised", borderwidth=2, padding=(10, 4),
                     background="#8fb3dc", bordercolor="#2f4f73",
                     lightcolor="#bcd3ed", darkcolor="#5b7da6")
@@ -164,9 +207,6 @@ def _apply_retro_theme(root):
     style.map("TRadiobutton", background=[("active", p["bg"])])
 
     style.configure("TScale", background=p["bg"], troughcolor=p["trough"])
-    style.configure("Horizontal.TProgressbar", background=p["select"],
-                    troughcolor=p["trough"], bordercolor=p["dark"],
-                    lightcolor=p["select"], darkcolor=p["select"])
 
     style.configure("Treeview", background=p["field"], fieldbackground=p["field"],
                     foreground=p["text"], bordercolor=p["dark"])
@@ -181,17 +221,29 @@ def _apply_retro_theme(root):
                         bordercolor=p["dark"], arrowcolor=p["text"],
                         lightcolor=p["light"], darkcolor=p["dark"])
 
+    style.configure("TNotebook", background=p["bg"], bordercolor=p["dark"])
+    style.configure("TNotebook.Tab", background=p["bg"], foreground=p["text"],
+                    padding=(12, 5), bordercolor=p["dark"], font=bold_font)
+    style.map("TNotebook.Tab",
+              background=[("selected", p["field"]), ("active", p["active"])])
+
 
 class _SegmentedProgress(tk.Canvas):
     """Classic segmented progress bar: discrete blue blocks marching across a
     sunken gray trough. Drop-in for the bits of ttk.Progressbar we use --
     ``configure(maximum=..., value=...)``."""
 
+    # Lighter blue shades for the trailing "comet" of the marching sweep.
+    _COMET = ("#6f97c6", "#8fb3dc", "#a9c6e6", "#c4d8ef")
+
     def __init__(self, parent, **kw):
         super().__init__(parent, height=16, highlightthickness=0,
                          bg=_RETRO["trough"], bd=2, relief="sunken", **kw)
         self._max = 100.0
         self._val = 0.0
+        self._marching = False
+        self._phase = 0
+        self._anim_id = None
         self.bind("<Configure>", lambda _e: self._redraw())
 
     def configure(self, cnf=None, **kw):
@@ -205,22 +257,70 @@ class _SegmentedProgress(tk.Canvas):
 
     config = configure
 
+    def start(self):
+        """Begin the indeterminate marching sweep through the unfilled trough."""
+        if self._marching:
+            return
+        self._marching = True
+        self._step()
+
+    def stop(self):
+        self._marching = False
+        if self._anim_id is not None:
+            try:
+                self.after_cancel(self._anim_id)
+            except Exception:
+                pass
+            self._anim_id = None
+        self._redraw()
+
+    def _step(self):
+        if not self._marching:
+            return
+        try:
+            if not self.winfo_exists():
+                return
+            self._phase += 1
+            self._redraw()
+            self._anim_id = self.after(90, self._step)
+        except tk.TclError:
+            self._marching = False
+
     def _redraw(self):
+        try:
+            if not self.winfo_exists():
+                return
+        except tk.TclError:
+            return
         self.delete("all")
         w = self.winfo_width()
         h = self.winfo_height()
         if w <= 2:
             return
         pad = 2
+        seg, gap = 11, 3
+        period = seg + gap
         frac = min(self._val / self._max, 1.0) if self._max else 0.0
         filled = (w - 2 * pad) * frac
-        seg, gap = 11, 3
+
+        # Marching comet first (drawn under the solid fill, so it only shows in
+        # the empty trough and reads as "still working").
+        if self._marching:
+            n = max(int((w - 2 * pad) // period), 1)
+            head = self._phase % (n + len(self._COMET))
+            for k, shade in enumerate(self._COMET):
+                idx = head - k
+                if 0 <= idx < n:
+                    sx = pad + idx * period
+                    self.create_rectangle(sx, pad, min(sx + seg, w - pad), h - pad,
+                                          fill=shade, outline=shade)
+
         x = pad
         while x - pad < filled:
             x1 = min(x + seg, pad + filled)
             self.create_rectangle(x, pad, x1, h - pad,
                                   fill=_RETRO["select"], outline=_RETRO["select"])
-            x += seg + gap
+            x += period
 
 
 # ---------------------------------------------------------------------------
@@ -241,7 +341,10 @@ class _GUIBase(_TkBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        _apply_retro_theme(self)
+        self._theme = _load_config().get("theme", "light")
+        if self._theme not in ("light", "dark"):
+            self._theme = "light"
+        _apply_retro_theme(self, self._theme)
 
     # ---- 80s Apple header banner ----
 
@@ -373,6 +476,9 @@ class _GUIBase(_TkBase):
         canvas.pack(fill=tk.X, pady=(0, 6))
         canvas.bind("<Configure>", lambda _e, c=canvas: self._draw_header(c))
         self.after(60, lambda c=canvas: self._draw_header(c))
+        self._header_canvas = canvas
+        self._pin_region = None
+        self._start_shimmer()
         return canvas
 
     def _draw_header(self, canvas):
@@ -398,15 +504,15 @@ class _GUIBase(_TkBase):
         title_font = tkfont.Font(family=fam, size=27, weight="bold")
         # Soft drop shadow, then the wordmark.
         canvas.create_text(title_x + 1, cy - 9, text="Wave Analysis", anchor="w",
-                           font=title_font, fill="#b9b5ad")
+                           font=title_font, fill=_RETRO["header_shadow"])
         canvas.create_text(title_x, cy - 10, text="Wave Analysis", anchor="w",
-                           font=title_font, fill="#2a2a2a")
+                           font=title_font, fill=_RETRO["header_title"])
 
         sub = getattr(self, "_header_subtitle", None)
         if sub:
             spaced = "  ".join(sub.upper())
             canvas.create_text(title_x + 2, cy + 16, text=spaced, anchor="w",
-                               font=(fam, 9), fill="#6a6a6a")
+                               font=(fam, 9), fill=_RETRO["header_sub"])
 
         # Classic Mac title-bar pinstripes filling the empty space on the right.
         ps_x0 = title_x + title_font.measure("Wave Analysis") + 28
@@ -414,7 +520,11 @@ class _GUIBase(_TkBase):
         if ps_x1 - ps_x0 > 50:
             for i in range(6):
                 yy = cy - 16 + i * 6
-                canvas.create_line(ps_x0, yy, ps_x1, yy, fill="#a8a49c")
+                canvas.create_line(ps_x0, yy, ps_x1, yy, fill=_RETRO["header_pin"])
+            # Region the idle shimmer sweeps across.
+            self._pin_region = (ps_x0, ps_x1, cy - 18, cy + 18)
+        else:
+            self._pin_region = None
 
         # Beveled divider under the banner.
         canvas.create_line(0, h - 2, w, h - 2, fill=_RETRO["dark"])
@@ -532,18 +642,28 @@ class _GUIBase(_TkBase):
         self.stop_button = ttk.Button(btn, text="Stop", command=self.stop_analysis, state="disabled")
         self.stop_button.pack(side=tk.LEFT, padx=4)
         ttk.Button(btn, text="Load Results", command=self._load_existing_results).pack(side=tk.LEFT, padx=4)
+        ttk.Button(btn, text="Info", command=self._open_info).pack(side=tk.LEFT, padx=(0, 4))
+        self.theme_button = ttk.Button(
+            btn, text=("Light Mode" if self._theme == "dark" else "Dark Mode"),
+            command=self._toggle_theme, width=10)
+        self.theme_button.pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(btn, text="Close Window", command=self.cancel_analysis).pack(side=tk.LEFT)
         self.elapsed_label = ttk.Label(btn, text="")
         self.elapsed_label.pack(side=tk.RIGHT)
         self._build_extra_buttons(btn)  # subclass hook
 
-        # status + progress (status sits in a sunken inset strip)
+        # status + progress (status sits in a sunken inset strip, with a playful
+        # ticker on the right that animates while analysis runs)
         status_box = tk.Frame(parent, bg=_RETRO["bg"], relief="sunken", bd=1)
         status_box.pack(fill=tk.X)
+        self._status_box = status_box
+        self.flavor_label = ttk.Label(status_box, text="", foreground=_RETRO["accent_text"],
+                                      font=("TkDefaultFont", 10, "bold"))
+        self.flavor_label.pack(side=tk.RIGHT, padx=(4, 6), pady=1)
         self.status_label = ttk.Label(status_box, text="Status: Ready",
                                       font=("TkDefaultFont", 10, "bold"),
                                       anchor="w", justify="left")
-        self.status_label.pack(fill=tk.X, padx=3, pady=1)
+        self.status_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=3, pady=1)
 
         # Wrap long status text (e.g. full filenames) to the available width
         # instead of clipping it. Guard against the relayout re-triggering us.
@@ -558,17 +678,21 @@ class _GUIBase(_TkBase):
         prog.pack(fill=tk.X, pady=(2, 4))
         self.progress_bar = _SegmentedProgress(prog)
         self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.progress_file_label = ttk.Label(prog, text="", width=12, anchor="e")
+        self.subprogress_label = ttk.Label(prog, text="", width=24, anchor="e",
+                                           foreground=_RETRO["accent_text"])
+        self.subprogress_label.pack(side=tk.LEFT, padx=(6, 0))
+        self.progress_file_label = ttk.Label(prog, text="", width=10, anchor="e")
         self.progress_file_label.pack(side=tk.LEFT, padx=(6, 0))
+        self.progress_bar.start()  # gentle marching even while idle
 
         # log
         self.log_text = scrolledtext.ScrolledText(parent, height=10, state="disabled", wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True, pady=(2, 0))
-        self.log_text.tag_configure("error", foreground="#b00000")
-        # Classic terminal feel: parchment field, sunken bevel.
-        self.log_text.configure(background="#f3eede", foreground="#2a2a2a",
+        self.log_text.tag_configure("error", foreground=_RETRO["error"])
+        # Classic terminal feel: parchment (or dark) field, sunken bevel.
+        self.log_text.configure(background=_RETRO["log_bg"], foreground=_RETRO["log_fg"],
                                 relief="sunken", borderwidth=2, highlightthickness=0,
-                                insertbackground="#2a2a2a")
+                                insertbackground=_RETRO["log_fg"])
         mono = getattr(self, "_retro_mono_family", None)
         if mono:
             self.log_text.configure(font=(mono, 11))
@@ -592,6 +716,130 @@ class _GUIBase(_TkBase):
     def _build_extra_buttons(self, parent):
         """Override in subclasses to add extra buttons to the button row."""
         pass
+
+    def _open_info(self):
+        _InfoPanel(self)
+
+    # ---- light / dark theme toggle ----
+
+    def _toggle_theme(self):
+        self._theme = "dark" if getattr(self, "_theme", "light") == "light" else "light"
+        _save_config({"theme": self._theme})
+        _apply_retro_theme(self, self._theme)       # restyles every ttk widget + root bg
+        self._refresh_palette_widgets()             # update the explicitly-colored bits
+        try:
+            self.theme_button.configure(
+                text=("Light Mode" if self._theme == "dark" else "Dark Mode"))
+        except Exception:
+            pass
+
+    def _refresh_palette_widgets(self):
+        """Re-apply palette colors to widgets that set explicit (non-ttk) colors,
+        since the ttk restyle alone doesn't touch them."""
+        p = _RETRO
+        try:
+            self.configure(bg=p["bg"])
+        except tk.TclError:
+            return
+        if getattr(self, "_status_box", None) is not None:
+            self._status_box.configure(bg=p["bg"])
+        if getattr(self, "log_text", None) is not None:
+            self.log_text.configure(background=p["log_bg"], foreground=p["log_fg"],
+                                    insertbackground=p["log_fg"])
+            self.log_text.tag_configure("error", foreground=p["error"])
+        for name in ("flavor_label", "subprogress_label"):
+            w = getattr(self, name, None)
+            if w is not None:
+                w.configure(foreground=p["accent_text"])
+        if getattr(self, "progress_bar", None) is not None:
+            try:
+                self.progress_bar.configure(bg=p["trough"])
+            except tk.TclError:
+                pass
+        canvas = getattr(self, "_header_canvas", None)
+        if canvas is not None:
+            try:
+                canvas.configure(bg=p["bg"])
+                self._draw_header(canvas)
+            except tk.TclError:
+                pass
+
+    # ---- playful run + idle animations ----
+
+    _RUN_FLAVORS = (
+        "Crunching waves", "Chasing oscillations", "Correlating channels",
+        "Measuring peaks", "Summoning Fourier", "Aligning phases",
+        "Counting bins", "Smoothing signals", "Tracing landmarks",
+    )
+
+    def _start_run_animations(self):
+        """Kick off the marching progress sweep and the flavor ticker. Each
+        self-stops once _is_running flips false (set by the analysis thread)."""
+        self._spin_idx = 0
+        self._flavor_idx = 0
+        self._flavor_ctr = 0
+        try:
+            self.progress_bar.start()
+        except Exception:
+            pass
+        self._run_anim_tick()
+
+    def _run_anim_tick(self):
+        try:
+            if not self.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        if not getattr(self, "_is_running", False):
+            # finalize: clear the ticker and sub-progress; the bar keeps marching
+            # gently while idle.
+            try:
+                self.flavor_label.configure(text="")
+                self.subprogress_label.configure(text="")
+            except Exception:
+                pass
+            return
+        self._spin_idx += 1
+        self._flavor_ctr += 1
+        if self._flavor_ctr >= 22:
+            self._flavor_ctr = 0
+            self._flavor_idx = (self._flavor_idx + 1) % len(self._RUN_FLAVORS)
+        dots = "." * (self._spin_idx % 4)
+        try:
+            self.flavor_label.configure(text=f"{self._RUN_FLAVORS[self._flavor_idx]}{dots}")
+        except Exception:
+            return
+        self.after(110, self._run_anim_tick)
+
+    def _start_shimmer(self):
+        """Drive the idle light-sweep across the header pinstripes."""
+        self._shimmer_phase = 0
+        self.after(500, self._shimmer_tick)
+
+    def _shimmer_tick(self):
+        try:
+            if not self.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        canvas = getattr(self, "_header_canvas", None)
+        if canvas is not None:
+            try:
+                canvas.delete("shimmer")
+                pin = getattr(self, "_pin_region", None)
+                self._shimmer_phase = (self._shimmer_phase + 1) % 150
+                sweep_steps = 22
+                if pin and not getattr(self, "_is_running", False) and self._shimmer_phase < sweep_steps:
+                    x0, x1, y0, y1 = pin
+                    frac = self._shimmer_phase / sweep_steps
+                    sx = x0 - 12 + (x1 - x0 + 24) * frac
+                    glint = _RETRO["shimmer"]
+                    for off in (-3, 0, 3):
+                        canvas.create_line(sx + off, y0, sx + off, y1,
+                                           fill=glint, tags="shimmer")
+            except tk.TclError:
+                pass
+        self.after(55, self._shimmer_tick)
 
     # ---- settings persistence ----
 
@@ -680,37 +928,8 @@ class _GUIBase(_TkBase):
                     return
             except tk.TclError:
                 return
-            self._clear_progress_marks()
             self._do_append(msg if msg.endswith("\n") else msg + "\n")
         self.after(0, _append)
-
-    def update_progress_line(self, label, text):
-        try:
-            if not self.winfo_exists():
-                return
-        except tk.TclError:
-            return
-
-        def _update():
-            try:
-                if not self.winfo_exists():
-                    return
-            except tk.TclError:
-                return
-            safe = "".join(c if c.isalnum() else "_" for c in label)
-            mark = f"_prog_{safe}"
-            self.log_text.configure(state="normal")
-            if mark in self.log_text.mark_names():
-                idx = self.log_text.index(mark)
-                self.log_text.delete(idx, f"{idx} lineend + 1c")
-                self.log_text.insert(idx, text + "\n")
-            else:
-                self.log_text.mark_set(mark, tk.END)
-                self.log_text.mark_gravity(mark, tk.LEFT)
-                self.log_text.insert(tk.END, text + "\n")
-            self.log_text.see(tk.END)
-            self.log_text.configure(state="disabled")
-        self.after(0, _update)
 
     def _do_append(self, text):
         self.log_text.configure(state="normal")
@@ -720,11 +939,6 @@ class _GUIBase(_TkBase):
             self.log_text.insert(tk.END, text)
         self.log_text.see(tk.END)
         self.log_text.configure(state="disabled")
-
-    def _clear_progress_marks(self):
-        for m in list(self.log_text.mark_names()):
-            if m.startswith("_prog_"):
-                self.log_text.mark_unset(m)
 
     def clear_log(self):
         def _clear():
@@ -792,6 +1006,18 @@ class _GUIBase(_TkBase):
             self.progress_file_label.configure(text=f"File {current}/{total}")
         self.after(0, _upd)
 
+    def set_subprogress(self, text):
+        """Compact live indicator for the per-file tqdm sub-bars, shown next to
+        the progress bar instead of flooding the log."""
+        def _upd():
+            try:
+                if not self.winfo_exists():
+                    return
+            except tk.TclError:
+                return
+            self.subprogress_label.configure(text=text)
+        self.after(0, _upd)
+
     def reset_progress(self):
         def _rst():
             try:
@@ -801,6 +1027,7 @@ class _GUIBase(_TkBase):
                 return
             self.progress_bar.configure(value=0)
             self.progress_file_label.configure(text="")
+            self.subprogress_label.configure(text="")
             self.elapsed_label.configure(text="")
         self.after(0, _rst)
 
@@ -1185,6 +1412,7 @@ class _GUIBase(_TkBase):
             self._stop_requested = False
             self.start_button.configure(state="disabled")
             self.stop_button.configure(state="normal")
+            self._start_run_animations()
             if self.on_start:
                 self.on_start()
         except Exception as e:
@@ -2248,3 +2476,228 @@ class _SummaryViewer(tk.Toplevel):
         arrow = " v" if self._sort_rev else " ^"
         for c in self.tree["columns"]:
             self.tree.heading(c, text=c.rstrip(" ^v") + (arrow if c == col else ""))
+
+
+# ---------------------------------------------------------------------------
+# Info / glossary panel
+# ---------------------------------------------------------------------------
+
+# Plain-language reference for the controls, plots, and metrics. Each section is
+# a list of (title, body) entries rendered into a tab of the Info panel.
+_HELP = {
+    "Controls": [
+        ("Input folder / Browse",
+         "The folder of .tif movies to analyze (all non-hidden .tif files are "
+         "processed). You can also drag a folder onto the window. The last-used "
+         "folder is remembered between sessions."),
+        ("Group names",
+         "Comma-separated labels for grouping files in the comparison graphs. A "
+         "file joins a group when the group's text appears in its filename. Leave "
+         "blank to skip grouping. Example: 'control,drug'."),
+        ("Order & names…",
+         "Set the left-to-right order of groups in the comparison graphs and give "
+         "each a display name, without renaming any files."),
+        ("Box size (px) — standard",
+         "Side length of each square sampling box (a 'bin'). The image is tiled "
+         "into boxes and each box produces one mean-intensity trace per channel "
+         "that is analyzed independently."),
+        ("Line width (px) — kymograph",
+         "Width, in pixels, of each vertical sampling line across the kymograph. "
+         "Each line yields one trace per channel."),
+        ("Box / Line shift (px)",
+         "Step between neighboring bins. Setting it equal to the box size / line "
+         "width tiles without overlap; a smaller value produces overlapping, "
+         "denser bins."),
+        ("Subframe size / roll — rolling",
+         "Rolling analysis splits the movie into temporal sub-windows. 'Subframe "
+         "size' is the number of frames per window; 'Subframe roll' is how many "
+         "frames the window advances each step."),
+        ("ACF peak threshold",
+         "Minimum relative prominence (0–1) a peak in the autocorrelation must "
+         "have to count when detecting the period. Higher = stricter. Typical 0.1."),
+        ("CCF peak threshold",
+         "Minimum relative prominence (0–1) for a peak in the cross-correlation "
+         "when measuring the temporal shift between two channels."),
+        ("Peak prominence fraction",
+         "Minimum prominence — as a fraction of the trace's intensity range — "
+         "for a peak in the raw signal to be included in peak-shape analysis."),
+        ("Small shifts correction",
+         "Resolves sign ambiguity for near-zero CCF shifts so a small lead/lag "
+         "isn't flipped to a near-period value. Only recommended for signals that are closely matched."
+         " Otherwise, leave this off to avoid biasing the shift measurement."),
+        ("Smoothing (Ch1–Ch4, CCF)",
+         "Savitzky–Golay smoothing applied to each channel's trace (and the CCF) "
+         "before analysis. 'win' is the window length in frames (odd number); "
+         "'poly' is the polynomial order. 'Enable smoothing' is the master toggle."
+         " Window length should be smaller than the shortest expected period, "
+         "and should be the same across all channels if you want to compare their timing directly."),
+        ("Channel Names (optional)",
+         "Names for channels shown in plot labels only. Blank fields fall "
+         "back to Ch1–Ch4. Does not affect the analysis or filenames."),
+        ("Landmark Edge Height (Rise/fall height)",
+         "The height — as a percentage of each peak's amplitude — at which the "
+         "rising and falling 'landmarks' are placed. These landmarks define the "
+         "rise/fall durations and edge-shift metrics. 50% ≈ full-width-half-max."
+         " 100% = peak apex; 0% = baseline. The landmarks are drawn on the plots."),
+        ("Plot Options",
+         "Choose which figure sets to generate (see the Plots tab). 'Summary' plots "
+         "aggregate across all bins of an image; 'Indv' plots are one-per-bin. "
+         "'Dark plots' renders figures on a dark background."),
+        ("Test File",
+         "Run the full analysis on a single chosen .tif (no settings are saved). A "
+         "fast way to check parameters before processing a whole folder."),
+        ("Preview Bins",
+         "Overlay the current box/line bin grid on one image so you can see exactly "
+         "where signals will be sampled before running."),
+        ("Load Results",
+         "Open an existing results folder (a 0_signalProcessing-… folder)"
+         " to browse its plots and summary without re-running."),
+        ("Rolling / Kymograph",
+         "Switch the analysis mode. Standard = boxes on a movie; Kymograph = lines "
+         "on a kymograph image; Rolling = temporal sub-windows of a movie."),
+    ],
+    "Plots": [
+        ("Summary ACFs",
+         "Per-channel mean autocorrelation across all bins of an image, used to "
+         "read out the dominant period."),
+        ("Summary CCFs",
+         "Mean cross-correlation between each channel pair, summarizing the typical "
+         "temporal shift between channels."),
+        ("Summary peaks",
+         "Distribution of peak-shape metrics (amplitude, width, etc.) pooled over "
+         "all bins of an image."),
+        ("Metric correlations (per image)",
+         "Spearman correlation heatmap between metrics computed across the bins of "
+         "a single image — which measurements correlate."),
+        ("Indv ACFs / CCFs / peaks",
+         "The same ACF, CCF, and peak analyses drawn separately for every "
+         "individual bin. Useful for QC but produces many figures and significantly "
+         "increases the time required for analysis."),
+        ("Heatmaps",
+         "Spatial overlay maps: each metric painted onto the image at the location "
+         "of its bin, plus a bin-ID reference map."),
+        ("Fourier transforms",
+         "FFT power spectrum of each bin's trace, annotated with the top three "
+         "spectral peaks and a reference line at the ACF-detected period (with the "
+         "nearest FFT peak highlighted)."),
+        ("Summary / Indv landmark",
+         "Rise- and fall-edge timing summaries (and per-bin versions), based on the "
+         "Landmark Edge Height setting."),
+        ("Group comparison (results viewer)",
+         "Box-and-swarm plot per group for each metric, with the sample size in the "
+         "axis label and a non-parametric significance test (Mann–Whitney for two "
+         "groups, Kruskal–Wallis for more)."),
+        ("Group correlations",
+         "Spearman cross-metric correlation heatmap computed separately for each "
+         "group, where each row is one image's per-image mean."),
+        ("Group scatter",
+         "Scatter of any two summary metrics with one point per image, groups "
+         "overlaid by color/marker, with an optional trend line and statistics."),
+        ("Quality: detection quality",
+         "Per group, the percentage of bins where no period/peak/shift could be "
+         "measured. High values mean the group's metrics rest on few usable bins; a "
+         "caution band marks >50%."),
+        ("Quality: coverage",
+         "Number of usable bins per image ('Num Bins'), per group. Flags "
+         "under-sampled images whose per-image means are statistically thin."),
+        ("Quality: effective N heatmap",
+         "Group × metric grid showing how many images carry a usable (non-NaN) "
+         "value for each metric — the 'can I even run stats here?' map. "
+         "Under-supported cells are outlined."),
+        ("Quality: per-image reliability",
+         "Caterpillar plot: each image's per-image mean ± within-image "
+         "variability, blocked by group. Long error bars flag images whose mean "
+         "rests on highly variable bins."),
+    ],
+    "Metrics": [
+        ("Units",
+         "AU = arbitrary intensity units. s = seconds. Summary values are means "
+         "across an image's bins."),
+        ("Period (s)",
+         "Dominant oscillation period of the trace, from the first peak of the "
+         "autocorrelation."),
+        ("Peak Amp (AU)",
+         "Peak height above its local baseline, in intensity units."),
+        ("Peak Rel Amp",
+         "Peak amplitude relative to the baseline (dimensionless)."),
+        ("Peak Width (s)",
+         "Peak width at half maximum (FWHM)."),
+        ("Peak Max / Peak Min (AU)",
+         "Maximum (apex) and baseline/minimum intensity of the peak."),
+        ("Peak Offset (s)",
+         "Offset of the peak apex from the midpoint between its rise and fall "
+         "landmarks — a measure of asymmetry."),
+        ("Peak Area (AU·s)",
+         "Area under the peak above its local baseline, integrated over time."),
+        ("Rise Duration (s)",
+         "Time from the rising landmark (at the chosen edge height) up to the apex."),
+        ("Fall Duration (s)",
+         "Time from the apex down to the falling landmark."),
+        ("Rise minus Fall Duration (s)",
+         "Rise duration minus fall duration; sign indicates asymmetry direction."),
+        ("Rising / Falling Slope",
+         "Mean rate of change on the rising / falling edge (intensity per second)."),
+        ("Max Rising / Falling Slope",
+         "Steepest instantaneous slope on the rising / falling edge."),
+        ("Rising/Falling Slope Ratio",
+         "Ratio of rising to falling slope; 1 = symmetric edges."),
+        ("Shift (s)",
+         "Temporal shift between two channels from the cross-correlation peak. The "
+         "sign indicates which channel leads."),
+        ("% Phase Shift",
+         "CCF shift expressed as a percentage of the period (phase)."),
+        ("Peak Shift (s)",
+         "Shift between the channels' peak-apex times."),
+        ("Rise Shift / Fall Shift (s)",
+         "Shift between channels measured at the rising / falling edge landmarks."),
+        ("Rise-Peak Diff / Fall-Peak Diff (s)",
+         "Edge shift minus peak shift — whether the edges and apex shift by the "
+         "same amount."),
+        ("Num Bins (quality)",
+         "Number of usable bins contributing to an image's per-image means."),
+        ("Pcnt No … (quality)",
+         "Percentage of bins in an image where a given measurement (period, peak, "
+         "or shift) could not be detected."),
+    ],
+}
+
+
+class _InfoPanel(tk.Toplevel):
+    """Tabbed help panel explaining the controls, plots, and metrics."""
+
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.title("Wave Analysis — Info & Glossary")
+        self.geometry("840x640")
+        self.transient(parent)
+
+        ttk.Label(self, text="Wave Analysis — Info & Glossary",
+                  font=("TkDefaultFont", 13, "bold")).pack(anchor="w", padx=12, pady=(10, 0))
+        ttk.Label(self, text="What each control, plot, and metric means.",
+                  foreground=_RETRO["header_sub"]).pack(anchor="w", padx=12, pady=(0, 6))
+
+        nb = ttk.Notebook(self)
+        nb.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 6))
+        for section in ("Controls", "Plots", "Metrics"):
+            frame = ttk.Frame(nb)
+            nb.add(frame, text=section)
+            self._build_section(frame, _HELP[section])
+
+        ttk.Button(self, text="Close", command=self.destroy).pack(pady=(0, 10))
+
+    @staticmethod
+    def _build_section(parent, entries):
+        txt = scrolledtext.ScrolledText(
+            parent, wrap=tk.WORD, relief="sunken", borderwidth=2,
+            highlightthickness=0, background=_RETRO["log_bg"], foreground=_RETRO["log_fg"],
+            padx=12, pady=10,
+        )
+        txt.pack(fill=tk.BOTH, expand=True)
+        fam = tkfont.nametofont("TkDefaultFont").actual("family")
+        txt.tag_configure("h", font=(fam, 11, "bold"), foreground=_RETRO["select"],
+                          spacing1=10, spacing3=2)
+        txt.tag_configure("body", font=(fam, 10), spacing3=6, lmargin1=6, lmargin2=6)
+        for title, body in entries:
+            txt.insert(tk.END, title + "\n", "h")
+            txt.insert(tk.END, body + "\n", "body")
+        txt.configure(state="disabled")

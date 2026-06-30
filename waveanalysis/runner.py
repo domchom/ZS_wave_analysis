@@ -52,8 +52,13 @@ class _GUIWriter:
 
             tqdm_match = _TQDM_RE.search(line)
             if tqdm_match:
-                label = line[:tqdm_match.start()].strip() or "progress"
-                self.gui.update_progress_line(label, line)
+                # Per-file sub-bars (ind acfs/peaks/ccfs/landmark, etc.) would
+                # flood the log with a line per update; show a compact live
+                # "task NN%" indicator next to the progress bar instead.
+                label = line[:tqdm_match.start()].strip(" :") or "working"
+                pct_match = re.search(r"(\d+)%\|", line)
+                pct = pct_match.group(1) if pct_match else "?"
+                self.gui.set_subprogress(f"{label} {pct}%")
                 continue
 
             if (line.startswith("Processing ")
