@@ -672,35 +672,51 @@ class _GUIBase(_TkBase):
     def _build_bottom(self, parent):
         """Build the status bar, progress bar, and log text inside *parent*."""
 
-        # button row
-        btn = ttk.Frame(parent)
-        btn.pack(fill=tk.X, pady=(6, 4))
-        self.start_button = ttk.Button(btn, text="Start Analysis", command=self.start_analysis,
+        # Button grid. Columns 0-3 hold the main controls in one uniform group
+        # so every button is the same width; a weighted spacer (col 4) pushes the
+        # mode-switch buttons (cols 5-6, their own uniform group) to the right.
+        # Rows are grouped by purpose: run controls on top, utilities below.
+        btnbar = ttk.Frame(parent)
+        btnbar.pack(fill=tk.X, pady=(6, 4))
+        for c in (0, 1, 2, 3):
+            btnbar.columnconfigure(c, weight=0, uniform="mainbtn")
+        btnbar.columnconfigure(4, weight=1)
+        for c in (5, 6):
+            btnbar.columnconfigure(c, weight=0, uniform="modebtn")
+
+        def _cell(col):
+            return {"sticky": "ew", "padx": (0 if col == 0 else 4, 0), "pady": (0, 4)}
+
+        # Row 0: run controls
+        self.start_button = ttk.Button(btnbar, text="Start Analysis", command=self.start_analysis,
                                        style="Retro.Accent.TButton")
-        self.start_button.pack(side=tk.LEFT)
-        ttk.Button(btn, text="Test File", command=self._test_first_file).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn, text="Preview Bins", command=self._preview_bins).pack(side=tk.LEFT, padx=4)
-        self.stop_button = ttk.Button(btn, text="Stop", command=self.stop_analysis, state="disabled")
-        self.stop_button.pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn, text="Load Results", command=self._load_existing_results).pack(side=tk.LEFT, padx=4)
-        ttk.Button(btn, text="Info", command=self._open_info).pack(side=tk.LEFT, padx=(0, 4))
+        self.start_button.grid(row=0, column=0, **_cell(0))
+        self.stop_button = ttk.Button(btnbar, text="Stop", command=self.stop_analysis, state="disabled")
+        self.stop_button.grid(row=0, column=1, **_cell(1))
+        ttk.Button(btnbar, text="Test File", command=self._test_first_file).grid(row=0, column=2, **_cell(2))
+        ttk.Button(btnbar, text="Preview Bins", command=self._preview_bins).grid(row=0, column=3, **_cell(3))
+
+        # Row 1: results / utilities / window
+        ttk.Button(btnbar, text="Load Results", command=self._load_existing_results).grid(row=1, column=0, **_cell(0))
+        ttk.Button(btnbar, text="Info", command=self._open_info).grid(row=1, column=1, **_cell(1))
         self.theme_button = ttk.Button(
-            btn, text=("Light Mode" if self._theme == "dark" else "Dark Mode"),
-            command=self._toggle_theme, width=10)
-        self.theme_button.pack(side=tk.LEFT, padx=(0, 4))
-        ttk.Button(btn, text="Close Window", command=self.cancel_analysis).pack(side=tk.LEFT)
-        self.elapsed_label = ttk.Label(btn, text="")
-        self.elapsed_label.pack(side=tk.RIGHT)
-        self._build_extra_buttons(btn)  # subclass hook
+            btnbar, text=("Light Mode" if self._theme == "dark" else "Dark Mode"),
+            command=self._toggle_theme)
+        self.theme_button.grid(row=1, column=2, **_cell(2))
+        ttk.Button(btnbar, text="Close Window", command=self.cancel_analysis).grid(row=1, column=3, **_cell(3))
+
+        self._build_extra_buttons(btnbar)  # subclass hook: mode-switch buttons (cols 5-6)
 
         # status + progress (status sits in a sunken inset strip, with a playful
         # ticker on the right that animates while analysis runs)
         status_box = tk.Frame(parent, bg=_RETRO["bg"], relief="sunken", bd=1)
         status_box.pack(fill=tk.X)
         self._status_box = status_box
+        self.elapsed_label = ttk.Label(status_box, text="", font=("TkDefaultFont", 10, "bold"))
+        self.elapsed_label.pack(side=tk.RIGHT, padx=(4, 6), pady=1)
         self.flavor_label = ttk.Label(status_box, text="", foreground=_RETRO["accent_text"],
                                       font=("TkDefaultFont", 10, "bold"))
-        self.flavor_label.pack(side=tk.RIGHT, padx=(4, 6), pady=1)
+        self.flavor_label.pack(side=tk.RIGHT, padx=(4, 0), pady=1)
         self.status_label = ttk.Label(status_box, text="Status: Ready",
                                       font=("TkDefaultFont", 10, "bold"),
                                       anchor="w", justify="left")
@@ -755,7 +771,8 @@ class _GUIBase(_TkBase):
             self.dnd_bind("<<Drop>>", self._on_folder_drop)
 
     def _build_extra_buttons(self, parent):
-        """Override in subclasses to add extra buttons to the button row."""
+        """Override in subclasses to add mode-switch buttons to the button grid.
+        Place them in columns 5-6, row 0 (the right-aligned mode-switch group)."""
         pass
 
     def _open_info(self):
@@ -1490,13 +1507,17 @@ class BaseGUI(_GUIBase):
 
         self._build_header(root, subtitle="Standard Analysis")
 
-        # ---- top: two columns ----
+        # ---- top: three weighted columns that share the width and stay
+        # top-aligned, so resizing distributes space instead of leaving a gap ----
         top = ttk.Frame(root)
         top.pack(fill=tk.X)
+        top.columnconfigure(0, weight=3, uniform="topcol")
+        top.columnconfigure(1, weight=3, uniform="topcol")
+        top.columnconfigure(2, weight=4, uniform="topcol")
 
         # left: analysis options
         opts = ttk.LabelFrame(top, text="Analysis Options", padding=6)
-        opts.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 4))
+        opts.grid(row=0, column=0, sticky="new", padx=(0, 4))
 
         pf = ttk.Frame(opts)
         pf.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
@@ -1514,7 +1535,7 @@ class BaseGUI(_GUIBase):
 
         # middle column: smoothing + channel names
         middle = ttk.Frame(top)
-        middle.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        middle.grid(row=0, column=1, sticky="new", padx=4)
 
         # smoothing
         sm = ttk.LabelFrame(middle, text="Smoothing", padding=4)
@@ -1532,15 +1553,17 @@ class BaseGUI(_GUIBase):
 
         # right column: edge-height slider + plot options
         right = ttk.Frame(top)
-        right.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        right.grid(row=0, column=2, sticky="new", padx=(4, 0))
 
         edge = ttk.LabelFrame(right, text="Landmark Edge Height", padding=4)
         edge.pack(fill=tk.X, pady=(0, 4))
         self._build_edge_height_slider(edge)
 
-        # plot options
+        # plot options (three aligned groups: Summary / Individual / Output)
         pl = ttk.LabelFrame(right, text="Plot Options", padding=4)
         pl.pack(fill=tk.X)
+        pl.columnconfigure(1, minsize=120)
+        pl.columnconfigure(3, minsize=92)
         self._add_check(pl, 0, 0, self.vars["plot_summary_ACFs"], "Summary ACFs")
         self._add_check(pl, 1, 0, self.vars["plot_summary_CCFs"], "Summary CCFs")
         self._add_check(pl, 2, 0, self.vars["plot_summary_peaks"], "Summary peaks")
@@ -1567,10 +1590,13 @@ class BaseGUI(_GUIBase):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._restore_settings()
+        self.minsize(940, 680)
 
     def _build_extra_buttons(self, parent):
-        ttk.Button(parent, text="Kymograph", command=self.launch_kymograph_analysis).pack(side=tk.RIGHT)
-        ttk.Button(parent, text="Rolling", command=self.launch_rolling_analysis).pack(side=tk.RIGHT, padx=(0, 4))
+        ttk.Button(parent, text="Rolling", command=self.launch_rolling_analysis).grid(
+            row=0, column=5, sticky="ew", padx=(0, 4), pady=(0, 4))
+        ttk.Button(parent, text="Kymograph", command=self.launch_kymograph_analysis).grid(
+            row=0, column=6, sticky="ew", pady=(0, 4))
 
     def launch_rolling_analysis(self):
         self.rolling = True
@@ -1634,11 +1660,18 @@ class RollingGUI(_GUIBase):
 
         self._build_header(root, subtitle="Rolling Analysis")
 
+        # Three balanced columns (mirrors the Standard window): options on the
+        # left, smoothing + channel names stacked in the middle, edge height +
+        # live injection stacked on the right.
         top = ttk.Frame(root)
         top.pack(fill=tk.X)
+        top.columnconfigure(0, weight=3, uniform="topcol")
+        top.columnconfigure(1, weight=3, uniform="topcol")
+        top.columnconfigure(2, weight=3, uniform="topcol")
 
+        # left: analysis options
         opts = ttk.LabelFrame(top, text="Analysis Options", padding=6)
-        opts.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 4))
+        opts.grid(row=0, column=0, sticky="new", padx=(0, 4))
 
         pf = ttk.Frame(opts)
         pf.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
@@ -1656,24 +1689,32 @@ class RollingGUI(_GUIBase):
         self._add_check(opts, 8, 0, self.vars["small_shifts_correction"], "Small shifts correction")
         self._add_check(opts, 9, 0, self.vars["dark_plots"], "Dark plots")
 
-        sm = ttk.LabelFrame(top, text="Smoothing", padding=4)
-        sm.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        # middle: smoothing + channel names
+        middle = ttk.Frame(top)
+        middle.grid(row=0, column=1, sticky="new", padx=4)
+
+        sm = ttk.LabelFrame(middle, text="Smoothing", padding=4)
+        sm.pack(fill=tk.X, pady=(0, 4))
         self._build_smoothing(sm, default_poly=3)
 
-        cn = ttk.LabelFrame(top, text="Channel Names (optional)", padding=4)
-        cn.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        cn = ttk.LabelFrame(middle, text="Channel Names (optional)", padding=4)
+        cn.pack(fill=tk.X)
         self._add_entry(cn, 0, 0, self.vars["Ch1_name"], "Ch1", width=10)
         self._add_entry(cn, 1, 0, self.vars["Ch2_name"], "Ch2", width=10)
-        self._add_entry(cn, 2, 0, self.vars["Ch3_name"], "Ch3", width=10)
-        self._add_entry(cn, 3, 0, self.vars["Ch4_name"], "Ch4", width=10)
+        self._add_entry(cn, 0, 2, self.vars["Ch3_name"], "Ch3", width=10)
+        self._add_entry(cn, 1, 2, self.vars["Ch4_name"], "Ch4", width=10)
 
-        edge = ttk.LabelFrame(top, text="Landmark Edge Height", padding=4)
-        edge.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        # right: edge height + live injection
+        right = ttk.Frame(top)
+        right.grid(row=0, column=2, sticky="new", padx=(4, 0))
+
+        edge = ttk.LabelFrame(right, text="Landmark Edge Height", padding=4)
+        edge.pack(fill=tk.X, pady=(0, 4))
         self._build_edge_height_slider(edge)
 
         # live-injection options (leave injection frame at 0 to ignore)
-        inj = ttk.LabelFrame(top, text="Live Injection (optional)", padding=4)
-        inj.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        inj = ttk.LabelFrame(right, text="Live Injection (optional)", padding=4)
+        inj.pack(fill=tk.X)
         self._add_entry(inj, 0, 0, self.vars["injection_frame"], "Injection frame", width=6)
         self._add_check(inj, 1, 0, self.vars["injection_ch1"], "Injection signal Ch1")
         self._add_check(inj, 2, 0, self.vars["injection_ch2"], "Injection signal Ch2")
@@ -1688,9 +1729,11 @@ class RollingGUI(_GUIBase):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._restore_settings()
+        self.minsize(940, 680)
 
     def _build_extra_buttons(self, parent):
-        ttk.Button(parent, text="Back to Standard", command=self._go_back).pack(side=tk.RIGHT)
+        ttk.Button(parent, text="Back to Standard", command=self._go_back).grid(
+            row=0, column=6, sticky="ew", pady=(0, 4))
 
     def _go_back(self):
         self._back_to_standard = True
@@ -1755,10 +1798,13 @@ class KymographGUI(_GUIBase):
 
         top = ttk.Frame(root)
         top.pack(fill=tk.X)
+        top.columnconfigure(0, weight=3, uniform="topcol")
+        top.columnconfigure(1, weight=3, uniform="topcol")
+        top.columnconfigure(2, weight=4, uniform="topcol")
 
         # left: analysis options
         opts = ttk.LabelFrame(top, text="Analysis Options", padding=6)
-        opts.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 4))
+        opts.grid(row=0, column=0, sticky="new", padx=(0, 4))
 
         pf = ttk.Frame(opts)
         pf.grid(row=0, column=0, columnspan=2, sticky="ew", pady=(0, 4))
@@ -1776,7 +1822,7 @@ class KymographGUI(_GUIBase):
 
         # middle column: smoothing + channel names
         middle = ttk.Frame(top)
-        middle.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        middle.grid(row=0, column=1, sticky="new", padx=4)
 
         sm = ttk.LabelFrame(middle, text="Smoothing", padding=4)
         sm.pack(fill=tk.X, pady=(0, 4))
@@ -1793,14 +1839,17 @@ class KymographGUI(_GUIBase):
 
         # right column: edge-height slider + plot options
         right = ttk.Frame(top)
-        right.pack(side=tk.LEFT, fill=tk.BOTH, padx=(4, 0))
+        right.grid(row=0, column=2, sticky="new", padx=(4, 0))
 
         edge = ttk.LabelFrame(right, text="Landmark Edge Height", padding=4)
         edge.pack(fill=tk.X, pady=(0, 4))
         self._build_edge_height_slider(edge)
 
+        # plot options (three aligned groups: Summary / Individual / Output)
         pl = ttk.LabelFrame(right, text="Plot Options", padding=4)
         pl.pack(fill=tk.X)
+        pl.columnconfigure(1, minsize=120)
+        pl.columnconfigure(3, minsize=92)
         self._add_check(pl, 0, 0, self.vars["plot_summary_ACFs"], "Summary ACFs")
         self._add_check(pl, 1, 0, self.vars["plot_summary_CCFs"], "Summary CCFs")
         self._add_check(pl, 2, 0, self.vars["plot_summary_peaks"], "Summary peaks")
@@ -1824,9 +1873,11 @@ class KymographGUI(_GUIBase):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self._restore_settings()
+        self.minsize(940, 680)
 
     def _build_extra_buttons(self, parent):
-        ttk.Button(parent, text="Back to Standard", command=self._go_back).pack(side=tk.RIGHT)
+        ttk.Button(parent, text="Back to Standard", command=self._go_back).grid(
+            row=0, column=6, sticky="ew", pady=(0, 4))
 
     def _go_back(self):
         self._back_to_standard = True
@@ -2055,6 +2106,7 @@ class _PlotViewer(tk.Toplevel):
         super().__init__(parent)
         self.title("Plot Viewer")
         self.geometry("1100x750")
+        self.minsize(880, 560)
         self.results_path = results_path
         self.default_dark_plots = self._infer_dark_plots(parent, results_path)
         self._summary_df = None
@@ -2088,16 +2140,20 @@ class _PlotViewer(tk.Toplevel):
         self.canvas.pack(fill=tk.BOTH, expand=True)
         self.canvas.bind("<Configure>", lambda e: self._show_current())
 
+        # Keep the tree pane from opening at half-width; give it a sensible
+        # initial share once the paned window has a real size.
+        self.after(80, lambda: self._init_sash(pane))
+
         nav = ttk.Frame(self)
         nav.pack(fill=tk.X, padx=10, pady=(0, 6))
         ttk.Button(nav, text="< Prev", command=self._prev).pack(side=tk.LEFT)
         ttk.Button(nav, text="Next >", command=self._next).pack(side=tk.LEFT, padx=4)
         ttk.Button(nav, text="Group Comparison", command=self._make_group_comparison).pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(nav, text="Group Correlations", command=self._make_group_correlations).pack(side=tk.LEFT, padx=(0, 4))
-        self.file_label = ttk.Label(nav, text="", wraplength=650)
-        self.file_label.pack(side=tk.LEFT, padx=10)
         self.count_label = ttk.Label(nav, text=f"{len(self.image_files)} plots")
         self.count_label.pack(side=tk.RIGHT)
+        self.file_label = ttk.Label(nav, text="", wraplength=650, anchor="w")
+        self.file_label.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=10)
 
         self.bind("<Left>", lambda e: self._prev())
         self.bind("<Right>", lambda e: self._next())
@@ -2148,6 +2204,15 @@ class _PlotViewer(tk.Toplevel):
                 text="No summary metrics with numeric mean values were found.",
                 foreground="red",
             )
+
+    def _init_sash(self, pane):
+        """Place the divider so the file tree opens at a readable fixed width
+        rather than claiming half the window."""
+        try:
+            if pane.winfo_exists() and pane.winfo_width() > 1:
+                pane.sashpos(0, 300)
+        except Exception:
+            pass
 
     def _scan_image_files(self):
         image_files = []
