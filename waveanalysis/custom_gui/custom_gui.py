@@ -421,10 +421,11 @@ class _GUIBase(_TkBase):
         # activation vs. long-range inhibition converges to clean, uniformly
         # spaced wavy stripes -- the classic pufferfish-skin labyrinth.
         n = 150
-        rng = np.random.default_rng(11)
+        rng = np.random.default_rng(8)
         grid = rng.standard_normal((n, n))
         activate, inhibit, amp = 4.0, 8.0, 0.15
-        for _ in range(50):
+        # Iterate well past pattern formation for a settled, steady-state look.
+        for _ in range(150):
             act = gaussian_filter(grid, activate, mode="wrap")
             inh = gaussian_filter(grid, inhibit, mode="wrap")
             grid = np.clip(grid + amp * np.sign(act - inh), -1.0, 1.0)
