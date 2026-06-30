@@ -46,6 +46,184 @@ def _save_config(data):
 
 
 # ---------------------------------------------------------------------------
+# Retro theme
+# ---------------------------------------------------------------------------
+
+# Classic beveled light-gray palette (Win2k / Motif look) shared by every window.
+_RETRO = {
+    "bg": "#d4d0c8",       # warm panel gray
+    "field": "#ffffff",    # entry / list / text field background
+    "text": "#1a1a1a",
+    "disabled": "#9a968f",
+    "light": "#ffffff",    # top-left bevel highlight
+    "dark": "#808080",     # bottom-right bevel shadow
+    "trough": "#bfbbb3",
+    "select": "#4a6b8a",   # muted steel-blue selection
+    "active": "#e3e0d9",   # hovered button face
+    "pressed": "#bdb9b1",  # pressed button face
+}
+
+
+def _apply_retro_theme(root):
+    """Give *root* -- and every child/Toplevel sharing its interpreter -- the
+    classic beveled light-gray look: grooved panels, raised buttons, white
+    sunken fields, steel-blue selection. Call once per Tk interpreter; failures
+    are swallowed so a missing theme never blocks the GUI."""
+    p = _RETRO
+    try:
+        style = ttk.Style(root)
+        style.theme_use("clam")  # most themeable theme; bundled on every platform
+    except tk.TclError:
+        return
+
+    # Retro fonts: classic Mac Geneva for the UI, Monaco for the monospace log.
+    families = set(tkfont.families(root))
+    ui_family = next((f for f in ("Geneva", "Chicago", "ChicagoFLF") if f in families), None)
+    mono_family = next((f for f in ("Monaco", "Andale Mono", "Courier") if f in families), None)
+    if ui_family:
+        for named in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkHeadingFont",
+                      "TkIconFont", "TkTooltipFont", "TkSmallCaptionFont"):
+            try:
+                tkfont.nametofont(named).configure(family=ui_family)
+            except tk.TclError:
+                pass
+    root._retro_ui_family = ui_family
+    root._retro_mono_family = mono_family
+
+    base_font = tkfont.nametofont("TkDefaultFont")
+    bold_font = (base_font.actual("family"), base_font.actual("size"), "bold")
+
+    root.configure(bg=p["bg"])
+
+    # Classic (non-ttk) tk widgets read their defaults from the option database.
+    root.option_add("*Toplevel.background", p["bg"])
+    for widget in ("Listbox", "Text", "*TCombobox*Listbox"):
+        root.option_add(f"*{widget}.background", p["field"])
+        root.option_add(f"*{widget}.foreground", p["text"])
+        root.option_add(f"*{widget}.selectBackground", p["select"])
+        root.option_add(f"*{widget}.selectForeground", "white")
+    root.option_add("*Listbox.relief", "sunken")
+    root.option_add("*Listbox.borderWidth", 1)
+
+    style.configure(
+        ".", background=p["bg"], foreground=p["text"], fieldbackground=p["field"],
+        bordercolor=p["dark"], lightcolor=p["light"], darkcolor=p["dark"],
+        troughcolor=p["trough"], focuscolor=p["bg"], font=base_font,
+    )
+    style.configure("TFrame", background=p["bg"])
+    style.configure("TLabel", background=p["bg"], foreground=p["text"])
+    style.configure("TLabelframe", background=p["bg"], relief="groove",
+                    bordercolor=p["dark"], lightcolor=p["light"], darkcolor=p["dark"])
+    style.configure("TLabelframe.Label", background=p["bg"], foreground=p["text"],
+                    font=bold_font)
+    style.configure("TSeparator", background=p["dark"])
+    style.configure("TPanedwindow", background=p["bg"])
+
+    # Raised, beveled buttons; sink in on press.
+    style.configure("TButton", background=p["bg"], foreground=p["text"],
+                    relief="raised", padding=(10, 4), anchor="center",
+                    bordercolor=p["dark"], lightcolor=p["light"], darkcolor=p["dark"])
+    style.map("TButton",
+              background=[("pressed", p["pressed"]), ("active", p["active"]),
+                          ("disabled", p["bg"])],
+              foreground=[("disabled", p["disabled"])],
+              relief=[("pressed", "sunken")])
+    # Primary action button: bold, with a pale-blue raised face so it reads as
+    # the default action while staying an obviously filled, beveled button.
+    style.configure("Retro.Accent.TButton", font=bold_font, foreground=p["text"],
+                    relief="raised", borderwidth=2, padding=(10, 4),
+                    background="#8fb3dc", bordercolor="#2f4f73",
+                    lightcolor="#bcd3ed", darkcolor="#5b7da6")
+    style.map("Retro.Accent.TButton",
+              background=[("pressed", "#6f97c6"), ("active", "#a3c2e6"),
+                          ("disabled", p["bg"])],
+              foreground=[("disabled", p["disabled"])],
+              relief=[("pressed", "sunken")])
+
+    # White, sunken text fields.
+    for field in ("TEntry", "TSpinbox", "TCombobox"):
+        style.configure(field, fieldbackground=p["field"], foreground=p["text"],
+                        background=p["bg"], relief="sunken", arrowcolor=p["text"],
+                        bordercolor=p["dark"], lightcolor=p["dark"],
+                        darkcolor=p["dark"], insertcolor=p["text"])
+    style.map("TCombobox",
+              fieldbackground=[("readonly", p["field"]), ("disabled", p["bg"])],
+              selectbackground=[("readonly", p["select"])],
+              selectforeground=[("readonly", "white")],
+              foreground=[("disabled", p["disabled"])])
+    style.map("TSpinbox", arrowcolor=[("disabled", p["dark"])])
+    style.map("TEntry", foreground=[("disabled", p["disabled"])])
+
+    style.configure("TCheckbutton", background=p["bg"], foreground=p["text"],
+                    indicatorcolor=p["field"], indicatorrelief="sunken",
+                    focuscolor=p["bg"])
+    style.map("TCheckbutton", background=[("active", p["bg"])],
+              indicatorcolor=[("selected", p["field"]), ("pressed", p["active"])])
+    style.configure("TRadiobutton", background=p["bg"], foreground=p["text"],
+                    indicatorcolor=p["field"], focuscolor=p["bg"])
+    style.map("TRadiobutton", background=[("active", p["bg"])])
+
+    style.configure("TScale", background=p["bg"], troughcolor=p["trough"])
+    style.configure("Horizontal.TProgressbar", background=p["select"],
+                    troughcolor=p["trough"], bordercolor=p["dark"],
+                    lightcolor=p["select"], darkcolor=p["select"])
+
+    style.configure("Treeview", background=p["field"], fieldbackground=p["field"],
+                    foreground=p["text"], bordercolor=p["dark"])
+    style.map("Treeview", background=[("selected", p["select"])],
+              foreground=[("selected", "white")])
+    style.configure("Treeview.Heading", background=p["bg"], foreground=p["text"],
+                    relief="raised", font=bold_font)
+    style.map("Treeview.Heading", background=[("active", p["active"])])
+
+    for sb in ("Vertical.TScrollbar", "Horizontal.TScrollbar"):
+        style.configure(sb, background=p["bg"], troughcolor=p["trough"],
+                        bordercolor=p["dark"], arrowcolor=p["text"],
+                        lightcolor=p["light"], darkcolor=p["dark"])
+
+
+class _SegmentedProgress(tk.Canvas):
+    """Classic segmented progress bar: discrete blue blocks marching across a
+    sunken gray trough. Drop-in for the bits of ttk.Progressbar we use --
+    ``configure(maximum=..., value=...)``."""
+
+    def __init__(self, parent, **kw):
+        super().__init__(parent, height=16, highlightthickness=0,
+                         bg=_RETRO["trough"], bd=2, relief="sunken", **kw)
+        self._max = 100.0
+        self._val = 0.0
+        self.bind("<Configure>", lambda _e: self._redraw())
+
+    def configure(self, cnf=None, **kw):
+        if "maximum" in kw:
+            self._max = max(float(kw.pop("maximum") or 1), 1.0)
+        if "value" in kw:
+            self._val = float(kw.pop("value") or 0)
+        if cnf is not None or kw:
+            super().configure(cnf, **kw)
+        self._redraw()
+
+    config = configure
+
+    def _redraw(self):
+        self.delete("all")
+        w = self.winfo_width()
+        h = self.winfo_height()
+        if w <= 2:
+            return
+        pad = 2
+        frac = min(self._val / self._max, 1.0) if self._max else 0.0
+        filled = (w - 2 * pad) * frac
+        seg, gap = 11, 3
+        x = pad
+        while x - pad < filled:
+            x1 = min(x + seg, pad + filled)
+            self.create_rectangle(x, pad, x1, h - pad,
+                                  fill=_RETRO["select"], outline=_RETRO["select"])
+            x += seg + gap
+
+
+# ---------------------------------------------------------------------------
 # Base class
 # ---------------------------------------------------------------------------
 
@@ -60,6 +238,187 @@ class _GUIBase(_TkBase):
     # dialog next to the group names entry; empty until the user edits them.
     _group_order = None
     _group_labels = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        _apply_retro_theme(self)
+
+    # ---- 80s Apple header banner ----
+
+    # Classic six-color Apple logo stripes, top-to-bottom (used as a fallback).
+    _APPLE_STRIPES = ("#5cb85c", "#f7d000", "#f5821f", "#e03a3e", "#8e44ad", "#3aa0dd")
+    # Mid gray used for the logo's below-threshold gaps and its outer stroke.
+    _LOGO_GAP = (110, 110, 110)
+
+    @staticmethod
+    def _bg_rgb():
+        h = _RETRO["bg"].lstrip("#")
+        return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
+
+    def _turing_logo_base(self):
+        """Generate (once) a rainbow Turing / excitable-media pattern as a PIL
+        image. Returns the cached image, or ``False`` if the imaging libs are
+        unavailable so the caller can fall back to the stripe mark."""
+        if getattr(self, "_turing_base", None) is not None:
+            return self._turing_base
+        try:
+            import numpy as np
+            from scipy.ndimage import gaussian_filter
+            from PIL import Image
+        except Exception:
+            self._turing_base = False
+            return False
+
+        # Reaction-diffusion at a single dominant wavelength: short-range
+        # activation vs. long-range inhibition converges to clean, uniformly
+        # spaced wavy stripes -- the classic pufferfish-skin labyrinth.
+        n = 150
+        rng = np.random.default_rng(11)
+        grid = rng.standard_normal((n, n))
+        activate, inhibit, amp = 4.0, 8.0, 0.15
+        for _ in range(50):
+            act = gaussian_filter(grid, activate, mode="wrap")
+            inh = gaussian_filter(grid, inhibit, mode="wrap")
+            grid = np.clip(grid + amp * np.sign(act - inh), -1.0, 1.0)
+        # Threshold the field into clean stripes; everything below goes black.
+        sharp = gaussian_filter(grid, 0.6, mode="wrap")
+        sharp = (sharp - sharp.min()) / (np.ptp(sharp) + 1e-9)
+        stripes = sharp >= 0.5
+
+        # The colors are pure decoration: a heavily smoothed random field
+        # (uncorrelated with the stripes) indexes the classic, muted six-color
+        # Apple rainbow, so soft color blobs land at random across the maze.
+        color_field = gaussian_filter(
+            np.random.default_rng(42).standard_normal((n, n)), 25.0, mode="wrap")
+        color_field = (color_field - color_field.min()) / (np.ptp(color_field) + 1e-9)
+
+        palette = np.array(
+            [[int(c[i:i + 2], 16) for i in (1, 3, 5)] for c in self._APPLE_STRIPES],
+            dtype=float,
+        )
+        stops = np.linspace(0.0, 1.0, len(palette))
+        lut_x = np.linspace(0.0, 1.0, 256)
+        lut = np.stack([np.interp(lut_x, stops, palette[:, k]) for k in range(3)], axis=1)
+        # Posterize the color field into a few bands so the palette steps in
+        # hard blocks instead of blending smoothly.
+        levels = 6
+        banded = np.clip(np.floor(color_field * levels) / (levels - 1), 0.0, 1.0)
+        idx = (banded * 255).astype(int)
+        rgb = lut[idx].astype("uint8").copy()
+        rgb[~stripes] = self._LOGO_GAP  # below threshold -> mid gray for contrast
+        self._turing_base = Image.fromarray(rgb, "RGB").convert("RGBA")
+        return self._turing_base
+
+    def _draw_logo(self, canvas, x, y, size):
+        """Draw the circular Turing-pattern logo (or stripe fallback). Returns
+        the x coordinate of the logo's right edge."""
+        base = self._turing_logo_base()
+        if base:
+            try:
+                from PIL import Image, ImageDraw, ImageTk
+                ss = max(size * 2, 2)  # supersample for clean circular edges
+                stroke = max(int(ss * 0.08), 1)
+                inner = max(ss - 2 * stroke, 2)
+
+                # Gray disc provides the outer stroke; pattern sits inset inside it.
+                disc = Image.new("RGBA", (ss, ss), self._LOGO_GAP + (255,))
+                pat = base.resize((inner, inner), Image.LANCZOS).convert("RGBA")
+                pat_mask = Image.new("L", (inner, inner), 0)
+                ImageDraw.Draw(pat_mask).ellipse((0, 0, inner - 1, inner - 1), fill=255)
+                disc.paste(pat, (stroke, stroke), pat_mask)
+
+                outer_mask = Image.new("L", (ss, ss), 0)
+                ImageDraw.Draw(outer_mask).ellipse((0, 0, ss - 1, ss - 1), fill=255)
+                bg = Image.new("RGBA", (ss, ss), self._bg_rgb() + (255,))
+                composed = (Image.composite(disc, bg, outer_mask)
+                            .resize((size, size), Image.LANCZOS).convert("RGB"))
+                self._logo_photo = ImageTk.PhotoImage(composed)
+                canvas.create_image(x, y, anchor="nw", image=self._logo_photo)
+                return x + size
+            except Exception:
+                pass
+
+        # Fallback: classic six-color Apple stripes.
+        lw = int(size * 0.95)
+        n = len(self._APPLE_STRIPES)
+        stripe_h = size / n
+        skew = 6
+        for i, col in enumerate(self._APPLE_STRIPES):
+            y0 = y + i * stripe_h
+            y1 = y0 + stripe_h + 0.6
+            canvas.create_polygon(x + skew, y0, x + lw + skew, y0,
+                                  x + lw, y1, x, y1, fill=col, outline=col)
+        return x + lw + skew
+
+    def _header_font_family(self):
+        """Pick the most Apple-Garamond-ish serif that's actually installed."""
+        if getattr(self, "_hdr_family", None):
+            return self._hdr_family
+        available = set(tkfont.families())
+        for cand in ("Apple Garamond", "Garamond", "Palatino", "Palatino Linotype",
+                     "Hoefler Text", "Georgia", "Times New Roman"):
+            if cand in available:
+                self._hdr_family = cand
+                break
+        else:
+            self._hdr_family = tkfont.nametofont("TkDefaultFont").actual("family")
+        return self._hdr_family
+
+    def _build_header(self, parent, subtitle=None):
+        """Banner with the rainbow Apple logo block, a serif 'Wave Analysis'
+        wordmark, classic Mac pinstripes, and a beveled divider underneath."""
+        self._header_subtitle = subtitle
+        canvas = tk.Canvas(parent, height=74, highlightthickness=0,
+                           bg=_RETRO["bg"], bd=0)
+        canvas.pack(fill=tk.X, pady=(0, 6))
+        canvas.bind("<Configure>", lambda _e, c=canvas: self._draw_header(c))
+        self.after(60, lambda c=canvas: self._draw_header(c))
+        return canvas
+
+    def _draw_header(self, canvas):
+        try:
+            if not canvas.winfo_exists():
+                return
+        except tk.TclError:
+            return
+        w = canvas.winfo_width()
+        h = canvas.winfo_height()
+        if w < 10:
+            return
+        canvas.delete("all")
+
+        # Circular rainbow Turing / excitable-media logo (falls back to stripes).
+        lx, ly = 10, 9
+        size = max(h - 20, 24)
+        logo_right = self._draw_logo(canvas, lx, ly, size)
+
+        fam = self._header_font_family()
+        title_x = logo_right + 18
+        cy = h // 2
+        title_font = tkfont.Font(family=fam, size=27, weight="bold")
+        # Soft drop shadow, then the wordmark.
+        canvas.create_text(title_x + 1, cy - 9, text="Wave Analysis", anchor="w",
+                           font=title_font, fill="#b9b5ad")
+        canvas.create_text(title_x, cy - 10, text="Wave Analysis", anchor="w",
+                           font=title_font, fill="#2a2a2a")
+
+        sub = getattr(self, "_header_subtitle", None)
+        if sub:
+            spaced = "  ".join(sub.upper())
+            canvas.create_text(title_x + 2, cy + 16, text=spaced, anchor="w",
+                               font=(fam, 9), fill="#6a6a6a")
+
+        # Classic Mac title-bar pinstripes filling the empty space on the right.
+        ps_x0 = title_x + title_font.measure("Wave Analysis") + 28
+        ps_x1 = w - 12
+        if ps_x1 - ps_x0 > 50:
+            for i in range(6):
+                yy = cy - 16 + i * 6
+                canvas.create_line(ps_x0, yy, ps_x1, yy, fill="#a8a49c")
+
+        # Beveled divider under the banner.
+        canvas.create_line(0, h - 2, w, h - 2, fill=_RETRO["dark"])
+        canvas.create_line(0, h - 1, w, h - 1, fill=_RETRO["light"])
 
     # ---- widget helpers (accept a parent frame) ----
 
@@ -165,7 +524,8 @@ class _GUIBase(_TkBase):
         # button row
         btn = ttk.Frame(parent)
         btn.pack(fill=tk.X, pady=(6, 4))
-        self.start_button = ttk.Button(btn, text="Start Analysis", command=self.start_analysis)
+        self.start_button = ttk.Button(btn, text="Start Analysis", command=self.start_analysis,
+                                       style="Retro.Accent.TButton")
         self.start_button.pack(side=tk.LEFT)
         ttk.Button(btn, text="Test File", command=self._test_first_file).pack(side=tk.LEFT, padx=4)
         ttk.Button(btn, text="Preview Bins", command=self._preview_bins).pack(side=tk.LEFT, padx=4)
@@ -177,10 +537,13 @@ class _GUIBase(_TkBase):
         self.elapsed_label.pack(side=tk.RIGHT)
         self._build_extra_buttons(btn)  # subclass hook
 
-        # status + progress
-        self.status_label = ttk.Label(parent, text="Status: Ready", font=("TkDefaultFont", 10, "bold"),
+        # status + progress (status sits in a sunken inset strip)
+        status_box = tk.Frame(parent, bg=_RETRO["bg"], relief="sunken", bd=1)
+        status_box.pack(fill=tk.X)
+        self.status_label = ttk.Label(status_box, text="Status: Ready",
+                                      font=("TkDefaultFont", 10, "bold"),
                                       anchor="w", justify="left")
-        self.status_label.pack(fill=tk.X)
+        self.status_label.pack(fill=tk.X, padx=3, pady=1)
 
         # Wrap long status text (e.g. full filenames) to the available width
         # instead of clipping it. Guard against the relayout re-triggering us.
@@ -193,7 +556,7 @@ class _GUIBase(_TkBase):
         self.status_label.bind("<Configure>", _wrap_status)
         prog = ttk.Frame(parent)
         prog.pack(fill=tk.X, pady=(2, 4))
-        self.progress_bar = ttk.Progressbar(prog, orient=tk.HORIZONTAL, mode="determinate")
+        self.progress_bar = _SegmentedProgress(prog)
         self.progress_bar.pack(side=tk.LEFT, fill=tk.X, expand=True)
         self.progress_file_label = ttk.Label(prog, text="", width=12, anchor="e")
         self.progress_file_label.pack(side=tk.LEFT, padx=(6, 0))
@@ -201,7 +564,14 @@ class _GUIBase(_TkBase):
         # log
         self.log_text = scrolledtext.ScrolledText(parent, height=10, state="disabled", wrap=tk.WORD)
         self.log_text.pack(fill=tk.BOTH, expand=True, pady=(2, 0))
-        self.log_text.tag_configure("error", foreground="red")
+        self.log_text.tag_configure("error", foreground="#b00000")
+        # Classic terminal feel: parchment field, sunken bevel.
+        self.log_text.configure(background="#f3eede", foreground="#2a2a2a",
+                                relief="sunken", borderwidth=2, highlightthickness=0,
+                                insertbackground="#2a2a2a")
+        mono = getattr(self, "_retro_mono_family", None)
+        if mono:
+            self.log_text.configure(font=(mono, 11))
 
         # timer state
         self._timer_start = None
@@ -877,6 +1247,8 @@ class BaseGUI(_GUIBase):
         root = ttk.Frame(self, padding=8)
         root.pack(fill=tk.BOTH, expand=True)
 
+        self._build_header(root, subtitle="Standard Analysis")
+
         # ---- top: two columns ----
         top = ttk.Frame(root)
         top.pack(fill=tk.X)
@@ -1018,6 +1390,9 @@ class RollingGUI(_GUIBase):
 
         root = ttk.Frame(self, padding=8)
         root.pack(fill=tk.BOTH, expand=True)
+
+        self._build_header(root, subtitle="Rolling Analysis")
+
         top = ttk.Frame(root)
         top.pack(fill=tk.X)
 
@@ -1134,6 +1509,9 @@ class KymographGUI(_GUIBase):
 
         root = ttk.Frame(self, padding=8)
         root.pack(fill=tk.BOTH, expand=True)
+
+        self._build_header(root, subtitle="Kymograph Analysis")
+
         top = ttk.Frame(root)
         top.pack(fill=tk.X)
 
