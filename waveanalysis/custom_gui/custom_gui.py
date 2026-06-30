@@ -55,6 +55,12 @@ class _GUIBase(_TkBase):
     _has_group_names = False
     _has_plot_flags = False
 
+    # Chosen left-to-right order (list of original group names) and display-name
+    # overrides for the group comparison graphs. Set via the "Order & names..."
+    # dialog next to the group names entry; empty until the user edits them.
+    _group_order = None
+    _group_labels = None
+
     # ---- widget helpers (accept a parent frame) ----
 
     @staticmethod
@@ -64,6 +70,41 @@ class _GUIBase(_TkBase):
         label = ttk.Label(parent, text=label_text)
         label.grid(row=row, column=col + 1, padx=(4, 8), pady=2, sticky="w")
         return entry, label
+
+    def _add_group_names(self, parent, row):
+        '''Group names entry + label, with the order/rename button below the label.'''
+        holder = ttk.Frame(parent)
+        holder.grid(row=row, column=0, columnspan=2, sticky="w")
+        ttk.Entry(holder, width=14, textvariable=self.vars["group_names"]).grid(
+            row=0, column=0, padx=2, pady=2, sticky="e")
+        ttk.Label(holder, text="Group names").grid(
+            row=0, column=1, padx=(4, 8), pady=2, sticky="w")
+        ttk.Button(holder, text="Order & names...", command=self._edit_group_order).grid(
+            row=1, column=1, padx=(4, 8), pady=(0, 2), sticky="w")
+
+    def _current_group_names(self):
+        '''De-duplicated, non-blank group names from the entry, in entry order.'''
+        raw = self.vars["group_names"].get() if "group_names" in self.vars else ""
+        return list(dict.fromkeys(g.strip() for g in raw.split(",") if g.strip()))
+
+    def _edit_group_order(self):
+        '''Open the reorder/rename dialog seeded from the current group names.'''
+        groups = self._current_group_names()
+        if len(groups) < 2:
+            messagebox.showinfo(
+                "Group order & names",
+                "Enter at least two comma-separated group names first.",
+            )
+            return
+        # Preserve any prior ordering/renames for groups that still exist.
+        if self._group_order:
+            ordered = [g for g in self._group_order if g in groups]
+            ordered += [g for g in groups if g not in ordered]
+        else:
+            ordered = groups
+        dialog = _GroupOrderDialog(self, ordered, initial_labels=self._group_labels)
+        if dialog.result is not None:
+            self._group_order, self._group_labels = dialog.result
 
     @staticmethod
     def _add_check(parent, row, col, var, label_text):
@@ -720,8 +761,21 @@ class _GUIBase(_TkBase):
                 self._resolved_params["group_names"] = [
                     g.strip() for g in self._resolved_params["group_names"].split(",")
                 ]
+                # Pass the chosen comparison-graph order and display-name overrides,
+                # keeping only groups that survive in the final group names list.
+                present = set(self._resolved_params["group_names"])
+                self._resolved_params["group_order"] = (
+                    [g for g in self._group_order if g in present]
+                    if self._group_order else None
+                )
+                self._resolved_params["group_labels"] = (
+                    {k: v for k, v in self._group_labels.items() if k in present}
+                    if self._group_labels else None
+                )
                 if getattr(self, "_ignore_group_names_once", False):
                     self._resolved_params["group_names"] = [""]
+                    self._resolved_params["group_order"] = None
+                    self._resolved_params["group_labels"] = None
             self._test_folder_path_once = None
             self._ignore_group_names_once = False
             sm = {}
@@ -837,7 +891,7 @@ class BaseGUI(_GUIBase):
         ttk.Entry(pf, textvariable=self.vars["folder_path"]).grid(row=0, column=0, sticky="ew")
         ttk.Button(pf, text="Browse", command=self.get_folder_path, width=7).grid(row=0, column=1, padx=(4, 0))
 
-        self._add_entry(opts, 1, 0, self.vars["group_names"], "Group names", width=14)
+        self._add_group_names(opts, 1)
         self._add_entry(opts, 2, 0, self.vars["box_size"], "Box size (px)")
         self._add_entry(opts, 3, 0, self.vars["bin_shift"], "Box shift (px)")
         self._add_entry(opts, 4, 0, self.vars["acf_peak_thresh"], "ACF peak thresh")
@@ -1093,7 +1147,7 @@ class KymographGUI(_GUIBase):
         ttk.Entry(pf, textvariable=self.vars["folder_path"]).grid(row=0, column=0, sticky="ew")
         ttk.Button(pf, text="Browse", command=self.get_folder_path, width=7).grid(row=0, column=1, padx=(4, 0))
 
-        self._add_entry(opts, 1, 0, self.vars["group_names"], "Group names", width=14)
+        self._add_group_names(opts, 1)
         self._add_entry(opts, 2, 0, self.vars["line_width"], "Line width (px)")
         self._add_entry(opts, 3, 0, self.vars["bin_shift"], "Line shift (px)")
         self._add_entry(opts, 4, 0, self.vars["acf_peak_thresh"], "ACF peak thresh")
@@ -1256,6 +1310,123 @@ class _ImagePreviewWindow(tk.Toplevel):
 
 
 # ---------------------------------------------------------------------------
+# Group order / rename dialog
+# ---------------------------------------------------------------------------
+
+class _GroupOrderDialog(tk.Toplevel):
+    """Modal dialog to reorder groups and rename them for comparison graphs.
+
+    Returns ``(order, labels)`` where ``order`` is the list of original group
+    names in the chosen left-to-right order and ``labels`` maps each original
+    name to its display name (only entries that were actually changed).
+    """
+
+    def __init__(self, parent, groups, initial_labels=None):
+        super().__init__(parent)
+        self.title("Group order & names")
+        self.result = None
+        self.transient(parent)
+        self.grab_set()
+
+        # Preserve the original name with each row so reordering never loses it.
+        # Pre-fill display names from a prior edit when one is supplied.
+        initial_labels = initial_labels or {}
+        self._rows = [
+            {"original": g, "name_var": tk.StringVar(value=initial_labels.get(g, g))}
+            for g in groups
+        ]
+
+        ttk.Label(
+            self,
+            text="Reorder groups (top = left) and edit the display names:",
+        ).pack(padx=10, pady=(10, 4), anchor="w")
+
+        body = ttk.Frame(self)
+        body.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 6))
+
+        self.listbox = tk.Listbox(body, height=min(max(len(groups), 4), 14),
+                                  activestyle="dotbox", exportselection=False)
+        self.listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.listbox.bind("<<ListboxSelect>>", lambda _e: self._sync_entry())
+
+        side = ttk.Frame(body)
+        side.pack(side=tk.LEFT, fill=tk.Y, padx=(8, 0))
+        ttk.Button(side, text="Move up", command=lambda: self._move(-1)).pack(fill=tk.X)
+        ttk.Button(side, text="Move down", command=lambda: self._move(1)).pack(fill=tk.X, pady=(4, 0))
+
+        rename = ttk.Frame(self)
+        rename.pack(fill=tk.X, padx=10, pady=(0, 6))
+        ttk.Label(rename, text="Display name:").pack(side=tk.LEFT)
+        self.name_entry = ttk.Entry(rename)
+        self.name_entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(6, 0))
+        self.name_entry.bind("<KeyRelease>", lambda _e: self._commit_entry())
+
+        btn = ttk.Frame(self)
+        btn.pack(fill=tk.X, padx=10, pady=(0, 10))
+        ttk.Button(btn, text="OK", command=self._ok).pack(side=tk.LEFT, padx=(0, 4))
+        ttk.Button(btn, text="Cancel", command=self._cancel).pack(side=tk.LEFT)
+
+        self._refresh()
+        if self._rows:
+            self.listbox.selection_set(0)
+            self._sync_entry()
+
+        self.protocol("WM_DELETE_WINDOW", self._cancel)
+        self.wait_window()
+
+    def _selected_index(self):
+        sel = self.listbox.curselection()
+        return sel[0] if sel else None
+
+    def _refresh(self):
+        self.listbox.delete(0, tk.END)
+        for row in self._rows:
+            name = row["name_var"].get()
+            label = name if name == row["original"] else f"{name}  (was {row['original']})"
+            self.listbox.insert(tk.END, label)
+
+    def _sync_entry(self):
+        idx = self._selected_index()
+        self.name_entry.delete(0, tk.END)
+        if idx is not None:
+            self.name_entry.insert(0, self._rows[idx]["name_var"].get())
+
+    def _commit_entry(self):
+        idx = self._selected_index()
+        if idx is not None:
+            self._rows[idx]["name_var"].set(self.name_entry.get())
+            self._refresh()
+            self.listbox.selection_set(idx)
+
+    def _move(self, delta):
+        idx = self._selected_index()
+        if idx is None:
+            return
+        new_idx = idx + delta
+        if not 0 <= new_idx < len(self._rows):
+            return
+        self._rows[idx], self._rows[new_idx] = self._rows[new_idx], self._rows[idx]
+        self._refresh()
+        self.listbox.selection_set(new_idx)
+        self._sync_entry()
+
+    def _ok(self):
+        self._commit_entry()
+        order = [row["original"] for row in self._rows]
+        labels = {}
+        for row in self._rows:
+            name = row["name_var"].get().strip()
+            if name and name != row["original"]:
+                labels[row["original"]] = name
+        self.result = (order, labels)
+        self.destroy()
+
+    def _cancel(self):
+        self.result = None
+        self.destroy()
+
+
+# ---------------------------------------------------------------------------
 # Plot viewer
 # ---------------------------------------------------------------------------
 
@@ -1300,6 +1471,7 @@ class _PlotViewer(tk.Toplevel):
         nav.pack(fill=tk.X, padx=10, pady=(0, 6))
         ttk.Button(nav, text="< Prev", command=self._prev).pack(side=tk.LEFT)
         ttk.Button(nav, text="Next >", command=self._next).pack(side=tk.LEFT, padx=4)
+        ttk.Button(nav, text="Group Comparison", command=self._make_group_comparison).pack(side=tk.LEFT, padx=(0, 4))
         ttk.Button(nav, text="Group Correlations", command=self._make_group_correlations).pack(side=tk.LEFT, padx=(0, 4))
         self.file_label = ttk.Label(nav, text="", wraplength=650)
         self.file_label.pack(side=tk.LEFT, padx=10)
@@ -1532,6 +1704,60 @@ class _PlotViewer(tk.Toplevel):
             self._show_generated_plot(output_path)
         except Exception as e:
             self.scatter_status.configure(text=f"Could not create plot: {e}", foreground="red")
+
+    def _make_group_comparison(self):
+        try:
+            import pandas as pd
+            import waveanalysis.plotting as pt
+            import waveanalysis.housekeeping.housekeeping_functions as hf
+
+            csv_files = glob.glob(os.path.join(self.results_path, "!*_summary.csv"))
+            if not csv_files:
+                raise ValueError("No summary CSV found.")
+
+            summary_df = pd.read_csv(sorted(csv_files)[-1])
+            if 'Group Name' not in summary_df.columns:
+                raise ValueError("Summary has no 'Group Name' column to compare.")
+
+            present_groups = [
+                g for g in dict.fromkeys(summary_df['Group Name'].dropna().tolist())
+                if str(g).strip() != ""
+            ]
+            if len(present_groups) < 2:
+                raise ValueError("At least two groups are required for a comparison.")
+
+            dialog = _GroupOrderDialog(self, present_groups)
+            if dialog.result is None:
+                return
+            order, labels = dialog.result
+
+            log_params = {'Plotting errors': []}
+            figs = pt.generate_group_comparison(
+                summary_df=summary_df,
+                log_params=log_params,
+                dark_plots=self.default_dark_plots,
+                group_order=order,
+                group_labels=labels,
+            )
+            if not figs:
+                raise ValueError("No metrics had data to compare.")
+
+            out_dir = os.path.join(self.results_path, "group_comparison_graphs")
+            os.makedirs(out_dir, exist_ok=True)
+            hf.save_plots(figs, out_dir, group_by_metric=True)
+
+            first_path = None
+            for root, _dirs, files in os.walk(out_dir):
+                for f in sorted(files, key=_natural_sort_key):
+                    if f.lower().endswith(".png"):
+                        first_path = os.path.join(root, f)
+                        break
+                if first_path:
+                    break
+            if first_path:
+                self._show_generated_plot(first_path)
+        except Exception as e:
+            messagebox.showerror("Group Comparison", f"Could not create group comparison:\n{e}")
 
     def _make_group_correlations(self):
         try:

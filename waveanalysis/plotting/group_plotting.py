@@ -21,6 +21,45 @@ _SIGNED_METRIC_KEYS = ('Shift', 'Diff')
 # Minimum observations per group before a statistical test is run.
 _MIN_N_FOR_STATS = 3
 
+# Substring identifying detection-failure columns: the percentage of bins with
+# no measurable period/peak/shift. These are quality signals (higher = weaker,
+# noisier signal) rather than biological measurements.
+_DETECTION_FAILURE_KEY = 'Pcnt No'
+
+# A group whose median detection-failure rate exceeds this is flagged: its wave
+# metrics rest on relatively few usable bins.
+_DETECTION_CAUTION_PCNT = 50.0
+
+
+def _resolve_display_and_order(
+    summary_df: pd.DataFrame,
+    group_order: list = None,
+    group_labels: dict = None,
+) -> tuple:
+    '''Apply display-name overrides and resolve left-to-right group order.
+
+    Returns (possibly-relabeled copy of summary_df, ordered list of group names).
+    Renaming is applied on a copy so the caller's frame is untouched, and the
+    returned order is expressed in the (possibly renamed) display space. Order is
+    caller-specified first, then any remaining groups in order of first
+    appearance (more meaningful than seaborn's alphabetical default).
+    '''
+    if group_labels:
+        summary_df = summary_df.copy()
+        summary_df['Group Name'] = summary_df['Group Name'].map(
+            lambda g: group_labels.get(g, g)
+        )
+        if group_order is not None:
+            group_order = [group_labels.get(g, g) for g in group_order]
+
+    present_groups = list(dict.fromkeys(summary_df['Group Name'].tolist()))
+    if group_order is not None:
+        order = [g for g in group_order if g in present_groups]
+        order += [g for g in present_groups if g not in order]
+    else:
+        order = present_groups
+    return summary_df, order
+
 
 def _p_to_stars(p: float) -> str:
     '''Conventional significance markers for a p-value.'''
@@ -83,6 +122,7 @@ def generate_group_comparison(
     channel_names: list = None,
     edge_height_fraction: float = 0.5,
     group_order: list = None,
+    group_labels: dict = None,
     add_stats: bool = True,
 ) -> dict:
     """
@@ -98,8 +138,12 @@ def generate_group_comparison(
         log_params (dict): A dictionary to log any errors encountered during plotting.
                            Expects a key 'Plotting errors' with a list as value.
         dark_plots (bool): If True, use a dark theme with black background.
-        group_order (list): Explicit left-to-right group order. Defaults to order
-                            of first appearance in the dataframe.
+        group_order (list): Explicit left-to-right group order, given as the
+                            original group names. Defaults to order of first
+                            appearance in the dataframe.
+        group_labels (dict): Optional mapping of original group name -> display
+                             name. Renaming is applied before ordering and is
+                             reflected in the x-axis tick labels.
         add_stats (bool): If True, annotate a non-parametric group test.
 
     Returns:
@@ -111,14 +155,7 @@ def generate_group_comparison(
     # get the parameters to compare
     parameters_to_compare = [column for column in summary_df.columns if 'Mean' in column]
 
-    # Determine left-to-right group order: caller-specified, else order of first
-    # appearance (more meaningful than seaborn's default alphabetical sort).
-    present_groups = list(dict.fromkeys(summary_df['Group Name'].tolist()))
-    if group_order is not None:
-        order = [g for g in group_order if g in present_groups]
-        order += [g for g in present_groups if g not in order]
-    else:
-        order = present_groups
+    summary_df, order = _resolve_display_and_order(summary_df, group_order, group_labels)
 
     point_color = 'lightgray' if dark_plots else '.25'
 
@@ -489,4 +526,401 @@ def _return_group_correlation_figure(
         ax.set_title(f'{group_name}: metric correlations')
         plt.close(fig)
 
+    return fig
+
+
+# ---------------------------------------------------------------------------
+# Dataset-quality plots (group comparison level)
+#
+# These describe how trustworthy a group's data is, rather than its biology:
+#  - detection failure: % of bins where no period/peak/shift was measurable
+#  - coverage: number of bins contributing to each image's per-image means
+#  - effective sample size: how many images actually carry a usable value for
+#    each metric in each group (the "can I even run stats here?" map)
+# ---------------------------------------------------------------------------
+
+
+def _quality_box_swarm(
+    summary_df: pd.DataFrame,
+    param: str,
+    order: list,
+    ylabel: str,
+    title: str,
+    dark_plots: bool = False,
+    caution_level: float = None,
+    caution_label: str = None,
+    add_stats: bool = True,
+) -> plt.Figure:
+    '''Draw one box + swarm-per-group figure for a single quality column.
+
+    Mirrors the look of generate_group_comparison (colorblind boxes, jittered
+    points, per-group n in the tick labels, optional non-parametric group test)
+    but is aimed at quality columns. An optional caution band shades the region
+    beyond caution_level to flag groups in the danger zone.
+    '''
+    point_color = 'lightgray' if dark_plots else '.25'
+    with style_context(dark_plots):
+        fig, ax = plt.subplots()
+        apply_dark(fig, ax, dark_plots)
+
+        sns.boxplot(
+            x='Group Name', y=param, data=summary_df, order=order,
+            showfliers=False, palette='colorblind', ax=ax,
+        )
+        sns.swarmplot(
+            x='Group Name', y=param, data=summary_df, order=order,
+            color=point_color, ax=ax,
+        )
+
+        groups_data = [
+            summary_df.loc[summary_df['Group Name'] == g, param].dropna().values
+            for g in order
+        ]
+
+        # Non-parametric group test (run before tick labels so any y-limit
+        # headroom for the significance bracket is already applied).
+        stat_line = None
+        if add_stats and len(order) >= 2:
+            stat_line = _group_comparison_stats(ax, groups_data, dark_plots)
+
+        # Shade the caution region (e.g. >50% of bins with no detection).
+        if caution_level is not None:
+            top = max(ax.get_ylim()[1], caution_level)
+            ax.axhspan(caution_level, top, color='red', alpha=0.08, zorder=0)
+            ax.axhline(caution_level, color='red', alpha=0.45, lw=1, ls='--')
+            if caution_label:
+                ax.text(
+                    0.99, caution_level, caution_label, transform=ax.get_yaxis_transform(),
+                    ha='right', va='bottom', fontsize=7,
+                    color='salmon' if dark_plots else 'firebrick',
+                )
+
+        full_title = title
+        if stat_line:
+            full_title += f'\n{stat_line}'
+        ax.set_title(full_title, fontsize=10)
+        ax.set_xlabel('Group')
+        ax.set_ylabel(ylabel)
+        ax.set_xticks(range(len(order)))
+        ax.set_xticklabels(
+            [f'{g}\n(n={len(d)})' for g, d in zip(order, groups_data)],
+            rotation=45, ha='right',
+        )
+        fig.tight_layout()
+        plt.close(fig)
+    return fig
+
+
+def generate_group_detection_quality(
+    summary_df: pd.DataFrame,
+    log_params: dict,
+    dark_plots: bool = False,
+    channel_names: list = None,
+    edge_height_fraction: float = 0.5,
+    group_order: list = None,
+    group_labels: dict = None,
+    add_stats: bool = True,
+) -> dict:
+    '''
+    Generate detection-failure comparisons per group.
+
+    For every "Pcnt No ..." column (the percentage of bins where no period,
+    peak, or shift could be measured) draw a box + swarm per group. A group
+    sitting high here has weak/noisy signal, so its wave metrics rest on few
+    usable bins. A caution band marks the >50% region.
+
+    Returns a dict mapping column name -> matplotlib Figure.
+    '''
+    print('Generating detection-quality comparisons...')
+    figs = {}
+    if 'Group Name' not in summary_df.columns:
+        return figs
+
+    summary_df, order = _resolve_display_and_order(summary_df, group_order, group_labels)
+    failure_cols = [c for c in summary_df.columns if _DETECTION_FAILURE_KEY in c]
+
+    for param in failure_cols:
+        try:
+            if summary_df[param].dropna().empty:
+                raise ValueError('No data to compare')
+            display_param = relabel_metric_text(param, channel_names, edge_height_fraction)
+            figs[param] = _quality_box_swarm(
+                summary_df,
+                param,
+                order,
+                ylabel=f'{display_param} (%)',
+                title=f'Detection failure: {display_param}',
+                dark_plots=dark_plots,
+                caution_level=_DETECTION_CAUTION_PCNT,
+                caution_label=f'caution: >{_DETECTION_CAUTION_PCNT:.0f}% undetected',
+                add_stats=add_stats,
+            )
+        except ValueError:
+            log_params.setdefault('Plotting errors', []).append(
+                f'No data to compare for {param}'
+            )
+    return figs
+
+
+def generate_group_coverage(
+    summary_df: pd.DataFrame,
+    log_params: dict,
+    dark_plots: bool = False,
+    group_order: list = None,
+    group_labels: dict = None,
+    add_stats: bool = True,
+) -> dict:
+    '''
+    Generate a per-group coverage comparison from the 'Num Bins' column.
+
+    Each point is one image; low values flag under-sampled images whose
+    per-image means are statistically thin. Returns a dict mapping a single
+    plot name -> matplotlib Figure (empty if the column is absent/empty).
+    '''
+    print('Generating coverage comparison...')
+    figs = {}
+    if 'Group Name' not in summary_df.columns or 'Num Bins' not in summary_df.columns:
+        return figs
+
+    summary_df, order = _resolve_display_and_order(summary_df, group_order, group_labels)
+    work_df = summary_df.copy()
+    work_df['Num Bins'] = pd.to_numeric(work_df['Num Bins'], errors='coerce')
+    if work_df['Num Bins'].dropna().empty:
+        log_params.setdefault('Plotting errors', []).append('No data to compare for Num Bins')
+        return figs
+
+    figs['Num Bins'] = _quality_box_swarm(
+        work_df,
+        'Num Bins',
+        order,
+        ylabel='Number of bins per image',
+        title='Coverage: bins per image',
+        dark_plots=dark_plots,
+        add_stats=add_stats,
+    )
+    return figs
+
+
+def generate_group_effective_n_heatmap(
+    summary_df: pd.DataFrame,
+    log_params: dict,
+    dark_plots: bool = False,
+    channel_names: list = None,
+    edge_height_fraction: float = None,
+    group_order: list = None,
+    group_labels: dict = None,
+) -> dict:
+    '''
+    Generate an effective sample-size heatmap (group x metric).
+
+    Each cell is the number of images in a group that carry a usable (non-NaN)
+    value for a metric -- the "can I even run stats here?" map. Cells below
+    _MIN_N_FOR_STATS are outlined so under-supported group/metric pairs stand
+    out. Returns a dict mapping a single plot name -> matplotlib Figure.
+    '''
+    print('Generating effective sample-size heatmap...')
+    figs = {}
+    if 'Group Name' not in summary_df.columns:
+        return figs
+
+    summary_df, order = _resolve_display_and_order(summary_df, group_order, group_labels)
+    metric_cols = [
+        c for c in summary_df.columns
+        if 'Mean' in c and pd.to_numeric(summary_df[c], errors='coerce').notna().any()
+    ]
+    if not order or not metric_cols:
+        log_params.setdefault('Plotting errors', []).append(
+            'Not enough data for effective sample-size heatmap'
+        )
+        return figs
+
+    counts = np.zeros((len(order), len(metric_cols)), dtype=int)
+    for i, group in enumerate(order):
+        group_df = summary_df.loc[summary_df['Group Name'] == group]
+        for j, col in enumerate(metric_cols):
+            counts[i, j] = int(pd.to_numeric(group_df[col], errors='coerce').notna().sum())
+
+    labels = [relabel_metric_text(c, channel_names, edge_height_fraction) for c in metric_cols]
+    figs['Effective Sample Size'] = _return_effective_n_figure(
+        counts, row_labels=[str(g) for g in order], col_labels=labels, dark_plots=dark_plots,
+    )
+    return figs
+
+
+def _return_effective_n_figure(
+    counts: np.ndarray,
+    row_labels: list,
+    col_labels: list,
+    dark_plots: bool = False,
+) -> plt.Figure:
+    n_rows, n_cols = counts.shape
+    with style_context(dark_plots):
+        width = min(max(0.5 * n_cols + 4, 8), 22)
+        height = min(max(0.5 * n_rows + 2, 4), 16)
+        fig, ax = plt.subplots(figsize=(width, height), constrained_layout=True)
+        apply_dark(fig, ax, dark_plots)
+
+        vmax = max(counts.max(), 1)
+        im = ax.imshow(counts, vmin=0, vmax=vmax, cmap='viridis', aspect='auto')
+        ax.set_xticks(range(n_cols))
+        ax.set_xticklabels(col_labels, rotation=45, ha='right', fontsize=7)
+        ax.set_yticks(range(n_rows))
+        ax.set_yticklabels(row_labels, fontsize=8)
+
+        for i in range(n_rows):
+            for j in range(n_cols):
+                value = int(counts[i, j])
+                # Annotate count; outline cells too thin to run a group test.
+                ax.text(j, i, str(value), ha='center', va='center', fontsize=7,
+                        color='white' if value < 0.6 * vmax else 'black')
+                if value < _MIN_N_FOR_STATS:
+                    ax.add_patch(plt.Rectangle(
+                        (j - 0.5, i - 0.5), 1, 1, fill=False,
+                        edgecolor='red', lw=1.5,
+                    ))
+
+        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
+        cbar.set_label('Usable images (non-NaN)')
+        ax.set_title(
+            f'Effective sample size per group x metric\n'
+            f'(red outline: n < {_MIN_N_FOR_STATS}, too few for a group test)',
+            fontsize=10,
+        )
+        plt.close(fig)
+    return fig
+
+
+def generate_group_per_image_reliability(
+    summary_df: pd.DataFrame,
+    log_params: dict,
+    dark_plots: bool = False,
+    channel_names: list = None,
+    edge_height_fraction: float = 0.5,
+    group_order: list = None,
+    group_labels: dict = None,
+) -> dict:
+    '''
+    Generate per-image reliability (caterpillar) plots, one per metric.
+
+    Each marker is one image's per-image mean for the metric, with a vertical
+    error bar of +/- the within-image StdDev across its bins. Images are blocked
+    by group (group dividers + a group label) and sorted by mean within each
+    block, so both the central tendency and the within-image spread of every
+    individual image are visible at a glance. Long error bars flag images whose
+    mean rests on highly variable bins.
+
+    Returns a dict mapping metric column name -> matplotlib Figure.
+    '''
+    print('Generating per-image reliability plots...')
+    figs = {}
+    if 'Group Name' not in summary_df.columns or 'File Name' not in summary_df.columns:
+        return figs
+
+    summary_df, order = _resolve_display_and_order(summary_df, group_order, group_labels)
+    mean_cols = [
+        c for c in summary_df.columns
+        if 'Mean' in c and pd.to_numeric(summary_df[c], errors='coerce').notna().any()
+    ]
+
+    palette = dict(zip(order, sns.color_palette('colorblind', n_colors=len(order))))
+
+    for param in mean_cols:
+        sd_param = param.replace('Mean', 'StdDev')
+        try:
+            cols = ['Group Name', 'File Name', param]
+            if sd_param in summary_df.columns:
+                cols.append(sd_param)
+            plot_df = summary_df[cols].copy()
+            plot_df[param] = pd.to_numeric(plot_df[param], errors='coerce')
+            if sd_param in plot_df.columns:
+                plot_df[sd_param] = pd.to_numeric(plot_df[sd_param], errors='coerce')
+            plot_df = plot_df.dropna(subset=[param])
+            if plot_df.empty:
+                raise ValueError('No data to plot')
+
+            display_param = relabel_metric_text(param, channel_names, edge_height_fraction)
+            figs[param] = _return_per_image_reliability_figure(
+                plot_df,
+                param=param,
+                sd_param=sd_param if sd_param in plot_df.columns else None,
+                order=order,
+                palette=palette,
+                ylabel=display_param,
+                title=f'Per-image reliability: {display_param}',
+                dark_plots=dark_plots,
+            )
+        except ValueError:
+            log_params.setdefault('Plotting errors', []).append(
+                f'No data to plot for {param}'
+            )
+    return figs
+
+
+def _return_per_image_reliability_figure(
+    plot_df: pd.DataFrame,
+    param: str,
+    sd_param: str,
+    order: list,
+    palette: dict,
+    ylabel: str,
+    title: str,
+    dark_plots: bool = False,
+) -> plt.Figure:
+    # Lay images out left-to-right: grouped by group order, sorted by mean within
+    # each group so each block reads as a rising "caterpillar".
+    blocks = []
+    for group in order:
+        block = plot_df.loc[plot_df['Group Name'] == group].sort_values(param)
+        if not block.empty:
+            blocks.append((group, block))
+    ordered = pd.concat([b for _, b in blocks]) if blocks else plot_df
+    n = len(ordered)
+
+    with style_context(dark_plots):
+        width = min(max(0.18 * n + 3, 7), 26)
+        fig, ax = plt.subplots(figsize=(width, 5.5))
+        apply_dark(fig, ax, dark_plots)
+
+        edge_color = 'white' if dark_plots else 'black'
+        x = 0
+        group_spans = []
+        for group, block in blocks:
+            xs = np.arange(x, x + len(block))
+            means = block[param].values
+            yerr = block[sd_param].values if sd_param else None
+            ax.errorbar(
+                xs, means, yerr=yerr, fmt='o', markersize=5,
+                color=palette.get(group, edge_color),
+                ecolor=palette.get(group, edge_color),
+                elinewidth=1, capsize=2, markeredgecolor=edge_color,
+                markeredgewidth=0.4, alpha=0.9, label=str(group),
+            )
+            group_spans.append((group, x, x + len(block) - 1))
+            x += len(block)
+            # divider between group blocks
+            if x < n:
+                ax.axvline(x - 0.5, color='gray', alpha=0.4, lw=0.8, ls='--')
+
+        # group label centered under each block
+        for group, x0, x1 in group_spans:
+            ax.text((x0 + x1) / 2, 1.01, str(group), transform=ax.get_xaxis_transform(),
+                    ha='center', va='bottom', fontsize=9,
+                    color=palette.get(group, edge_color))
+
+        # per-image file-name ticks, but only when there are few enough to read
+        if n <= 60:
+            ax.set_xticks(range(n))
+            ax.set_xticklabels(ordered['File Name'].astype(str).tolist(),
+                               rotation=90, fontsize=6)
+        else:
+            ax.set_xticks([])
+            ax.set_xlabel(f'Images (n={n}, sorted by mean within group)')
+
+        ax.set_ylabel(f'{ylabel} (mean ± SD)' if sd_param else ylabel)
+        # extra pad so the title clears the centered group labels above each block
+        ax.set_title(title, fontsize=10, pad=22)
+        ax.grid(True, axis='y', alpha=0.25)
+        ax.margins(x=0.01)
+        fig.tight_layout()
+        plt.close(fig)
     return fig

@@ -35,6 +35,8 @@ def combined_workflow(
     smoothing: bool = False,
     channel_names: list = None,
     edge_height_fraction: float = 0.5,
+    group_order: list = None,
+    group_labels: dict = None,
 ) -> pd.DataFrame:
     '''
     This is the combined workflow for kymographs and standard analysis. It processes the image files in the 
@@ -500,10 +502,53 @@ def combined_workflow(
                 dark_plots=plot_flags["dark_plots"],
                 channel_names=channel_names,
                 edge_height_fraction=edge_height_fraction,
+                group_order=group_order,
+                group_labels=group_labels,
             )
             group_plots_save_path = os.path.join(main_save_path, "group_comparison_graphs")
             os.makedirs(group_plots_save_path, exist_ok=True) if not test else None
             hf.save_plots(mean_parameter_figs, group_plots_save_path, group_by_metric=True) if not test else None
+
+            # dataset-quality plots: detection failure, coverage, effective N
+            quality_figs = {}
+            quality_figs.update(pt.generate_group_detection_quality(
+                summary_df=summary_df,
+                log_params=log_params,
+                dark_plots=plot_flags["dark_plots"],
+                channel_names=channel_names,
+                edge_height_fraction=edge_height_fraction,
+                group_order=group_order,
+                group_labels=group_labels,
+            ))
+            quality_figs.update(pt.generate_group_coverage(
+                summary_df=summary_df,
+                log_params=log_params,
+                dark_plots=plot_flags["dark_plots"],
+                group_order=group_order,
+                group_labels=group_labels,
+            ))
+            quality_figs.update(pt.generate_group_effective_n_heatmap(
+                summary_df=summary_df,
+                log_params=log_params,
+                dark_plots=plot_flags["dark_plots"],
+                channel_names=channel_names,
+                edge_height_fraction=edge_height_fraction,
+                group_order=group_order,
+                group_labels=group_labels,
+            ))
+            quality_figs.update(pt.generate_group_per_image_reliability(
+                summary_df=summary_df,
+                log_params=log_params,
+                dark_plots=plot_flags["dark_plots"],
+                channel_names=channel_names,
+                edge_height_fraction=edge_height_fraction,
+                group_order=group_order,
+                group_labels=group_labels,
+            ))
+            if not test and quality_figs:
+                quality_save_path = os.path.join(main_save_path, "quality_assessment_graphs")
+                os.makedirs(quality_save_path, exist_ok=True)
+                hf.save_plots(quality_figs, quality_save_path)
 
             # save the means each parameter for the attributes to make them easier to work with
             parameter_tables_dict = save_parameter_means_to_csv(summary_df=summary_df,group_names=group_names)

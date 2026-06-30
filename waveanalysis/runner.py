@@ -101,9 +101,14 @@ def _build_log_params(params, analysis_type):
             "Box Size(px)": params["box_size"],
             "Box Shift(px)": params["bin_shift"],
             "Group Names": params["group_names"],
+            "Group Order": params.get("group_order"),
+            "Group Display Names": params.get("group_labels"),
             "Plot Summary ACFs": params["plot_flags"]["plot_summary_ACFs"],
             "Plot Summary CCFs": params["plot_flags"]["plot_summary_CCFs"],
             "Plot Summary Peaks": params["plot_flags"]["plot_summary_peaks"],
+            "Plot Metric Correlations": params["plot_flags"].get(
+                "plot_metric_correlations", params["plot_flags"].get("plot_summary_peaks", False)
+            ),
             "Plot Individual ACFs": params["plot_flags"]["plot_indv_ACFs"],
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
@@ -130,9 +135,14 @@ def _build_log_params(params, analysis_type):
             "Line width": params["line_width"],
             "Line Shift(px)": params["bin_shift"],
             "Group Names": params["group_names"],
+            "Group Order": params.get("group_order"),
+            "Group Display Names": params.get("group_labels"),
             "Plot Summary ACFs": params["plot_flags"]["plot_summary_ACFs"],
             "Plot Summary CCFs": params["plot_flags"]["plot_summary_CCFs"],
             "Plot Summary Peaks": params["plot_flags"]["plot_summary_peaks"],
+            "Plot Metric Correlations": params["plot_flags"].get(
+                "plot_metric_correlations", params["plot_flags"].get("plot_summary_peaks", False)
+            ),
             "Plot Individual ACFs": params["plot_flags"]["plot_indv_ACFs"],
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
@@ -206,6 +216,8 @@ def _run_analysis(gui):
                 smoothing=params["smoothing"],
                 channel_names=channel_names,
                 edge_height_fraction=params["edge_height_fraction"],
+                group_order=params.get("group_order"),
+                group_labels=params.get("group_labels"),
             )
 
         elif analysis_type == "rolling":
@@ -252,6 +264,8 @@ def _run_analysis(gui):
                 smoothing=params["smoothing"],
                 channel_names=channel_names,
                 edge_height_fraction=params["edge_height_fraction"],
+                group_order=params.get("group_order"),
+                group_labels=params.get("group_labels"),
             )
 
         if log_params["Errors"]:
