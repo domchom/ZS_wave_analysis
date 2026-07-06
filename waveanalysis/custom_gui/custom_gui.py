@@ -2867,6 +2867,37 @@ _HELP = {
              "rests on highly variable bins.",
              "qualityReliability"),
         ],
+        "Rolling": [
+            ("About rolling plots",
+             "Rolling analysis splits a long movie into overlapping sub-movies and "
+             "reports every metric as a time course: its mean ± SD across bins, "
+             "plotted over the sub-movie index, so you can watch a wave property "
+             "drift over the recording. One figure is written per metric and "
+             "channel (or channel pair), sorted into sub-folders by category "
+             "(Period, Peak_Properties, Landmark, Slope_Properties, Channel_Shifts, "
+             "Edge_vs_Peak_Shifts). These replace the summary/group plots of the "
+             "standard and kymograph modes.",
+             "rolling_analysis"),
+            ("Period & peak shape (per channel)",
+             "Mean period and each peak-shape metric (amplitude, relative "
+             "amplitude, width, apex, baseline, apex offset, area) tracked across "
+             "the sub-movies."),
+            ("Edge timing & slopes (per channel)",
+             "Rise / fall durations and their difference, plus the rising / falling "
+             "and steepest (max) rising / falling edge slopes and their ratio — the "
+             "same metrics as the standard analysis, tracked over time."),
+            ("Inter-channel shifts (per channel pair)",
+             "For multi-channel data: the CCF shift and CCF % phase shift, plus the "
+             "landmark shifts (peak-apex, rising-edge, falling-edge) and their "
+             "apex-difference metrics, each across the sub-movies."),
+            ("Live injection overlay",
+             "When a recording captures a mid-experiment injection, set the "
+             "injection frame to mark it (a vertical dashed line on every rolling "
+             "plot) and tick 'Overlay signal Ch1–Ch4' to superimpose those "
+             "channels' mean intensity, rescaled to each plot's y-range, so metric "
+             "changes can be lined up against the injection. See the 'Live "
+             "Injection' control in the Controls tab."),
+        ],
     },
     "Metrics": [
         ("Units",
