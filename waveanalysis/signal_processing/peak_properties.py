@@ -233,6 +233,42 @@ def calc_indv_peak_props_workflow(
     
     return indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas, indv_rising_slopes, indv_falling_slopes, indv_max_rising_slopes, indv_max_falling_slopes
 
+def _peak_slopes(signal: np.ndarray, peaks: np.ndarray) -> tuple:
+    '''
+    Mean rising/falling edge slopes and their steepest (max) instantaneous
+    values over the detected peaks. Mirrors the slope math in
+    calc_indv_peak_props_workflow so rolling and standard analyses agree.
+
+    Returns (mean_rising, mean_falling, mean_max_rising, mean_max_falling);
+    entries are NaN where they cannot be computed.
+    '''
+    _, left_trough, right_trough = sig.peak_prominences(signal, peaks)
+
+    # Average edge slope: signal change divided by time from trough to apex.
+    rising_slopes = (signal[peaks] - signal[left_trough]) / (peaks - left_trough)
+    falling_slopes = (signal[peaks] - signal[right_trough]) / (peaks - right_trough)
+
+    # Steepest instantaneous slope on each edge, from the smoothed derivative.
+    # savgol needs at least window_length samples; skip (NaN) for tiny windows.
+    if len(signal) >= 11:
+        signal_derivative = np.gradient(signal)
+        signal_derivative = sig.savgol_filter(signal_derivative, window_length=11, polyorder=2)
+        max_rising_slopes, max_falling_slopes = compute_derivative_props(
+            signal_derivative, peaks, left_trough, right_trough)
+        mean_max_rising_slope = np.nanmean(max_rising_slopes)
+        mean_max_falling_slope = np.nanmean(max_falling_slopes)
+    else:
+        mean_max_rising_slope = np.nan
+        mean_max_falling_slope = np.nan
+
+    return (
+        np.nanmean(rising_slopes),
+        np.nanmean(falling_slopes),
+        mean_max_rising_slope,
+        mean_max_falling_slope,
+    )
+
+
 def calc_indv_peak_props_rolling(signal: np.ndarray, peak_prominence_fraction: float = _DEFAULT_PEAK_PROMINENCE_FRACTION) -> tuple:
     '''
     Calculate the individual peak properties of a signal using rolling window.
@@ -241,7 +277,9 @@ def calc_indv_peak_props_rolling(signal: np.ndarray, peak_prominence_fraction: f
         signal (np.ndarray): The input signal.
 
     Returns:
-        tuple: A tuple containing the mean width, mean maximum, mean minimum, and mean offset of the peaks. If no peaks are detected, NaN values are returned.
+        tuple: mean width, max, min, offset, area, and the rising/falling and
+        max rising/falling slopes of the peaks. If no peaks are detected, NaN
+        values are returned.
     '''
     # Find peaks in the (already-smoothed) signal
     peaks, _ = sig.find_peaks(signal, prominence=(np.max(signal)-np.min(signal))*peak_prominence_fraction)
@@ -296,7 +334,10 @@ def calc_indv_peak_props_rolling(signal: np.ndarray, peak_prominence_fraction: f
             peak_areas.append(auc_peak)
 
         mean_area = np.nanmean(peak_areas)
-        
+
+        # Rising/falling edge slopes (shared with the standard workflow)
+        mean_rising_slope, mean_falling_slope, mean_max_rising_slope, mean_max_falling_slope = _peak_slopes(signal, peaks)
+
     else:
         # If no peaks detected, return NaNs
         mean_width = np.nan
@@ -304,8 +345,13 @@ def calc_indv_peak_props_rolling(signal: np.ndarray, peak_prominence_fraction: f
         mean_min = np.nan
         mean_offset = np.nan
         mean_area = np.nan
+        mean_rising_slope = np.nan
+        mean_falling_slope = np.nan
+        mean_max_rising_slope = np.nan
+        mean_max_falling_slope = np.nan
 
-    return mean_width, mean_max, mean_min, mean_offset, mean_area
+    return (mean_width, mean_max, mean_min, mean_offset, mean_area,
+            mean_rising_slope, mean_falling_slope, mean_max_rising_slope, mean_max_falling_slope)
 
 def compute_derivative_props(signal_derivative, peaks, left_troughs, right_troughs):
     """

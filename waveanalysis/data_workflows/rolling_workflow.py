@@ -152,6 +152,10 @@ def rolling_workflow(
                 indv_peak_mins = np.zeros(shape=(num_submovies, num_channels, num_bins))
                 indv_peak_offsets = np.zeros(shape=(num_submovies, num_channels, num_bins))
                 indv_peak_areas = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_rising_slopes = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_falling_slopes = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_max_rising_slopes = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_max_falling_slopes = np.zeros(shape=(num_submovies, num_channels, num_bins))
 
                 its = num_submovies*num_channels*num_x_bins*num_y_bins
                 with tqdm(total = its, miniters=its/100) as pbar:
@@ -162,7 +166,9 @@ def rolling_workflow(
                                 pbar.update(1)
                                 signal = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, channel, bin]
 
-                                mean_width, mean_max, mean_min, mean_offset, mean_area = sp.calc_indv_peak_props_rolling(signal=signal, peak_prominence_fraction=img_props['peak_prominence_fraction'])
+                                (mean_width, mean_max, mean_min, mean_offset, mean_area,
+                                 mean_rising_slope, mean_falling_slope,
+                                 mean_max_rising_slope, mean_max_falling_slope) = sp.calc_indv_peak_props_rolling(signal=signal, peak_prominence_fraction=img_props['peak_prominence_fraction'])
 
                                 # Store peak measurements for each bin in each channel
                                 indv_peak_widths[submovie, channel, bin] = mean_width
@@ -170,6 +176,10 @@ def rolling_workflow(
                                 indv_peak_mins[submovie, channel, bin] = mean_min
                                 indv_peak_offsets[submovie, channel, bin] = mean_offset
                                 indv_peak_areas[submovie, channel, bin] = mean_area
+                                indv_rising_slopes[submovie, channel, bin] = mean_rising_slope
+                                indv_falling_slopes[submovie, channel, bin] = mean_falling_slope
+                                indv_max_rising_slopes[submovie, channel, bin] = mean_max_rising_slope
+                                indv_max_falling_slopes[submovie, channel, bin] = mean_max_falling_slope
 
                 indv_peak_amps = indv_peak_maxs - indv_peak_mins
                 indv_peak_rel_amps = indv_peak_amps / indv_peak_mins
@@ -264,6 +274,13 @@ def rolling_workflow(
                 indv_rise_minus_fall_durations = indv_rise_minus_fall_durations * img_props['frame_interval']
                 # peak area is integrated over the frame index (AU*frames), so scale to AU*s
                 indv_peak_areas = indv_peak_areas * img_props['frame_interval']
+                # slopes are AU per frame, so divide by the interval to get AU/s
+                indv_rising_slopes = indv_rising_slopes / img_props['frame_interval']
+                indv_falling_slopes = indv_falling_slopes / img_props['frame_interval']
+                indv_max_rising_slopes = indv_max_rising_slopes / img_props['frame_interval']
+                indv_max_falling_slopes = indv_max_falling_slopes / img_props['frame_interval']
+                # slope ratio is dimensionless (rise vs fall steepness; 1 = symmetric)
+                indv_max_slope_ratios = -1 * (indv_max_rising_slopes / indv_max_falling_slopes)
 
                 img_metrics = {
                                 'Period': indv_periods,
@@ -277,6 +294,11 @@ def rolling_workflow(
                                 'Rise Duration': indv_rise_durations,
                                 'Fall Duration': indv_fall_durations,
                                 'Rise minus Fall Duration': indv_rise_minus_fall_durations,
+                                'Rising Slope': indv_rising_slopes,
+                                'Falling Slope': indv_falling_slopes,
+                                'Max Rising Slope': indv_max_rising_slopes,
+                                'Max Falling Slope': indv_max_falling_slopes,
+                                'Rising/Falling Slope Ratio': indv_max_slope_ratios,
                 }
 
                 # add shifts to the dictionary if there are multiple channels
