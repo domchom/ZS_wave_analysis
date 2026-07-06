@@ -129,9 +129,6 @@ def _build_log_params(params, analysis_type):
         log_params.update({
             "Box Size(px)": params["box_size"],
             "Box Shift(px)": params["bin_shift"],
-            "Plot sub-movie ACFs": params["plot_subframe_ACFs"],
-            "Plot movie CCFs": params["plot_subframe_CCFs"],
-            "Plot movie Peaks": params["plot_subframe_peaks"],
             "Submovies Used": [],
             "Plotting errors": [],
             "Rise/Fall Landmark Height": params.get("edge_height_fraction", 0.5),
