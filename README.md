@@ -21,7 +21,7 @@ The mean pixel intensity in each box, when viewed over time, is a readout for th
 
 ![GitHub-Mark-Light](assets/images/autocorrelation_dark.png#gh-dark-mode-only)![GitHub-Mark-Dark](assets/images/autocorrelation_light.png#gh-light-mode-only)
 
-For multi-channel datasets, the temporal shift between the two signals is estimated by computing the cross-correlation of the channels. Additionally, it quantifies the shift as a percentage of the period (Phase Shift), offering a valuable means of normalizing data, particularly when dealing with varying periods.
+For multi-channel datasets, the temporal shift between the two signals is estimated by computing the cross-correlation of the channels (the CCF Shift). Additionally, it quantifies the shift as a percentage of the period (CCF % Phase Shift), offering a valuable means of normalizing data, particularly when dealing with varying periods.
 
 ![GitHub-Mark-Light](assets/images/crosscorrelation_dark.png#gh-dark-mode-only)![GitHub-Mark-Dark](assets/images/crosscorrelation_light.png#gh-light-mode-only)
 
@@ -66,16 +66,32 @@ Before running any analysis on your data, be sure to complete all necessary pre-
 - Currently, this tool agnostically analyzes the entire image. If you wish to only analyze a specific region, crop it into a separate file. In the future, I plan to incorporate the ability to pass in a mask to specifically measure one or more sub-regions of the image (e.g., to separate out measurements from individual cells, or separate out background regions). 
 
 ## Definition of Metrics
-- Peak Period: The temporal distance between a signal's first autocorrelation peak and the center of the autocorrelation curve. Estimated by identifying the most prominent peak nearest to zero-lag in the normalized autocorrelation function.
-- Peak Width: The full width at half maximum (FWHM) of each detected peak in the signal.
-- Peak Offset: The temporal distance between a detected peak and the midpoint of its two flanking troughs. A value of zero indicates a symmetric peak; non-zero values indicate asymmetry between the rising and falling phases. This metric is most informative for non-sinusoidal waveforms where peak shape deviates from symmetry.
-- Peak Shift: The temporal distance between a signal's first crosscorrelation peak and the center of the crosscorrelation curve. Estimated by identifying the most prominent peak nearest to zero-lag in the normalized crosscorrelation function.
-- Peak % Shift: The peak shift normalized to the period of the signal. Calculated by dividing the Peak Shift by the Period.
-- Peak Minimum: The lowest trough value associated with each detected peak, averaged across all detected peaks.
-- Peak Maximum: The average intensity at each detected peak location, averaged across all detected peaks.
-- Peak Amplitude: The difference between Peak Maximum and Peak Minimum (i.e., peak prominence), averaged across all detected peaks.
-- Peak Relative Amplitude: Peak Amplitude divided by Peak Minimum, representing the amplitude normalized to the local baseline. Averaged across all detected peaks.
-- Peak Area: The area under each detected peak relative to its local baseline, averaged across all detected peaks. For each peak, the local baseline is defined as the minimum signal value between the peak's left and right bases. The baseline-subtracted signal is integrated using the trapezoidal method over the interval spanning the left and right bases.
+
+Metric names below match the column names in the output summary CSV. Values reported per image are the mean across that image's bins. The GUI's **Info & Glossary** panel carries the same definitions.
+
+**Oscillation period**
+- Period: The dominant oscillation period, measured as the temporal distance between a signal's first autocorrelation peak and the center of the autocorrelation curve (the most prominent peak nearest to zero-lag in the normalized autocorrelation function).
+
+**Peak shape (per channel)**
+- Peak Amp: The peak amplitude — the difference between Peak Apex and Peak Baseline (i.e., peak prominence), averaged across all detected peaks.
+- Peak Rel Amp: Peak Amp divided by Peak Baseline, i.e. the amplitude normalized to the local baseline.
+- Peak Apex: The average intensity at each detected peak location (the peak maximum), averaged across all detected peaks.
+- Peak Baseline: The lowest trough value associated with each detected peak (the peak minimum), averaged across all detected peaks.
+- Peak Width: The full width at half maximum (FWHM) of each detected peak.
+- Peak Apex Offset: The temporal distance between a peak's apex and the midpoint of its two flanking troughs. Zero indicates a symmetric peak; non-zero values indicate rising/falling asymmetry, and it is most informative for non-sinusoidal waveforms.
+- Peak Area: The area under each detected peak relative to its local baseline. The local baseline is the minimum signal value between the peak's left and right bases; the baseline-subtracted signal is integrated (trapezoidal) over that interval.
+
+**Edge timing (per channel, from the rise/fall landmarks)**
+- Rise Duration / Fall Duration: Time from the rising landmark up to the apex / from the apex down to the falling landmark (landmarks are placed at the chosen edge height).
+- Rise minus Fall Duration: Rise duration minus fall duration; the sign indicates asymmetry direction.
+- Rising Slope / Falling Slope: Mean rate of intensity change on the rising / falling edge. Max Rising / Falling Slope is the steepest instantaneous slope, and Rising/Falling Slope Ratio compares the two (1 = symmetric).
+
+**Inter-channel shifts (multi-channel data)**
+- CCF Shift: The temporal shift between two channels, measured from the peak of their cross-correlation (the most prominent peak nearest zero-lag). The sign indicates which channel leads.
+- CCF % Phase Shift: The CCF Shift normalized to the period and expressed as a percentage of one cycle — useful for comparing signals with different periods.
+- Peak-Apex Shift: The inter-channel shift between the channels' peak-apex times (a landmark-based shift, not from the CCF).
+- Rising-Edge Shift / Falling-Edge Shift: The inter-channel shift measured where each channel crosses the chosen edge height on the rising / falling edge.
+- Rise-Apex Shift Diff / Fall-Apex Shift Diff: The rising-/falling-edge shift minus the peak-apex shift — whether the edges and the apex shift between channels by the same amount.
 
 ## Install and run code
 

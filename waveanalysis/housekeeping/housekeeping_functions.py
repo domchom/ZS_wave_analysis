@@ -211,26 +211,31 @@ def _metric_display_replacements(edge_height_fraction: float = None) -> tuple:
         fall_duration = f'fall duration (apex to {pct})'
         rise_minus_fall_duration = 'rise duration minus fall duration'
 
+    # Ordered longest/most-specific first so no earlier .replace() corrupts a
+    # later match (e.g. 'Peak Apex Offset' before 'Peak Apex'; the hyphenated
+    # 'Peak-Apex Shift' never collides with the spaced 'Peak Apex'). Keys are the
+    # renamed output column names (see summarize_images._METRIC_OUTPUT_NAMES).
+    # 'CCF Shift' also lowercases the plural inside 'Pcnt No CCF Shifts'.
     return (
-    ('% Phase Shift', 'phase shift (% of period)'),
-    ('Rise-Peak Diff', 'rise shift minus peak shift'),
-    ('Fall-Peak Diff', 'fall shift minus peak shift'),
+    ('CCF % Phase Shift', 'CCF phase shift'),
+    ('Rise-Apex Shift Diff', 'rising-edge minus apex shift'),
+    ('Fall-Apex Shift Diff', 'falling-edge minus apex shift'),
+    ('Peak-Apex Shift', 'peak-apex shift'),
+    ('Rising-Edge Shift', rise_shift),
+    ('Falling-Edge Shift', fall_shift),
+    ('CCF Shift', 'CCF shift'),
     ('Peak Rel Amp', 'relative peak amplitude'),
+    ('Peak Apex Offset', 'peak apex offset'),
     ('Peak Amp', 'peak amplitude'),
     ('Peak Width', 'peak width'),
-    ('Peak Offset', 'peak apex offset'),
     ('Peak Area', 'peak area'),
-    ('Peak Max', 'peak maximum'),
-    ('Peak Min', 'peak minimum'),
-    ('Peak Shift', 'peak-apex shift'),
-        ('Rise Shift', rise_shift),
-        ('Fall Shift', fall_shift),
+    ('Peak Apex', 'peak apex'),
+    ('Peak Baseline', 'peak baseline'),
         ('Rise minus Fall Duration', rise_minus_fall_duration),
         ('Rise Duration', rise_duration),
         ('Fall Duration', fall_duration),
     ('StdDev', 'SD'),
     ('Pcnt No', 'percent without'),
-    ('Shift', 'CCF shift'),
     )
 
 def relabel_metric_text(text: str, channel_names: list = None, edge_height_fraction: float = None) -> str:
@@ -243,6 +248,34 @@ def relabel_metric_text(text: str, channel_names: list = None, edge_height_fract
     for old, new in _metric_display_replacements(edge_height_fraction):
         text = text.replace(old, new)
     return text
+
+def metric_unit(name: str) -> str:
+    '''
+    Physical unit for a metric column name, for axis labels. Returns '' for
+    dimensionless metrics (ratios) and counts. Matched on the (renamed) column
+    text, most-specific substrings first.
+
+    AU = arbitrary intensity units; s = seconds.
+    '''
+    if 'Phase Shift' in name:          # CCF % Phase Shift
+        return '% of period'
+    if 'Pcnt No' in name:              # detection-failure percentage
+        return '%'
+    if 'Slope Ratio' in name:          # dimensionless
+        return ''
+    if 'Slope' in name:                # rising/falling/max slopes
+        return 'AU/s'
+    if 'Peak Area' in name:
+        return 'AU·s'
+    if 'Rel Amp' in name:              # amplitude ratio, dimensionless
+        return ''
+    if ('Shift' in name or 'Period' in name or 'Duration' in name
+            or 'Peak Width' in name or 'Apex Offset' in name):
+        return 's'
+    if ('Peak Amp' in name or 'Peak Apex' in name
+            or 'Peak Baseline' in name or 'Signal' in name):
+        return 'AU'
+    return ''                          # Num Bins and anything unrecognized
 
 def threshold_check(
     threshold: float,

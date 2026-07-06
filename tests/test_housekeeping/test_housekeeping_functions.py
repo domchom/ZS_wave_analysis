@@ -58,8 +58,8 @@ def test_relabel_channels_replaces_default_channel_tokens_only_when_named():
     assert relabel_channels(text, ["", "  "]) == text
 
 def test_relabel_metric_text_expands_internal_metric_names():
-    text = "Ch1 Mean Rise-Peak Diff and Ch2 StdDev Peak Amp"
-    expected = "Actin Mean rise shift minus peak shift and Ch2 SD peak amplitude"
+    text = "Ch1 Mean Rise-Apex Shift Diff and Ch2 StdDev Peak Amp"
+    expected = "Actin Mean rising-edge minus apex shift and Ch2 SD peak amplitude"
     assert relabel_metric_text(text, ["Actin", ""]) == expected
 
 

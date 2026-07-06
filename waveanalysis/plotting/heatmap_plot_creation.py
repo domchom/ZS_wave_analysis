@@ -14,8 +14,8 @@ def _channel_metric_labels(edge_height_fraction: float) -> dict:
     'Peak Amp':     'Peak amplitude (AU)',
     'Peak Rel Amp': 'Relative peak amplitude',
     'Peak Width':   'Peak width, FWHM (s)',
-    'Peak Max':     'Peak maximum intensity (AU)',
-    'Peak Min':     'Peak baseline/minimum intensity (AU)',
+    'Peak Max':     'Peak apex intensity (AU)',
+    'Peak Min':     'Peak baseline intensity (AU)',
     'Peak Offset':  'Peak apex offset from midpoint (s)',
     'Peak Area':    'Peak area above local baseline (AU·s)',
         'Rise Duration':    f'Rise duration, {pct} to apex (s)',
@@ -32,8 +32,8 @@ def _combo_metric_labels(edge_height_fraction: float) -> dict:
     'Peak Shift':     'Peak-apex shift (s)',
         'Rise Shift':     f'{pct} rising-edge shift (s)',
         'Fall Shift':     f'{pct} falling-edge shift (s)',
-    'Rise-Peak Diff': 'Rise shift minus peak shift (s)',
-    'Fall-Peak Diff': 'Fall shift minus peak shift (s)',
+    'Rise-Peak Diff': 'Rising-edge minus apex shift (s)',
+    'Fall-Peak Diff': 'Falling-edge minus apex shift (s)',
     }
 
 

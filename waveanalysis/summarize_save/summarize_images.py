@@ -9,6 +9,30 @@ _LANDMARK_SHIFT_METRICS = ('Peak Shift', 'Rise Shift', 'Fall Shift', 'Rise-Peak 
 # Metrics that are reported per channel-combination rather than per channel.
 _COMBO_METRICS = ('Shift', '% Phase Shift') + _LANDMARK_SHIFT_METRICS
 
+# Output (column / label) names for metrics whose internal key is terse or
+# ambiguous, so the summary CSV columns, per-bin "Parameter" labels, plot titles,
+# and saved filenames are self-explanatory. The internal metric keys in
+# img_metrics are unchanged; only the output text is remapped here.
+#   - CCF-derived shifts get a 'CCF' prefix (vs the landmark shifts).
+#   - Landmark shifts spell out the landmark and read as inter-channel shifts
+#     (vs the within-peak Rise/Fall Duration metrics).
+#   - Peak apex/baseline are clearer than "Peak Max"/"Peak Min".
+_METRIC_OUTPUT_NAMES = {
+    'Shift': 'CCF Shift',
+    '% Phase Shift': 'CCF % Phase Shift',
+    'Peak Shift': 'Peak-Apex Shift',
+    'Rise Shift': 'Rising-Edge Shift',
+    'Fall Shift': 'Falling-Edge Shift',
+    'Rise-Peak Diff': 'Rise-Apex Shift Diff',
+    'Fall-Peak Diff': 'Fall-Apex Shift Diff',
+    'Peak Offset': 'Peak Apex Offset',
+    'Peak Min': 'Peak Baseline',
+    'Peak Max': 'Peak Apex',
+}
+
+def _output_metric_name(name: str) -> str:
+    return _METRIC_OUTPUT_NAMES.get(name, name)
+
 def summarize_image(
     img_metrics: dict,
     img_props: dict
@@ -98,10 +122,10 @@ def _add_stats_for_parameter(
         for index, item in enumerate(channel_combos if measurement_name in _COMBO_METRICS else range(num_channels)):
             if measurement_name in _COMBO_METRICS:
                 measurements_subset = measurements[index]
-                channel_label = f'Ch{channel_combos[index][0]+1}-Ch{channel_combos[index][1]+1} {measurement_name}'
+                channel_label = f'Ch{channel_combos[index][0]+1}-Ch{channel_combos[index][1]+1} {_output_metric_name(measurement_name)}'
             else:
                 measurements_subset = measurements[item]
-                channel_label = f'Ch {item + 1} {measurement_name}'
+                channel_label = f'Ch {item + 1} {_output_metric_name(measurement_name)}'
             
             stats_rows.append(calculate_statistics(measurements_subset, channel_label))
 
@@ -150,19 +174,19 @@ def combine_stats_for_image_kymo_standard(
         for combo_number, combo in enumerate(channel_combos):
             shift_data = img_metrics['Shift'][combo_number]
             pcnt_no_shift = np.count_nonzero(np.isnan(shift_data)) / shift_data.shape[0] * 100
-            file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Pcnt No Shifts'] = pcnt_no_shift
+            file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Pcnt No CCF Shifts'] = pcnt_no_shift
             for ind, stat in enumerate(stats_location):
-                file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} Shift'] = stats_by_parameter['Shift'][combo_number][ind + 1]
+                file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} {_output_metric_name("Shift")}'] = stats_by_parameter['Shift'][combo_number][ind + 1]
             # Unnecessary for loop to add stats for % Phase Shift after the Shifts
             for ind, stat in enumerate(stats_location):
-                file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} % Phase Shift'] = stats_by_parameter['% Phase Shift'][combo_number][ind + 1]
+                file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} {_output_metric_name("% Phase Shift")}'] = stats_by_parameter['% Phase Shift'][combo_number][ind + 1]
 
             # Add stats for the landmark-based shifts (peak apex, rising edge, and their difference)
             for metric in _LANDMARK_SHIFT_METRICS:
                 if metric not in stats_by_parameter:
                     continue
                 for ind, stat in enumerate(stats_location):
-                    file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} {metric}'] = stats_by_parameter[metric][combo_number][ind + 1]
+                    file_data_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat} {_output_metric_name(metric)}'] = stats_by_parameter[metric][combo_number][ind + 1]
 
     # Add stats for each parameter
     for name, measurement in img_metrics.items():
@@ -179,9 +203,9 @@ def combine_stats_for_image_kymo_standard(
                     file_data_summary[f'Ch {channel + 1} {stat} {name}'] = stats_by_parameter[name][channel][ind + 1]
         # All parameters that are not wave speed
         elif name not in ['Wave Speed']:
-            for channel in range(num_channels):        
+            for channel in range(num_channels):
                 for ind, stat in enumerate(stats_location):
-                    file_data_summary[f'Ch {channel + 1} {stat} {name}'] = stats_by_parameter[name][channel][ind + 1]
+                    file_data_summary[f'Ch {channel + 1} {stat} {_output_metric_name(name)}'] = stats_by_parameter[name][channel][ind + 1]
         # Wave Speed is a single value, so it doesn't need to be separated by channel
         elif name in ['Wave Speed']:
             for ind, stat in enumerate(stats_location):
@@ -241,12 +265,12 @@ def combine_stats_rolling(
             indv_phase_shifts = img_metrics['% Phase Shift']
             for combo_number, combo in enumerate(channel_combos):
                 pcnt_no_shift = np.count_nonzero(np.isnan(indv_ccfs[submovie, combo_number])) / num_bins * 100
-                submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Pcnt No Shifts'] = pcnt_no_shift
+                submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} Pcnt No CCF Shifts'] = pcnt_no_shift
                 for stat_name, func in stat_name_and_func.items():
-                    submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat_name} Shift'] = func(indv_shifts[submovie, combo_number])
+                    submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat_name} {_output_metric_name("Shift")}'] = func(indv_shifts[submovie, combo_number])
                 # Unnecessary for loop to add stats for % Phase Shift after the Shifts
                 for stat_name, func in stat_name_and_func.items():
-                    submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat_name} % Phase Shift'] = func(indv_phase_shifts[submovie, combo_number])
+                    submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat_name} {_output_metric_name("% Phase Shift")}'] = func(indv_phase_shifts[submovie, combo_number])
 
         # Calculate statistics for each channel
         for channel in range(num_channels):
@@ -273,7 +297,7 @@ def combine_stats_rolling(
             for name, measurements in img_metrics.items():
                 if name not in _COMBO_METRICS:
                     for stat_name, func in stat_name_and_func.items():
-                        submovie_summary[f'Ch {channel + 1} {stat_name} {name}'] = func(measurements[submovie, channel])
+                        submovie_summary[f'Ch {channel + 1} {stat_name} {_output_metric_name(name)}'] = func(measurements[submovie, channel])
 
         # Calculate statistics for landmark-based shift metrics (per combo)
         if num_channels > 1:
@@ -282,7 +306,7 @@ def combine_stats_rolling(
                     continue
                 for combo_number, combo in enumerate(channel_combos):
                     for stat_name, func in stat_name_and_func.items():
-                        submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat_name} {metric}'] = func(img_metrics[metric][submovie, combo_number])
+                        submovie_summary[f'Ch{combo[0] + 1}-Ch{combo[1] + 1} {stat_name} {_output_metric_name(metric)}'] = func(img_metrics[metric][submovie, combo_number])
 
         all_submovie_summary.append(submovie_summary)
     

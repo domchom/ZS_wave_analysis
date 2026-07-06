@@ -50,10 +50,10 @@ def plot_rolling_summary(
     # Generate the rolling mean plots for the mean shifts
     if num_channels > 1:
         for combo_number, combo in enumerate(channel_combos):
-            rolling_mean_shifts[f'Ch{combo[0]+1}-Ch{combo[1]+1} Shift'] = _return_mean_periods_shifts_props_plots(
+            rolling_mean_shifts[f'Ch{combo[0]+1}-Ch{combo[1]+1} CCF Shift'] = _return_mean_periods_shifts_props_plots(
                 independent_variable='Submovie',
-                dependent_variable=f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean Shift',
-                dependent_error=f'Ch{combo[0]+1}-Ch{combo[1]+1} StdDev Shift',
+                dependent_variable=f'Ch{combo[0]+1}-Ch{combo[1]+1} Mean CCF Shift',
+                dependent_error=f'Ch{combo[0]+1}-Ch{combo[1]+1} StdDev CCF Shift',
                 y_label=relabel_channels(f'Ch{combo[0]+1}-Ch{combo[1]+1}: mean CCF shift ± SD (seconds)', channel_names),
                 fullmovie_summary=fullmovie_summary,
                 dark_plots=dark_plots,
@@ -67,7 +67,9 @@ def plot_rolling_summary(
 
     # Generate the rolling mean plots for the peak properties
     for channel in range(num_channels):
-        for prop_name in ['Width', 'Max', 'Min', 'Amp', 'Rel Amp', 'Offset', 'Area']:
+        # Suffixes match the renamed output columns (Peak Max/Min/Offset are now
+        # Peak Apex/Baseline/Apex Offset), so 'Mean Peak {suffix}' still resolves.
+        for prop_name in ['Width', 'Apex', 'Baseline', 'Amp', 'Rel Amp', 'Apex Offset', 'Area']:
             rolling_mean_peak_props[f'Ch{channel+1} {prop_name}'] = _return_mean_periods_shifts_props_plots(
                 independent_variable='Submovie',
                 dependent_variable=f'Ch {channel+1} Mean Peak {prop_name}',
