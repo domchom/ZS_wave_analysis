@@ -2878,25 +2878,35 @@ _HELP = {
              "Edge_vs_Peak_Shifts). These replace the summary/group plots of the "
              "standard and kymograph modes.",
              "rolling_analysis"),
-            ("Period & peak shape (per channel)",
-             "Mean period and each peak-shape metric (amplitude, relative "
-             "amplitude, width, apex, baseline, apex offset, area) tracked across "
-             "the sub-movies."),
+            ("Period over time (per channel)",
+             "Mean period ± SD across bins, tracked over the sub-movies.",
+             "rollingPeriod"),
+            ("Peak shape over time (per channel)",
+             "Each peak-shape metric over the sub-movies (amplitude shown; also "
+             "relative amplitude, width, apex, baseline, apex offset, and area).",
+             "rollingPeakShape"),
             ("Edge timing & slopes (per channel)",
              "Rise / fall durations and their difference, plus the rising / falling "
              "and steepest (max) rising / falling edge slopes and their ratio — the "
              "same metrics as the standard analysis, tracked over time."),
             ("Inter-channel shifts (per channel pair)",
              "For multi-channel data: the CCF shift and CCF % phase shift, plus the "
-             "landmark shifts (peak-apex, rising-edge, falling-edge) and their "
-             "apex-difference metrics, each across the sub-movies."),
+             "landmark shifts (peak-apex shown; also rising-edge and falling-edge), "
+             "each across the sub-movies.",
+             "rollingShift"),
+            ("Edge-vs-apex shift differences (per channel pair)",
+             "How the rising / falling-edge shift differs from the peak-apex shift "
+             "over time — whether the edges and the apex stay aligned between "
+             "channels as the recording progresses.",
+             "rollingShiftDiff"),
             ("Live injection overlay",
              "When a recording captures a mid-experiment injection, set the "
              "injection frame to mark it (a vertical dashed line on every rolling "
              "plot) and tick 'Overlay signal Ch1–Ch4' to superimpose those "
              "channels' mean intensity, rescaled to each plot's y-range, so metric "
              "changes can be lined up against the injection. See the 'Live "
-             "Injection' control in the Controls tab."),
+             "Injection' control in the Controls tab.",
+             "rollingInjection"),
         ],
     },
     "Metrics": [
