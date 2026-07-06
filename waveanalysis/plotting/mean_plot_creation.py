@@ -1,4 +1,3 @@
-import textwrap
 import numpy as np
 import matplotlib.pyplot as plt
 from waveanalysis.signal_processing.correlation_functions import calc_indv_edge_lag_profile, _get_signal
@@ -12,77 +11,8 @@ from waveanalysis.plotting.style import (
     raincloud,
 )
 
-# Explanatory captions added to the bottom of summary plots. Signed pair metrics
-# use first-channel minus second-channel order from the figure title.
-CCF_SHIFT_NOTE = ("CCF shift is the time offset that best aligns the two channels' oscillations (the lag at the peak of "
-                  "their cross-correlation), i.e. the overall phase difference between the whole signals.")
-PHASE_SHIFT_NOTE = ("Phase shift is the CCF shift normalized by the channel pair's mean period and reported as percent "
-                    "of one cycle.")
-EDGE_DURATION_NOTE = ("Each wave's own shape (no comparison between channels). Rise duration = selected-height rising edge "
-                  "up to the apex. Fall duration = apex down to the selected-height falling edge. Peak width = full "
-                  "width at half maximum. A fall longer than the rise means an asymmetric, slow-decaying wave.")
-EDGE_LAG_NOTE = ("This plots inter-channel lag at multiple heights along the rising and falling edges; 100% is the "
-                 "peak-apex shift. If a curve is flat, the channel offset is the same from edge to peak, consistent "
-                 "with a constant phase shift. Example: a rising-edge curve that goes from 10 s at 25% to 2 s at "
-                 "100% means the first channel is much more delayed at wave onset, then catches up by the peak. A "
-                 "sloped falling-edge curve similarly means the channels decay at different rates.")
-
 def _edge_percent(edge_height_fraction: float) -> str:
     return f'{int(round(float(edge_height_fraction) * 100))}%'
-
-def _add_figure_note(fig: plt.Figure, note: str, dark_plots: bool = False, bottom: float = 0.12) -> None:
-    '''
-    Reserve space at the bottom of a figure and add a centered explanatory caption.
-    Call this instead of fig.tight_layout() so the note is not clipped.
-    '''
-    color = 'lightgray' if dark_plots else 'dimgray'
-    width, height = fig.get_size_inches()
-    wrap_width = max(52, int(width * 15))
-    wrapped_note = textwrap.fill(note, width=wrap_width)
-    note_lines = wrapped_note.count('\n') + 1
-
-    # Add physical height for the caption instead of taking it away from the
-    # plot. This keeps group-comparison axes readable when x labels are rotated.
-    note_space = 0.38 + (0.20 * note_lines)
-    fig.set_size_inches(width, height + note_space, forward=True)
-    _, new_height = fig.get_size_inches()
-    bottom_frac = max(note_space / new_height, min(bottom, 0.18))
-
-    fig.tight_layout(rect=[0, bottom_frac, 1, 1])
-    fig.text(
-        0.5,
-        bottom_frac * 0.32,
-        wrapped_note,
-        ha='center',
-        va='bottom',
-        fontsize=8,
-        color=color,
-        linespacing=1.15,
-    )
-
-def _add_panel_notes(fig: plt.Figure, notes: list, dark_plots: bool = False,
-                     bottom: float = 0.22, wrap_width: int = 58) -> None:
-    '''
-    Place a caption beneath each panel of a multi-panel figure so every panel
-    carries only the note relevant to what it shows.
-
-    notes: list of (x_center, text), with x_center in figure-fraction coords
-    roughly under each panel. Text is hard-wrapped to wrap_width characters so
-    side-by-side captions stay within their own half of the figure.
-    '''
-    color = 'lightgray' if dark_plots else 'dimgray'
-    wrapped_notes = [(x, textwrap.fill(text, width=wrap_width)) for x, text in notes]
-    max_lines = max((text.count('\n') + 1 for _, text in wrapped_notes), default=1)
-    width, height = fig.get_size_inches()
-    note_space = 0.38 + (0.20 * max_lines)
-    fig.set_size_inches(width, height + note_space, forward=True)
-    _, new_height = fig.get_size_inches()
-    bottom_frac = max(note_space / new_height, min(bottom, 0.20))
-
-    fig.tight_layout(rect=[0, bottom_frac, 1, 1])
-    for x_center, text in wrapped_notes:
-        fig.text(x_center, bottom_frac * 0.30, text,
-                 ha='center', va='bottom', fontsize=8, color=color, linespacing=1.15)
 
 def _annotate_lead_direction(
     ax: plt.Axes,
@@ -181,7 +111,6 @@ def _return_mean_acf_figure(
         # Period distribution as a single raincloud (shape + summary + n)
         raincloud(ax['B'], data=[periods], labels=['period'],
                   colors=['gray'], dark_plots=dark_plots)
-        ax['B'].set_xlabel('Detected period distribution')
         ax['B'].set_ylabel('Period (seconds)')
 
         plt.close(fig)
@@ -264,25 +193,23 @@ def _return_mean_prop_peaks_figure(
         raincloud(
             ax1,
             data=[amp_array, min_array, max_array],
-            labels=['amp', 'min', 'max'],
+            labels=['amp', 'baseline', 'apex'],
             colors=amp_min_max_colors,
             dark_plots=dark_plots,
         )
-        ax1.set_xlabel(f'{channel_name}: peak amplitude, minimum, and maximum')
         ax1.set_ylabel('Intensity (AU)')
 
         # Peak width
         raincloud(ax2, data=[width_array], labels=['width'],
                   colors=[value_color], dark_plots=dark_plots)
-        ax2.set_xlabel(f'{channel_name}: peak full width at half maximum')
         ax2.set_ylabel('Full width at half maximum (seconds)')
 
         # Peak apex offset (signed -> reference line at 0)
         raincloud(ax3, data=[offsets_array], labels=['apex offset'],
                   colors=[value_color], dark_plots=dark_plots, zero_line=True)
-        ax3.set_xlabel(f'{channel_name}: peak apex offset from waveform midpoint')
         ax3.set_ylabel('Apex offset from midpoint (seconds)')
 
+        fig.suptitle(f'{channel_name} peak properties')
         plt.close(fig)
 
     return fig
@@ -365,15 +292,14 @@ def _return_mean_slope_figure(
             zero_line=True,
             rotation=20,
         )
-        ax1.set_xlabel(f'{channel_name}: rising, falling, and max edge slopes')
         ax1.set_ylabel('Rate of change (AU/s)')
 
         # Rising/falling slope ratio (dimensionless)
         raincloud(ax2, data=[ratio_array], labels=['ratio'],
                   colors=['dimgray'], dark_plots=dark_plots)
-        ax2.set_xlabel(f'{channel_name}: rising / falling slope ratio')
         ax2.set_ylabel('Max rising / max falling slope')
 
+        fig.suptitle(f'{channel_name} slope properties')
         plt.close(fig)
 
     return fig
@@ -438,10 +364,8 @@ def _return_mean_ccf_figure(
     x_axis = np.arange(-num_frames + 1, num_frames) * frame_interval
 
     with style_context(dark_plots):
-        # Mean curve on top, shift distribution (raincloud) below. No
-        # constrained_layout here: _add_figure_note() manages spacing via
-        # tight_layout to reserve room for the caption.
-        fig, ax = plt.subplot_mosaic('A\nB', figsize=(7, 7))
+        # Mean curve on top, shift distribution (raincloud) below.
+        fig, ax = plt.subplot_mosaic('A\nB', figsize=(7, 7), constrained_layout=True)
         apply_dark(fig, list(ax.values()), dark_plots)
 
         # Plot mean cross-correlation curve with shaded area representing standard deviation
@@ -456,11 +380,9 @@ def _return_mean_ccf_figure(
         # CCF shift distribution as a single raincloud (signed -> zero line)
         raincloud(ax['B'], data=[shifts], labels=['CCF shift'],
                   colors=['gray'], dark_plots=dark_plots, zero_line=True)
-        ax['B'].set_xlabel('CCF shift distribution')
         ax['B'].set_ylabel('CCF shift (seconds)')
         _annotate_lead_direction(ax['B'], ch1_name, ch2_name, axis='y', dark_plots=dark_plots)
 
-        _add_figure_note(fig, f'{CCF_SHIFT_NOTE}', dark_plots, bottom=0.20)
         plt.close(fig)
 
     return fig
@@ -478,34 +400,6 @@ def _landmark_labels(edge_height_fraction: float) -> dict:
         'Rise-Peak Diff': 'Rise shift - peak shift',
         'Fall-Peak Diff': 'Fall shift - peak shift',
     }
-
-def landmark_metric_note(metric_key: str, edge_height_fraction: float) -> str:
-    '''
-    Caption for a single landmark-shift metric, so each plot only carries the
-    note relevant to the metric it shows. *metric_key* may be a bare metric name
-    ('Rise Shift') or a longer column/title containing it ('... Mean Rise Shift').
-    Returns '' when no landmark metric matches.
-    '''
-    pct = _edge_percent(edge_height_fraction)
-    # Check the apex-relative differences first: 'Rise-Peak Diff' also contains
-    # the substrings 'Peak' and 'Rise'.
-    if 'Rise-Peak' in metric_key:
-        return (f'Rise-Peak diff = the {pct} rising-edge shift minus the apex shift. It is zero when the two channels '
-                f'are the same waveform offset by a fixed delay, so a non-zero value reflects different rising kinetics. '
-                f'Positive = the rising edge is more delayed than the peak (the first channel reaches the rising edge '
-                f'even later, relative to the second channel, than it reaches its apex); negative = less delayed.')
-    if 'Fall-Peak' in metric_key:
-        return (f'Fall-Peak diff = the {pct} falling-edge shift minus the apex shift. It is zero when the two channels '
-                f'are the same waveform offset by a fixed delay, so a non-zero value reflects different falling kinetics. '
-                f'Positive = the falling edge is more delayed than the peak (the first channel reaches the falling edge '
-                f'even later, relative to the second channel, than it reaches its apex); negative = less delayed.')
-    if 'Peak Shift' in metric_key:
-        return ('Peak shift = the time between the two channels reaching their apex (peak).')
-    if 'Rise Shift' in metric_key:
-        return (f'Rise shift = the time between the two channels crossing {pct} of peak height on the rising edge. ')
-    if 'Fall Shift' in metric_key:
-        return (f'Fall shift = the time between the two channels crossing {pct} of peak height on the falling edge. ')
-    return ''
 
 def plot_mean_landmark_shift_workflow(
     img_metrics: dict,
@@ -580,8 +474,7 @@ def _return_landmark_shift_figure(
     Space saving function to return the landmark-shift distribution figure.
     '''
     with style_context(dark_plots):
-        # _add_panel_notes() manages layout (tight_layout), so no constrained_layout.
-        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5))
+        fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 5), constrained_layout=True)
         apply_dark(fig, (ax1, ax2), dark_plots)
 
         labels = _landmark_labels(edge_height_fraction)
@@ -594,17 +487,6 @@ def _return_landmark_shift_figure(
         ax2.set_ylabel('Difference from apex shift (seconds)')
         ax2.set_title(f'{combo_label}: edge timing relative to apex')
 
-        pct = _edge_percent(edge_height_fraction)
-        # One caption per panel: the left panel shows the raw landmark shifts,
-        # the right panel shows each edge shift relative to the apex shift.
-        left_note = (f'Absolute timing: peak shift = time between the two channels reaching their apex; rise and fall '
-                     f'shifts = time between them crossing {pct} of peak height on the rising and falling edges. '
-                     f'Arrows mark which channel leads (negative) versus trails (positive).')
-        right_note = (f'Relative to apex: each value is the edge shift minus the apex shift. It is zero when the two '
-                      f'channels are the same waveform offset by a fixed delay; positive = that edge is more delayed '
-                      f'than the peak, negative = less delayed. This isolates differences in rise/fall kinetics from '
-                      f'the overall phase offset.')
-        _add_panel_notes(fig, [(0.28, left_note), (0.76, right_note)], dark_plots, bottom=0.24)
         plt.close(fig)
 
     return fig
@@ -665,20 +547,13 @@ def _return_edge_times_figure(
     Space saving function to return the per-channel edge-time distribution figure.
     '''
     with style_context(dark_plots):
-        # _add_figure_note() manages layout (tight_layout), so no constrained_layout.
-        fig, ax = plt.subplots(figsize=(6, 5))
+        fig, ax = plt.subplots(figsize=(6, 5), constrained_layout=True)
         apply_dark(fig, ax, dark_plots)
 
         _boxplot_with_points(ax, data, labels, dark_plots)
         ax.set_ylabel('Duration / asymmetry within each peak (seconds)')
         ax.set_title(f'{channel_label}: peak edge durations')
 
-        pct = _edge_percent(edge_height_fraction)
-        note = (f'Each wave\'s own shape (no comparison between channels). Rise duration = time from {pct} of peak '
-                f'height up to the apex. Fall duration = time from the apex down to {pct} of peak height. Peak width = '
-                f'full width at half maximum. Rise - fall is positive for a slower rise than fall, and negative for a '
-                f'faster rise than fall.')
-        _add_figure_note(fig, note, dark_plots)
         plt.close(fig)
 
     return fig
@@ -762,8 +637,7 @@ def _return_lag_profile_figure(
     pct = fractions * 100
 
     with style_context(dark_plots):
-        # _add_figure_note() manages layout (tight_layout), so no constrained_layout.
-        fig, ax = plt.subplots(figsize=(8, 5))
+        fig, ax = plt.subplots(figsize=(8, 5), constrained_layout=True)
         apply_dark(fig, ax, dark_plots)
 
         rise_color = 'lightblue' if dark_plots else 'tab:blue'
@@ -781,7 +655,6 @@ def _return_lag_profile_figure(
         _annotate_lead_direction(ax, ch1_name, ch2_name, axis='y', dark_plots=dark_plots)
         ax.legend(loc='best', fontsize='small')
 
-        _add_figure_note(fig, f'{EDGE_LAG_NOTE}', dark_plots, bottom=0.16)
         plt.close(fig)
 
     return fig
@@ -806,7 +679,6 @@ def return_mean_wave_speeds_figure(
         raincloud(ax, data=[wave_speeds], labels=['wave speed'],
                   colors=['blue' if not dark_plots else 'lightblue'],
                   dark_plots=dark_plots)
-        ax.set_xlabel('Wave speeds')
         ax.set_ylabel('Wave speed (µm/s)')
         ax.set_title('Wave speed distribution')
 

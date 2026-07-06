@@ -15,10 +15,49 @@ import matplotlib.pyplot as plt
 # this, a KDE is more misleading than informative, so we show box+points only.
 _MIN_VIOLIN_N = 10
 
+# Clean, modern rcParams layered on top of the base ('default' or
+# 'dark_background') style. Color-agnostic so the same overrides work for both
+# themes: open frames (no top/right spine), a faint y-grid behind the data,
+# lighter type, and a consistent title hierarchy. Applied via style_context so
+# every figure picks it up without per-plot boilerplate.
+_STYLE_RC = {
+    'axes.spines.top': False,
+    'axes.spines.right': False,
+    'axes.linewidth': 0.8,
+    'axes.titlesize': 12,
+    'axes.titleweight': 'medium',
+    'axes.titlepad': 10,
+    'axes.labelsize': 10,
+    'axes.axisbelow': True,
+    'axes.grid': True,
+    'axes.grid.axis': 'y',
+    'grid.alpha': 0.25,
+    'grid.linewidth': 0.6,
+    'xtick.labelsize': 9,
+    'ytick.labelsize': 9,
+    'xtick.direction': 'out',
+    'ytick.direction': 'out',
+    'xtick.major.size': 3,
+    'ytick.major.size': 3,
+    'xtick.major.width': 0.8,
+    'ytick.major.width': 0.8,
+    'legend.frameon': False,
+    'legend.fontsize': 9,
+    'figure.titlesize': 13,
+    'figure.titleweight': 'medium',
+    'lines.linewidth': 1.8,
+    'lines.solid_capstyle': 'round',
+}
+
 
 def style_context(dark_plots: bool = False):
-    """Return the matplotlib style context to use for a figure."""
-    return plt.style.context('dark_background' if dark_plots else 'default')
+    """Return the matplotlib style context to use for a figure.
+
+    Layers the clean-minimal `_STYLE_RC` overrides on top of the themed base
+    style so all figures share one modern look.
+    """
+    base = 'dark_background' if dark_plots else 'default'
+    return plt.style.context([base, _STYLE_RC])
 
 
 def clean_array(values) -> np.ndarray:
@@ -84,6 +123,8 @@ def raincloud(
                 )
                 for body in parts['bodies']:
                     body.set_facecolor(col or ('gray' if dark_plots else 'lightgray'))
+                    body.set_edgecolor('none')
+                    body.set_linewidth(0)
                     body.set_alpha(0.25)
 
     # Box (no fliers): outline only so the points and violin stay visible.

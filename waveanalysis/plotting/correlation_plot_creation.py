@@ -104,6 +104,7 @@ def _return_correlation_figure(
         apply_dark(fig, ax, dark_plots)
 
         im = ax.imshow(corr, vmin=-1, vmax=1, cmap='RdBu_r')
+        ax.grid(False)
 
         ax.set_xticks(range(n))
         ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=8)
