@@ -132,7 +132,8 @@ If you were successful in installing/running the project, a window will appear a
 
 > **Tip:** Every control, plot, and metric is also documented inside the app. Click the **Info** button in the GUI to open the **Info & Glossary** panel — a tabbed reference (Overview, Controls, Plots, Metrics, Preparing Data, Output, Tips) with worked example figures for each plot type.
 
-<img src="assets/images/gui1new.png" width="800">
+<img src="assets/images/new_plots/gui/standardGui-Light.png#gh-light-mode-only" width="800">
+<img src="assets/images/new_plots/gui/standardGui-Dark.png#gh-dark-mode-only" width="800">
 
 Fill in the essentials and press **Start**; only the first-run basics are covered here:
 
@@ -147,10 +148,12 @@ Fill in the essentials and press **Start**; only the first-run basics are covere
 
 The **Rolling** and **Kymograph** buttons open variants of this window:
 
-<img src="assets/images/gui2new.png" width="800">
+<img src="assets/images/new_plots/gui/rollingGui-Light.png#gh-light-mode-only" width="800">
+<img src="assets/images/new_plots/gui/rollingGui-Dark.png#gh-dark-mode-only" width="800">
 
-- **Rolling** adds a **sub-movie size** and **roll** (step) so wave properties can be tracked over long recordings (tens–thousands of periods).
+- **Rolling** adds a **sub-movie size** and **roll** (step) so wave properties can be tracked over long recordings (tens–thousands of periods). It also offers an optional **Live Injection** overlay: enter the **injection frame** to mark when something was added mid-recording (a vertical dashed line on every rolling plot at that time point), and tick **Overlay signal Ch1–Ch4** to plot the selected channels' mean intensity — rescaled to each metric's y-range — so you can line a metric's change up against when a channel's signal (e.g. a co-imaged injection marker) rises or falls.
 
-<img src="assets/images/gui3new.png" width="800">
+<img src="assets/images/new_plots/gui/kymographGui-Light.png#gh-light-mode-only" width="800">
+<img src="assets/images/new_plots/gui/kymographGui-Dark.png#gh-dark-mode-only" width="800">
 
 - **Kymograph** samples vertical **lines** of a kymograph instead of boxes, producing the same metrics from a single medial slice.
