@@ -70,7 +70,7 @@ def plot_rolling_summary(
         # Suffixes match the renamed output columns (Peak Max/Min/Offset are now
         # Peak Apex/Baseline/Apex Offset), so 'Mean Peak {suffix}' still resolves.
         for prop_name in ['Width', 'Apex', 'Baseline', 'Amp', 'Rel Amp', 'Apex Offset', 'Area']:
-            rolling_mean_peak_props[f'Ch{channel+1} {prop_name}'] = _return_mean_periods_shifts_props_plots(
+            rolling_mean_peak_props[f'Ch{channel+1} Peak {prop_name}'] = _return_mean_periods_shifts_props_plots(
                 independent_variable='Submovie',
                 dependent_variable=f'Ch {channel+1} Mean Peak {prop_name}',
                 dependent_error=f'Ch {channel+1} StdDev Peak {prop_name}',
@@ -84,6 +84,46 @@ def plot_rolling_summary(
                     
     # Update the dictionary with the rolling mean plots for the peak properties
     rolling_mean_plots_dict.update(rolling_mean_peak_props)
+
+    # Generate the rolling mean plots for the per-channel edge timing and slopes
+    rolling_mean_edge_slope = {}
+    for channel in range(num_channels):
+        for metric in ['Rise Duration', 'Fall Duration', 'Rise minus Fall Duration',
+                       'Rising Slope', 'Falling Slope', 'Max Rising Slope',
+                       'Max Falling Slope', 'Rising/Falling Slope Ratio']:
+            rolling_mean_edge_slope[f'Ch{channel+1} {metric}'] = _return_mean_periods_shifts_props_plots(
+                independent_variable='Submovie',
+                dependent_variable=f'Ch {channel+1} Mean {metric}',
+                dependent_error=f'Ch {channel+1} StdDev {metric}',
+                y_label=relabel_metric_text(f'Ch {channel+1}: mean ± SD {metric}', channel_names),
+                fullmovie_summary=fullmovie_summary,
+                dark_plots=dark_plots,
+                injection_channels=live_injection_dict.get("injection_channels"),
+                injection_submovie=live_injection_dict.get("injection_submovie"),
+                channel_names=channel_names,
+                )
+    rolling_mean_plots_dict.update(rolling_mean_edge_slope)
+
+    # Generate the rolling mean plots for the per-combo phase shift and
+    # landmark (peak-apex / edge) inter-channel shifts
+    if num_channels > 1:
+        rolling_mean_combo = {}
+        for combo in channel_combos:
+            base = f'Ch{combo[0]+1}-Ch{combo[1]+1}'
+            for metric in ['CCF % Phase Shift', 'Peak-Apex Shift', 'Rising-Edge Shift',
+                           'Falling-Edge Shift', 'Rise-Apex Shift Diff', 'Fall-Apex Shift Diff']:
+                rolling_mean_combo[f'{base} {metric}'] = _return_mean_periods_shifts_props_plots(
+                    independent_variable='Submovie',
+                    dependent_variable=f'{base} Mean {metric}',
+                    dependent_error=f'{base} StdDev {metric}',
+                    y_label=relabel_metric_text(f'{base}: mean ± SD {metric}', channel_names),
+                    fullmovie_summary=fullmovie_summary,
+                    dark_plots=dark_plots,
+                    injection_channels=live_injection_dict.get("injection_channels"),
+                    injection_submovie=live_injection_dict.get("injection_submovie"),
+                    channel_names=channel_names,
+                    )
+        rolling_mean_plots_dict.update(rolling_mean_combo)
 
     return rolling_mean_plots_dict
 

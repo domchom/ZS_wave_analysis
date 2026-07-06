@@ -364,7 +364,7 @@ def rolling_workflow(
                 )
                 plot_save_path = os.path.join(im_save_path, 'summary_plots')
                 os.makedirs(plot_save_path, exist_ok=True) if not test else None
-                hf.save_plots(summary_plots, plot_save_path) if not test else None
+                hf.save_plots(summary_plots, plot_save_path, group_by_metric=True) if not test else None
 
                 end = timeit.default_timer()
                 log_params["Time Elapsed"] = f"{end - start:.2f} seconds"
