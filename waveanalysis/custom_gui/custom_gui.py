@@ -2888,7 +2888,8 @@ _HELP = {
             ("Edge timing & slopes (per channel)",
              "Rise / fall durations and their difference, plus the rising / falling "
              "and steepest (max) rising / falling edge slopes and their ratio — the "
-             "same metrics as the standard analysis, tracked over time."),
+             "same metrics as the standard analysis, tracked over time.",
+             "rollingSlope"),
             ("Inter-channel shifts (per channel pair)",
              "For multi-channel data: the CCF shift and CCF % phase shift, plus the "
              "landmark shifts (peak-apex shown; also rising-edge and falling-edge), "
