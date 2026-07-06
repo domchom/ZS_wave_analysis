@@ -39,9 +39,9 @@ def plot_rolling_summary(
             y_label=relabel_channels(f'Ch {channel + 1}: mean period ± SD (seconds)', channel_names),
             fullmovie_summary=fullmovie_summary,
             dark_plots=dark_plots,
-            injection_ch1=live_injection_dict["injection_ch1"],
-            injection_ch2=live_injection_dict["injection_ch2"],
-            injection_frame=live_injection_dict["injection_frame"]
+            injection_channels=live_injection_dict.get("injection_channels"),
+            injection_submovie=live_injection_dict.get("injection_submovie"),
+            channel_names=channel_names,
             )
             
     # Update the dictionary with the rolling mean plots for the mean period
@@ -57,9 +57,9 @@ def plot_rolling_summary(
                 y_label=relabel_channels(f'Ch{combo[0]+1}-Ch{combo[1]+1}: mean CCF shift ± SD (seconds)', channel_names),
                 fullmovie_summary=fullmovie_summary,
                 dark_plots=dark_plots,
-                injection_ch1=live_injection_dict["injection_ch1"],
-                injection_ch2=live_injection_dict["injection_ch2"],
-                injection_frame=live_injection_dict["injection_frame"]
+                injection_channels=live_injection_dict.get("injection_channels"),
+                injection_submovie=live_injection_dict.get("injection_submovie"),
+                channel_names=channel_names,
                 )
             
     # Update the dictionary with the rolling mean plots for the mean shifts
@@ -77,9 +77,9 @@ def plot_rolling_summary(
                 y_label=relabel_metric_text(f'Ch {channel+1}: mean ± SD Peak {prop_name}', channel_names),
                 fullmovie_summary=fullmovie_summary,
                 dark_plots=dark_plots,
-                injection_ch1=live_injection_dict["injection_ch1"],
-                injection_ch2=live_injection_dict["injection_ch2"],
-                injection_frame=live_injection_dict["injection_frame"]
+                injection_channels=live_injection_dict.get("injection_channels"),
+                injection_submovie=live_injection_dict.get("injection_submovie"),
+                channel_names=channel_names,
                 )
                     
     # Update the dictionary with the rolling mean plots for the peak properties
@@ -87,60 +87,85 @@ def plot_rolling_summary(
 
     return rolling_mean_plots_dict
 
+# Distinct overlay colors for the injection-channel signals, indexed by
+# channel number (1-4). Chosen to stand out from the blue metric trace in both
+# light and dark themes.
+_INJECTION_COLORS = {
+    False: {1: 'darkorange', 2: 'green', 3: 'purple', 4: 'saddlebrown'},
+    True:  {1: 'yellow', 2: 'lightgreen', 3: 'violet', 4: 'sandybrown'},
+}
+
+
 def _return_mean_periods_shifts_props_plots(
-    independent_variable: str, 
-    dependent_variable: str, 
-    dependent_error: str, 
+    independent_variable: str,
+    dependent_variable: str,
+    dependent_error: str,
     y_label: str,
     fullmovie_summary: pd.DataFrame,
     dark_plots: bool = False,
-    injection_ch1: bool = False,
-    injection_ch2: bool = False,
-    injection_frame: int = None
-) -> plt.Figure:    
+    injection_channels: list = None,
+    injection_submovie: float = None,
+    channel_names: list = None,
+) -> plt.Figure:
     '''
-    Space saving function to generate the rolling summary plots
-    '''      
+    Space saving function to generate the rolling summary plots.
+
+    injection_channels is a 1-indexed list of channels whose mean signal is
+    overlaid (each rescaled to the metric's y-range so its shape can be read
+    against the metric). injection_submovie draws a vertical line at the
+    injection time, in submovie-index units.
+    '''
     with style_context(dark_plots):
         fig, ax = plt.subplots()
         apply_dark(fig, ax, dark_plots)
 
         # plot the dataframe
-        ax.plot(fullmovie_summary[independent_variable], 
+        ax.plot(fullmovie_summary[independent_variable],
                 fullmovie_summary[dependent_variable],
                 color = 'blue' if not dark_plots else 'lightblue')
-        
+
         # fill between the ± standard deviation of the dependent variable
         ax.fill_between(x = fullmovie_summary[independent_variable],
                         y1 = fullmovie_summary[dependent_variable] - fullmovie_summary[dependent_error],
                         y2 = fullmovie_summary[dependent_variable] + fullmovie_summary[dependent_error],
                         color = 'blue' if not dark_plots else 'lightblue',
                         alpha = 0.25)
-        
-        # plot average signal of injection channel over all the frames
-        if (injection_ch1 != injection_ch2):
-            injection_channel = 1 if injection_ch1 else 2
-            overlay_signal = fullmovie_summary[f'Ch {injection_channel} Mean Signal']
+
+        # Overlay the mean signal of each selected injection channel, rescaled to
+        # the metric's y-range (shape, not absolute intensity, is what matters).
+        labeled = False
+        if injection_channels:
             ymin = (fullmovie_summary[dependent_variable] - fullmovie_summary[dependent_error]).min()
-
             ymax = (fullmovie_summary[dependent_variable] + fullmovie_summary[dependent_error]).max()
+            palette = _INJECTION_COLORS[bool(dark_plots)]
+            for ch in injection_channels:
+                col = f'Ch {ch} Mean Signal'
+                if col not in fullmovie_summary.columns:
+                    continue
+                overlay_signal = fullmovie_summary[col]
+                signal_range = overlay_signal.max() - overlay_signal.min()
+                if signal_range == 0:
+                    continue
+                signal_scaled = (overlay_signal - overlay_signal.min()) / signal_range
+                signal_scaled = signal_scaled * (ymax - ymin) + ymin
+                ax.plot(
+                    fullmovie_summary[independent_variable],
+                    signal_scaled,
+                    color=palette.get(ch, 'gray'),
+                    linewidth=2,
+                    alpha=0.8,
+                    label=relabel_channels(f'Ch {ch} signal', channel_names),
+                )
+                labeled = True
 
-            signal_scaled = ((overlay_signal - overlay_signal.min()) / (overlay_signal.max() - overlay_signal.min()))
-
-            signal_scaled = signal_scaled * (ymax - ymin) + ymin
-
-            ax.plot(
-                fullmovie_summary[independent_variable],
-                signal_scaled,
-                color='orange' if not dark_plots else 'yellow',
-                linewidth=2,
-                alpha=0.8
-            )
-        
         # plot vertical line indicating when injection takes place
-        if (injection_frame is not None and injection_frame != 0):
-            ax.axvline(x=injection_frame, color='red', linestyle='--', alpha=0.5)
-        
+        if injection_submovie is not None and injection_submovie != 0:
+            ax.axvline(x=injection_submovie, color='red', linestyle='--', alpha=0.6,
+                       label='injection')
+            labeled = True
+
+        if labeled:
+            ax.legend(loc='best', fontsize=8)
 
         # set axis labels
         ax.set_xlabel('Rolling submovie index')

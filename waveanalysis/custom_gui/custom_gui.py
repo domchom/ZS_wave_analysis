@@ -1672,6 +1672,8 @@ class RollingGUI(_GUIBase):
             "injection_frame": tk.IntVar(value=0),
             "injection_ch1": tk.BooleanVar(value=False),
             "injection_ch2": tk.BooleanVar(value=False),
+            "injection_ch3": tk.BooleanVar(value=False),
+            "injection_ch4": tk.BooleanVar(value=False),
         }
         self.kymograph = False
         self._back_to_standard = False
@@ -1737,8 +1739,10 @@ class RollingGUI(_GUIBase):
         inj = ttk.LabelFrame(right, text="Live Injection (optional)", padding=4)
         inj.pack(fill=tk.X)
         self._add_entry(inj, 0, 0, self.vars["injection_frame"], "Injection frame", width=6)
-        self._add_check(inj, 1, 0, self.vars["injection_ch1"], "Injection signal Ch1")
-        self._add_check(inj, 2, 0, self.vars["injection_ch2"], "Injection signal Ch2")
+        self._add_check(inj, 1, 0, self.vars["injection_ch1"], "Overlay signal Ch1")
+        self._add_check(inj, 2, 0, self.vars["injection_ch2"], "Overlay signal Ch2")
+        self._add_check(inj, 3, 0, self.vars["injection_ch3"], "Overlay signal Ch3")
+        self._add_check(inj, 4, 0, self.vars["injection_ch4"], "Overlay signal Ch4")
 
         ttk.Separator(root, orient="horizontal").pack(fill=tk.X, pady=6)
         self._bottom = ttk.Frame(root)
@@ -2681,6 +2685,16 @@ _HELP = {
          "Rolling analysis splits the movie into temporal sub-windows. 'Subframe "
          "size' is the number of frames per window; 'Subframe roll' is how many "
          "frames the window advances each step."),
+        ("Live Injection — rolling",
+         "Optional overlay for experiments where something is added mid-recording "
+         "(e.g. a drug injection). 'Injection frame' draws a vertical dashed line "
+         "on every rolling plot at that time point — enter the frame number where "
+         "the injection occurred (leave 0 to omit the line). The 'Overlay signal "
+         "Ch1–Ch4' checkboxes additionally plot each selected channel's mean "
+         "intensity over the movie, rescaled to the metric's y-range, so you can "
+         "line up changes in a wave metric against when a channel's signal (e.g. a "
+         "co-imaged injection marker) rises or falls. Only applies to rolling "
+         "analysis."),
         ("ACF peak threshold",
          "Minimum relative prominence (0–1) a peak in the autocorrelation must "
          "have to count when detecting the period. Higher = stricter. Typical 0.1."),

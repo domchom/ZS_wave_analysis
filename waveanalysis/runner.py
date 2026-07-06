@@ -248,6 +248,8 @@ def _run_analysis(gui):
                 channel_names=channel_names,
                 injection_ch1=params.get("injection_ch1", False),
                 injection_ch2=params.get("injection_ch2", False),
+                injection_ch3=params.get("injection_ch3", False),
+                injection_ch4=params.get("injection_ch4", False),
                 injection_frame=params.get("injection_frame", None),
                 edge_height_fraction=params.get("edge_height_fraction", 0.5),
             )

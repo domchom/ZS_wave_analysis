@@ -14,6 +14,23 @@ from waveanalysis.image_props.image_to_np_arrays import tiff_to_np_array_multi_f
 from waveanalysis.signal_processing.correlation_functions import _peak_landmarks
 from waveanalysis.summarize_save.summarize_images import summarize_image, combine_stats_rolling
 
+
+def _build_injection_dict(flags: list, num_channels: int, injection_frame: int, subframe_roll: int) -> dict:
+    '''
+    Assemble the live-injection overlay spec for the rolling summary plots.
+
+    flags is [Ch1, Ch2, Ch3, Ch4] booleans; the returned 'injection_channels'
+    is the 1-indexed list of selected channels that actually exist in the image.
+    'injection_submovie' converts the injection frame to the rolling plots'
+    x-axis units (submovie index = frame / subframe_roll), or None when no
+    injection frame is set.
+    '''
+    injection_channels = [ch for ch, on in enumerate(flags, start=1)
+                          if on and ch <= num_channels]
+    injection_submovie = (injection_frame / subframe_roll) if injection_frame else None
+    return {"injection_channels": injection_channels, "injection_submovie": injection_submovie}
+
+
 def rolling_workflow(
     folder_path: str,
     log_params: dict[str, Any],
@@ -32,6 +49,8 @@ def rolling_workflow(
     channel_names: list = None,
     injection_ch1: bool = False,
     injection_ch2: bool = False,
+    injection_ch3: bool = False,
+    injection_ch4: bool = False,
     injection_frame: int = None,
     edge_height_fraction: float = 0.5,
 ) -> pd.DataFrame:
@@ -314,7 +333,12 @@ def rolling_workflow(
                     channel_combos=channel_combos,
                     dark_plots=dark_plots,
                     channel_names=channel_names,
-                    live_injection_dict={"injection_ch1": injection_ch1, "injection_ch2": injection_ch2, "injection_frame": (injection_frame / img_props['frame_interval']) if injection_frame is not None else None}
+                    live_injection_dict=_build_injection_dict(
+                        flags=[injection_ch1, injection_ch2, injection_ch3, injection_ch4],
+                        num_channels=num_channels,
+                        injection_frame=injection_frame,
+                        subframe_roll=subframe_roll,
+                    )
                 )
                 plot_save_path = os.path.join(im_save_path, 'summary_plots')
                 os.makedirs(plot_save_path, exist_ok=True) if not test else None
