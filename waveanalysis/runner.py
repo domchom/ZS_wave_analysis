@@ -122,6 +122,8 @@ def _build_log_params(params, analysis_type):
             "Plot Individual Landmark Shifts": params["plot_flags"].get("plot_indv_landmark_shifts", False),
             "Plot FTs": params["plot_flags"].get("plot_fts", False),
             "Dark Plots": params["plot_flags"]["dark_plots"],
+            "Group Stats": params["plot_flags"].get("group_stats", True),
+            "Group Stats Test": params["plot_flags"].get("group_stats_test", "nonparametric"),
         })
     elif analysis_type == "rolling":
         log_params.update({
@@ -156,6 +158,8 @@ def _build_log_params(params, analysis_type):
             "Plot Individual Landmark Shifts": params["plot_flags"].get("plot_indv_landmark_shifts", False),
             "Plot FTs": params["plot_flags"].get("plot_fts", False),
             "Dark Plots": params["plot_flags"]["dark_plots"],
+            "Group Stats": params["plot_flags"].get("group_stats", True),
+            "Group Stats Test": params["plot_flags"].get("group_stats_test", "nonparametric"),
             "Calc Wave Speeds": params["calculate_wave_speeds"],
             "Plot Wave Speeds": True,
         })

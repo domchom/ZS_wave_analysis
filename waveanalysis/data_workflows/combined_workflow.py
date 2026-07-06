@@ -495,6 +495,11 @@ def combined_workflow(
         summary_df.to_csv(f"{main_save_path}/!{now.strftime('%Y%m%d%H%M')}_summary.csv", index = False) if not test else None
 
         if group_names != ['']:
+            # Group-test options: whether to annotate a significance test at all,
+            # and which test family (rank-based non-parametric vs t-test/ANOVA).
+            group_stats = plot_flags.get("group_stats", True)
+            group_stats_test = plot_flags.get("group_stats_test", "nonparametric")
+
             # generate comparisons between each group
             mean_parameter_figs = pt.generate_group_comparison(
                 summary_df=summary_df,
@@ -504,6 +509,8 @@ def combined_workflow(
                 edge_height_fraction=edge_height_fraction,
                 group_order=group_order,
                 group_labels=group_labels,
+                add_stats=group_stats,
+                stats_test=group_stats_test,
             )
             group_plots_save_path = os.path.join(main_save_path, "group_comparison_graphs")
             os.makedirs(group_plots_save_path, exist_ok=True) if not test else None
@@ -519,6 +526,8 @@ def combined_workflow(
                 edge_height_fraction=edge_height_fraction,
                 group_order=group_order,
                 group_labels=group_labels,
+                add_stats=group_stats,
+                stats_test=group_stats_test,
             ))
             quality_figs.update(pt.generate_group_coverage(
                 summary_df=summary_df,
@@ -526,15 +535,8 @@ def combined_workflow(
                 dark_plots=plot_flags["dark_plots"],
                 group_order=group_order,
                 group_labels=group_labels,
-            ))
-            quality_figs.update(pt.generate_group_effective_n_heatmap(
-                summary_df=summary_df,
-                log_params=log_params,
-                dark_plots=plot_flags["dark_plots"],
-                channel_names=channel_names,
-                edge_height_fraction=edge_height_fraction,
-                group_order=group_order,
-                group_labels=group_labels,
+                add_stats=group_stats,
+                stats_test=group_stats_test,
             ))
             quality_figs.update(pt.generate_group_per_image_reliability(
                 summary_df=summary_df,

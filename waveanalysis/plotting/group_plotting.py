@@ -5,14 +5,56 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import stats
 from .mean_plot_creation import (
-    CCF_SHIFT_NOTE,
-    PHASE_SHIFT_NOTE,
-    landmark_metric_note,
-    _add_figure_note,
     _annotate_lead_direction,
 )
 from .style import style_context, apply_dark
-from waveanalysis.housekeeping.housekeeping_functions import relabel_metric_text, get_channel_name
+from waveanalysis.housekeeping.housekeeping_functions import relabel_metric_text, get_channel_name, metric_unit
+
+
+def _axis_label(display: str, param: str) -> str:
+    '''Append the metric's physical unit to an axis label, when it has one.'''
+    unit = metric_unit(param)
+    return f'{display} ({unit})' if unit else display
+
+
+def _shorten_labels(names: list, max_len: int = 24) -> list:
+    '''Trim long image filenames for x-tick labels.
+
+    Drops the file extension and any leading run shared by every name (cut back
+    to a separator so tokens stay intact), then elides the middle of anything
+    still longer than max_len — keeping the head and the distinguishing tail
+    (e.g. the trailing '-1' / '-2') so images remain identifiable.
+    '''
+    base = []
+    for n in names:
+        n = str(n)
+        for ext in ('.tiff', '.tif'):
+            if n.lower().endswith(ext):
+                n = n[:-len(ext)]
+                break
+        base.append(n)
+
+    if len(base) > 1:
+        prefix = base[0]
+        for s in base[1:]:
+            while prefix and not s.startswith(prefix):
+                prefix = prefix[:-1]
+            if not prefix:
+                break
+        if prefix:
+            cut = max(prefix.rfind('_'), prefix.rfind('-'), prefix.rfind(' ')) + 1
+            prefix = prefix[:cut]
+            if prefix:
+                base = [s[len(prefix):] or s for s in base]
+
+    out = []
+    for s in base:
+        if len(s) > max_len:
+            head = (max_len - 1) // 2
+            tail = max_len - 1 - head
+            s = s[:head] + '…' + s[-tail:]
+        out.append(s)
+    return out
 
 # Metrics whose value is a signed inter-channel offset, so a positive/negative
 # note is meaningful. Matched as a substring of the column name.
@@ -83,31 +125,59 @@ def _add_significance_bracket(ax, x1, x2, y, text, dark_plots=False):
             color=color, fontsize=10)
 
 
-def _group_comparison_stats(ax, groups_data, dark_plots):
-    '''Run a non-parametric group test and annotate the axes.
+def _cohens_d(a, b) -> float:
+    '''Pooled-SD Cohen's d effect size for two samples (0 = full overlap).'''
+    n1, n2 = len(a), len(b)
+    s1, s2 = np.nanvar(a, ddof=1), np.nanvar(b, ddof=1)
+    pooled = np.sqrt(((n1 - 1) * s1 + (n2 - 1) * s2) / (n1 + n2 - 2))
+    if not np.isfinite(pooled) or pooled == 0:
+        return np.nan
+    return (np.nanmean(a) - np.nanmean(b)) / pooled
 
-    Two groups -> Mann-Whitney U with a rank-biserial effect size and a
-    significance bracket. More than two -> Kruskal-Wallis omnibus test. Returns
-    a short text summary for the title, or None if a test could not be run.
+
+def _group_comparison_stats(ax, groups_data, dark_plots, stats_test='nonparametric'):
+    '''Run a group test and annotate the axes.
+
+    stats_test selects the test family:
+      'nonparametric' (default, rank-based, no distribution assumption):
+        two groups -> Mann-Whitney U with a rank-biserial effect size;
+        more than two -> Kruskal-Wallis omnibus test.
+      'parametric' (assumes each group is roughly normally distributed):
+        two groups -> Student's t-test with a Cohen's d effect size;
+        more than two -> one-way ANOVA (F-test).
+
+    Two-group tests also draw a significance bracket. Returns a short text
+    summary for the title, or None if a test could not be run.
     '''
     ns = [len(d) for d in groups_data]
     if any(n < _MIN_N_FOR_STATS for n in ns):
         return None
+    parametric = stats_test == 'parametric'
     try:
         if len(groups_data) == 2:
-            u_stat, p = stats.mannwhitneyu(
-                groups_data[0], groups_data[1], alternative='two-sided'
-            )
-            # rank-biserial correlation: 0 = full overlap, ±1 = full separation
-            rbc = 1 - (2.0 * u_stat) / (ns[0] * ns[1])
+            if parametric:
+                _, p = stats.ttest_ind(groups_data[0], groups_data[1], equal_var=True)
+                effect = f"Cohen's d={_cohens_d(groups_data[0], groups_data[1]):.2f}"
+                test_name = 't-test'
+            else:
+                u_stat, p = stats.mannwhitneyu(
+                    groups_data[0], groups_data[1], alternative='two-sided'
+                )
+                # rank-biserial correlation: 0 = full overlap, ±1 = full separation
+                rbc = 1 - (2.0 * u_stat) / (ns[0] * ns[1])
+                effect = f'rank-biserial r={rbc:.2f}'
+                test_name = 'Mann–Whitney'
             dmax = max(np.nanmax(groups_data[0]), np.nanmax(groups_data[1]))
             dmin = min(np.nanmin(groups_data[0]), np.nanmin(groups_data[1]))
             span = (dmax - dmin) or 1.0
             ax.set_ylim(top=dmax + 0.20 * span)
             _add_significance_bracket(ax, 0, 1, dmax + 0.08 * span,
                                       _p_to_stars(p), dark_plots)
-            return f'Mann–Whitney p={p:.3g} ({_p_to_stars(p)}), rank-biserial r={rbc:.2f}'
+            return f'{test_name} p={p:.3g} ({_p_to_stars(p)}), {effect}'
         else:
+            if parametric:
+                _, p = stats.f_oneway(*groups_data)
+                return f'ANOVA p={p:.3g} ({_p_to_stars(p)})'
             _, p = stats.kruskal(*groups_data)
             return f'Kruskal–Wallis p={p:.3g} ({_p_to_stars(p)})'
     except ValueError:
@@ -124,13 +194,16 @@ def generate_group_comparison(
     group_order: list = None,
     group_labels: dict = None,
     add_stats: bool = True,
+    stats_test: str = 'nonparametric',
 ) -> dict:
     """
     Generate group comparison plots for each parameter in the summary dataframe.
 
     Each plot shows a box + swarm per group with the sample size in the x label
-    and, when there are enough observations, a non-parametric significance test
-    (Mann-Whitney for two groups, Kruskal-Wallis for more).
+    and, when add_stats is True and there are enough observations, a group
+    significance test. stats_test picks the test family: 'nonparametric'
+    (Mann-Whitney / Kruskal-Wallis, the default) or 'parametric' (t-test /
+    one-way ANOVA, which assume normally distributed groups).
 
     Parameters:
         summary_df (pd.DataFrame): The summary dataframe containing the data for comparison.
@@ -144,7 +217,9 @@ def generate_group_comparison(
         group_labels (dict): Optional mapping of original group name -> display
                              name. Renaming is applied before ordering and is
                              reflected in the x-axis tick labels.
-        add_stats (bool): If True, annotate a non-parametric group test.
+        add_stats (bool): If True, annotate a group significance test.
+        stats_test (str): 'nonparametric' (Mann-Whitney / Kruskal-Wallis) or
+                          'parametric' (t-test / one-way ANOVA).
 
     Returns:
         dict: A dictionary mapping parameter name -> matplotlib Figure.
@@ -200,7 +275,7 @@ def generate_group_comparison(
                 # y-limit headroom for the bracket is already applied).
                 stat_line = None
                 if add_stats and len(order) >= 2:
-                    stat_line = _group_comparison_stats(ax, groups_data, dark_plots)
+                    stat_line = _group_comparison_stats(ax, groups_data, dark_plots, stats_test)
 
                 display_param = relabel_metric_text(param, channel_names, edge_height_fraction)
                 title = f'Group comparison: {display_param}'
@@ -208,7 +283,7 @@ def generate_group_comparison(
                     title += f'\n{stat_line}'
                 ax.set_title(title, fontsize=10)
                 ax.set_xlabel('Group')
-                ax.set_ylabel(display_param)
+                ax.set_ylabel(_axis_label(display_param, param))
 
                 # Sample size per group in the tick labels
                 ax.set_xticks(range(len(order)))
@@ -217,12 +292,10 @@ def generate_group_comparison(
                     rotation=45, ha='right'
                 )
 
-                # Signed offset metrics get metric-specific captions; others
-                # (durations, widths, periods, amplitudes) have no +/- meaning.
+                # Signed offset metrics: mark which channel leads at each end of
+                # the axis for actual shift metrics (a "Diff" is a difference of
+                # shifts, so the leading/trailing framing does not apply to it).
                 if any(key in param for key in _SIGNED_METRIC_KEYS):
-                    # Mark which channel leads at each end of the axis for actual
-                    # shift metrics (a "Diff" is a difference of shifts, so the
-                    # leading/trailing framing does not apply to it).
                     combo_match = re.search(r'Ch(\d+)-Ch(\d+)', param)
                     if 'Shift' in param and 'Diff' not in param and combo_match:
                         ch1_idx = int(combo_match.group(1)) - 1
@@ -234,17 +307,7 @@ def generate_group_comparison(
                             axis='y',
                             dark_plots=dark_plots,
                         )
-                    note = landmark_metric_note(param, edge_height_fraction)
-                    if not note and '% Phase Shift' in param:
-                        note = PHASE_SHIFT_NOTE
-                    elif not note and 'Shift' in param:
-                        note = CCF_SHIFT_NOTE
-                    if note:
-                        _add_figure_note(fig, note, dark_plots, bottom=0.30)
-                    else:
-                        fig.tight_layout()
-                else:
-                    fig.tight_layout()
+                fig.tight_layout()
                 group_mean_parameter_figs[param] = fig
                 plt.close(fig)
 
@@ -313,8 +376,8 @@ def generate_group_metric_scatter(
         )
 
         ax.set_title(f'Group scatter:\n{x_label} vs {y_label}', fontsize=10)
-        ax.set_xlabel(x_label)
-        ax.set_ylabel(y_label)
+        ax.set_xlabel(_axis_label(x_label, x_param))
+        ax.set_ylabel(_axis_label(y_label, y_param))
         ax.grid(True, alpha=0.25)
 
         stats_text = None
@@ -509,6 +572,7 @@ def _return_group_correlation_figure(
         apply_dark(fig, ax, dark_plots)
 
         im = ax.imshow(corr, vmin=-1, vmax=1, cmap='RdBu_r')
+        ax.grid(False)
         ax.set_xticks(range(n))
         ax.set_xticklabels(labels, rotation=45, ha='right', fontsize=7)
         ax.set_yticks(range(n))
@@ -535,8 +599,7 @@ def _return_group_correlation_figure(
 # These describe how trustworthy a group's data is, rather than its biology:
 #  - detection failure: % of bins where no period/peak/shift was measurable
 #  - coverage: number of bins contributing to each image's per-image means
-#  - effective sample size: how many images actually carry a usable value for
-#    each metric in each group (the "can I even run stats here?" map)
+#  - per-image reliability: each image's mean +/- within-image spread, by group
 # ---------------------------------------------------------------------------
 
 
@@ -550,6 +613,7 @@ def _quality_box_swarm(
     caution_level: float = None,
     caution_label: str = None,
     add_stats: bool = True,
+    stats_test: str = 'nonparametric',
 ) -> plt.Figure:
     '''Draw one box + swarm-per-group figure for a single quality column.
 
@@ -581,7 +645,7 @@ def _quality_box_swarm(
         # headroom for the significance bracket is already applied).
         stat_line = None
         if add_stats and len(order) >= 2:
-            stat_line = _group_comparison_stats(ax, groups_data, dark_plots)
+            stat_line = _group_comparison_stats(ax, groups_data, dark_plots, stats_test)
 
         # Shade the caution region (e.g. >50% of bins with no detection).
         if caution_level is not None:
@@ -620,6 +684,7 @@ def generate_group_detection_quality(
     group_order: list = None,
     group_labels: dict = None,
     add_stats: bool = True,
+    stats_test: str = 'nonparametric',
 ) -> dict:
     '''
     Generate detection-failure comparisons per group.
@@ -654,6 +719,7 @@ def generate_group_detection_quality(
                 caution_level=_DETECTION_CAUTION_PCNT,
                 caution_label=f'caution: >{_DETECTION_CAUTION_PCNT:.0f}% undetected',
                 add_stats=add_stats,
+                stats_test=stats_test,
             )
         except ValueError:
             log_params.setdefault('Plotting errors', []).append(
@@ -669,6 +735,7 @@ def generate_group_coverage(
     group_order: list = None,
     group_labels: dict = None,
     add_stats: bool = True,
+    stats_test: str = 'nonparametric',
 ) -> dict:
     '''
     Generate a per-group coverage comparison from the 'Num Bins' column.
@@ -697,97 +764,9 @@ def generate_group_coverage(
         title='Coverage: bins per image',
         dark_plots=dark_plots,
         add_stats=add_stats,
+        stats_test=stats_test,
     )
     return figs
-
-
-def generate_group_effective_n_heatmap(
-    summary_df: pd.DataFrame,
-    log_params: dict,
-    dark_plots: bool = False,
-    channel_names: list = None,
-    edge_height_fraction: float = None,
-    group_order: list = None,
-    group_labels: dict = None,
-) -> dict:
-    '''
-    Generate an effective sample-size heatmap (group x metric).
-
-    Each cell is the number of images in a group that carry a usable (non-NaN)
-    value for a metric -- the "can I even run stats here?" map. Cells below
-    _MIN_N_FOR_STATS are outlined so under-supported group/metric pairs stand
-    out. Returns a dict mapping a single plot name -> matplotlib Figure.
-    '''
-    print('Generating effective sample-size heatmap...')
-    figs = {}
-    if 'Group Name' not in summary_df.columns:
-        return figs
-
-    summary_df, order = _resolve_display_and_order(summary_df, group_order, group_labels)
-    metric_cols = [
-        c for c in summary_df.columns
-        if 'Mean' in c and pd.to_numeric(summary_df[c], errors='coerce').notna().any()
-    ]
-    if not order or not metric_cols:
-        log_params.setdefault('Plotting errors', []).append(
-            'Not enough data for effective sample-size heatmap'
-        )
-        return figs
-
-    counts = np.zeros((len(order), len(metric_cols)), dtype=int)
-    for i, group in enumerate(order):
-        group_df = summary_df.loc[summary_df['Group Name'] == group]
-        for j, col in enumerate(metric_cols):
-            counts[i, j] = int(pd.to_numeric(group_df[col], errors='coerce').notna().sum())
-
-    labels = [relabel_metric_text(c, channel_names, edge_height_fraction) for c in metric_cols]
-    figs['Effective Sample Size'] = _return_effective_n_figure(
-        counts, row_labels=[str(g) for g in order], col_labels=labels, dark_plots=dark_plots,
-    )
-    return figs
-
-
-def _return_effective_n_figure(
-    counts: np.ndarray,
-    row_labels: list,
-    col_labels: list,
-    dark_plots: bool = False,
-) -> plt.Figure:
-    n_rows, n_cols = counts.shape
-    with style_context(dark_plots):
-        width = min(max(0.5 * n_cols + 4, 8), 22)
-        height = min(max(0.5 * n_rows + 2, 4), 16)
-        fig, ax = plt.subplots(figsize=(width, height), constrained_layout=True)
-        apply_dark(fig, ax, dark_plots)
-
-        vmax = max(counts.max(), 1)
-        im = ax.imshow(counts, vmin=0, vmax=vmax, cmap='viridis', aspect='auto')
-        ax.set_xticks(range(n_cols))
-        ax.set_xticklabels(col_labels, rotation=45, ha='right', fontsize=7)
-        ax.set_yticks(range(n_rows))
-        ax.set_yticklabels(row_labels, fontsize=8)
-
-        for i in range(n_rows):
-            for j in range(n_cols):
-                value = int(counts[i, j])
-                # Annotate count; outline cells too thin to run a group test.
-                ax.text(j, i, str(value), ha='center', va='center', fontsize=7,
-                        color='white' if value < 0.6 * vmax else 'black')
-                if value < _MIN_N_FOR_STATS:
-                    ax.add_patch(plt.Rectangle(
-                        (j - 0.5, i - 0.5), 1, 1, fill=False,
-                        edgecolor='red', lw=1.5,
-                    ))
-
-        cbar = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.04)
-        cbar.set_label('Usable images (non-NaN)')
-        ax.set_title(
-            f'Effective sample size per group x metric\n'
-            f'(red outline: n < {_MIN_N_FOR_STATS}, too few for a group test)',
-            fontsize=10,
-        )
-        plt.close(fig)
-    return fig
 
 
 def generate_group_per_image_reliability(
@@ -846,6 +825,7 @@ def generate_group_per_image_reliability(
                 order=order,
                 palette=palette,
                 ylabel=display_param,
+                unit=metric_unit(param),
                 title=f'Per-image reliability: {display_param}',
                 dark_plots=dark_plots,
             )
@@ -864,6 +844,7 @@ def _return_per_image_reliability_figure(
     palette: dict,
     ylabel: str,
     title: str,
+    unit: str = '',
     dark_plots: bool = False,
 ) -> plt.Figure:
     # Lay images out left-to-right: grouped by group order, sorted by mean within
@@ -907,16 +888,21 @@ def _return_per_image_reliability_figure(
                     ha='center', va='bottom', fontsize=9,
                     color=palette.get(group, edge_color))
 
-        # per-image file-name ticks, but only when there are few enough to read
+        # per-image file-name ticks, but only when there are few enough to read.
+        # Names are shortened (common prefix/suffix stripped, middle elided) so
+        # long dataset filenames stay legible instead of running off the figure.
         if n <= 60:
             ax.set_xticks(range(n))
-            ax.set_xticklabels(ordered['File Name'].astype(str).tolist(),
-                               rotation=90, fontsize=6)
+            ax.set_xticklabels(_shorten_labels(ordered['File Name'].astype(str).tolist()),
+                               rotation=90, fontsize=7)
         else:
             ax.set_xticks([])
             ax.set_xlabel(f'Images (n={n}, sorted by mean within group)')
 
-        ax.set_ylabel(f'{ylabel} (mean ± SD)' if sd_param else ylabel)
+        y = f'{ylabel} ({unit}, mean ± SD)' if (unit and sd_param) else \
+            f'{ylabel} (mean ± SD)' if sd_param else \
+            f'{ylabel} ({unit})' if unit else ylabel
+        ax.set_ylabel(y)
         # extra pad so the title clears the centered group labels above each block
         ax.set_title(title, fontsize=10, pad=22)
         ax.grid(True, axis='y', alpha=0.25)
