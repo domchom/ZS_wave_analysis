@@ -30,11 +30,11 @@ Oscillation properties (e.g., signal peak, signal trough, signal amplitude, temp
 
 ![GitHub-Mark-Light](assets/images/peaks_dark.png#gh-dark-mode-only)![GitHub-Mark-Dark](assets/images/peaks_light.png#gh-light-mode-only)
 
-Once each box has been independently quantified, they can be combined to estimate properties of the wave population. For example, in the example above we measured a period of 12 frames, is that measurement representative of the whole sample? By looking at the distribution of all period measurements, we can see that it is. 
+Once each box has been independently quantified, they can be combined to estimate properties of the wave population. For example, is the period measured in a single box representative of the whole sample? By looking at the distribution of all period measurements, we can find out.
 
 ![GitHub-Mark-Light](assets/images/meanACF_dark.png#gh-dark-mode-only)![GitHub-Mark-Dark](assets/images/meanACF_light.png#gh-light-mode-only)
 
-Similarly, we can assess the population of signal shift measurements, and oscillation/wave properties.
+Similarly, we can assess the population of peak-shape and other oscillation/wave properties across all boxes.
 
 ![GitHub-Mark-Light](assets/images/meanPeaks_dark.png#gh-dark-mode-only)![GitHub-Mark-Dark](assets/images/meanPeaks_light.png#gh-light-mode-only)
 
