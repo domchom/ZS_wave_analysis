@@ -38,7 +38,7 @@ Similarly, we can assess the population of signal shift measurements, and oscill
 
 ![GitHub-Mark-Light](assets/images/meanPeaks_dark.png#gh-dark-mode-only)![GitHub-Mark-Dark](assets/images/meanPeaks_light.png#gh-light-mode-only)
 
-If different groups are specified within the GUI, the script will generate a folder full of plots comparing basic signal properties between groups.
+If different groups are specified within the GUI, the script will generate a folder full of plots comparing signal properties between groups. Each comparison can optionally be annotated with a significance test — either non-parametric (Mann–Whitney for two groups, Kruskal–Wallis for more) or parametric (t-test / one-way ANOVA) — selectable in the GUI. Alongside the comparisons, quality plots report detection rates and per-image coverage so you can see how many bins each group's metrics rest on.
 
 ![GitHub-Mark-Light](assets/images/comparisons_dark.png#gh-dark-mode-only)![GitHub-Mark-Dark](assets/images/comparisons_light.png#gh-light-mode-only)
 
@@ -129,6 +129,8 @@ You can also install this package into an existing virtual environment, for exam
 ## Using the GUI
 
 If you were successful in installing/running the project, a window will appear asking you for some parameters to adjust:
+
+> **Tip:** Every control, plot, and metric is also documented inside the app. Click the **Info** button in the GUI to open the **Info & Glossary** panel — a tabbed reference (Overview, Controls, Plots, Metrics, Preparing Data, Output, Tips) with worked example figures for each plot type.
 
 <img src="assets/images/gui1new.png" width="800">
 
