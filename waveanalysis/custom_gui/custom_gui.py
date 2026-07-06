@@ -624,6 +624,24 @@ class _GUIBase(_TkBase):
         lbl.grid(row=row, column=col + 1, padx=(2, 8), pady=1, sticky="w")
         return cb, lbl
 
+    def _build_group_stats_controls(self, parent, row):
+        """Group-comparison stats: a toggle plus the test-family selector.
+
+        'Group stats' turns the significance annotation on group comparison and
+        quality plots on/off. The test family is non-parametric (Mann–Whitney /
+        Kruskal–Wallis, no distribution assumption) or parametric (t-test /
+        one-way ANOVA, which assume roughly normal groups).
+        """
+        gs = ttk.Frame(parent)
+        gs.grid(row=row, column=0, columnspan=6, sticky="w", pady=(4, 0))
+        ttk.Checkbutton(gs, variable=self.vars["group_stats"],
+                        text="Group stats").pack(side=tk.LEFT, padx=(2, 10))
+        ttk.Label(gs, text="Test:").pack(side=tk.LEFT)
+        ttk.Radiobutton(gs, text="Non-parametric", value="nonparametric",
+                        variable=self.vars["group_stats_test"]).pack(side=tk.LEFT, padx=(4, 0))
+        ttk.Radiobutton(gs, text="Parametric (ANOVA / t-test)", value="parametric",
+                        variable=self.vars["group_stats_test"]).pack(side=tk.LEFT, padx=(4, 0))
+
     def _build_smoothing(self, parent, default_poly=2):
         """Build smoothing channel rows inside *parent* frame."""
         self.smoothing_widgets = {}
@@ -1422,7 +1440,7 @@ class _GUIBase(_TkBase):
                               "plot_metric_correlations",
                               "plot_indv_ACFs", "plot_indv_CCFs", "plot_indv_peaks",
                               "plot_heatmaps", "plot_landmark_shifts", "plot_indv_landmark_shifts",
-                              "plot_fts", "dark_plots")
+                              "plot_fts", "dark_plots", "group_stats", "group_stats_test")
                     if k in self._resolved_params
                 }
             errs = self._validate_inputs()
@@ -1486,6 +1504,8 @@ class BaseGUI(_GUIBase):
             "plot_indv_landmark_shifts": tk.BooleanVar(value=False),
             "plot_fts": tk.BooleanVar(value=False),
             "dark_plots": tk.BooleanVar(value=True),
+            "group_stats": tk.BooleanVar(value=True),
+            "group_stats_test": tk.StringVar(value="nonparametric"),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
             "peak_prominence_fraction": tk.DoubleVar(value=0.1),
@@ -1576,6 +1596,7 @@ class BaseGUI(_GUIBase):
         self._add_check(pl, 2, 4, self.vars["plot_fts"], "Fourier transforms")
         self._add_check(pl, 4, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
         self._add_check(pl, 3, 2, self.vars["plot_indv_landmark_shifts"], "Indv landmark")
+        self._build_group_stats_controls(pl, 5)
 
         # ---- separator ----
         ttk.Separator(root, orient="horizontal").pack(fill=tk.X, pady=6)
@@ -1774,6 +1795,8 @@ class KymographGUI(_GUIBase):
             "plot_indv_landmark_shifts": tk.BooleanVar(value=False),
             "plot_fts": tk.BooleanVar(value=False),
             "dark_plots": tk.BooleanVar(value=False),
+            "group_stats": tk.BooleanVar(value=True),
+            "group_stats_test": tk.StringVar(value="nonparametric"),
             "acf_peak_thresh": tk.DoubleVar(value=0.1),
             "ccf_peak_thresh": tk.DoubleVar(value=0.1),
             "peak_prominence_fraction": tk.DoubleVar(value=0.1),
@@ -1862,6 +1885,7 @@ class KymographGUI(_GUIBase):
         self._add_check(pl, 2, 4, self.vars["plot_fts"], "Fourier transforms")
         self._add_check(pl, 4, 0, self.vars["plot_landmark_shifts"], "Summary landmark")
         self._add_check(pl, 3, 2, self.vars["plot_indv_landmark_shifts"], "Indv landmark")
+        self._build_group_stats_controls(pl, 5)
 
         ttk.Separator(root, orient="horizontal").pack(fill=tk.X, pady=6)
         self._bottom = ttk.Frame(root)
@@ -2149,6 +2173,12 @@ class _PlotViewer(tk.Toplevel):
         ttk.Button(nav, text="< Prev", command=self._prev).pack(side=tk.LEFT)
         ttk.Button(nav, text="Next >", command=self._next).pack(side=tk.LEFT, padx=4)
         ttk.Button(nav, text="Group Comparison", command=self._make_group_comparison).pack(side=tk.LEFT, padx=(0, 4))
+        # Stats options for the group comparison plots (see _make_group_comparison).
+        self.compare_stats_var = tk.BooleanVar(value=True)
+        ttk.Checkbutton(nav, variable=self.compare_stats_var, text="Stats").pack(side=tk.LEFT)
+        self.compare_test_var = tk.StringVar(value="Non-parametric")
+        ttk.Combobox(nav, textvariable=self.compare_test_var, state="readonly", width=15,
+                     values=["Non-parametric", "Parametric"]).pack(side=tk.LEFT, padx=(2, 8))
         ttk.Button(nav, text="Group Correlations", command=self._make_group_correlations).pack(side=tk.LEFT, padx=(0, 4))
         self.count_label = ttk.Label(nav, text=f"{len(self.image_files)} plots")
         self.count_label.pack(side=tk.RIGHT)
@@ -2276,13 +2306,14 @@ class _PlotViewer(tk.Toplevel):
     def _metric_sort_key(col):
         metric_order = [
             'Period',
-            'Peak Amp', 'Peak Rel Amp', 'Peak Max', 'Peak Min', 'Peak Width',
-            'Peak Area', 'Peak Offset',
+            'Peak Amp', 'Peak Rel Amp', 'Peak Apex Offset', 'Peak Apex',
+            'Peak Baseline', 'Peak Width', 'Peak Area',
             'Rise Duration', 'Fall Duration', 'Rise minus Fall Duration',
             'Rising Slope', 'Falling Slope', 'Max Rising Slope', 'Max Falling Slope',
             'Rising/Falling Slope Ratio',
-            '% Phase Shift', 'Peak Shift', 'Rise Shift', 'Fall Shift', 'Shift',
-            'Rise-Peak Diff', 'Fall-Peak Diff',
+            'CCF % Phase Shift', 'CCF Shift', 'Peak-Apex Shift',
+            'Rising-Edge Shift', 'Falling-Edge Shift',
+            'Rise-Apex Shift Diff', 'Fall-Apex Shift Diff',
         ]
         for idx, metric in enumerate(metric_order):
             if metric in col:
@@ -2417,6 +2448,8 @@ class _PlotViewer(tk.Toplevel):
                 return
             order, labels = dialog.result
 
+            stats_test = ('parametric' if self.compare_test_var.get().startswith('Parametric')
+                          else 'nonparametric')
             log_params = {'Plotting errors': []}
             figs = pt.generate_group_comparison(
                 summary_df=summary_df,
@@ -2424,6 +2457,8 @@ class _PlotViewer(tk.Toplevel):
                 dark_plots=self.default_dark_plots,
                 group_order=order,
                 group_labels=labels,
+                add_stats=self.compare_stats_var.get(),
+                stats_test=stats_test,
             )
             if not figs:
                 raise ValueError("No metrics had data to compare.")
@@ -2567,6 +2602,56 @@ class _SummaryViewer(tk.Toplevel):
 # Plain-language reference for the controls, plots, and metrics. Each section is
 # a list of (title, body) entries rendered into a tab of the Info panel.
 _HELP = {
+    "Overview": [
+        ("How the analysis works",
+         "Wave Analysis measures oscillatory / excitable dynamics in time-lapse "
+         "movies. Every mode follows the same pipeline: sample the image into small "
+         "regions ('bins'), turn each bin into a mean-intensity trace over time, then "
+         "quantify the timing and shape of that trace. The steps below show "
+         "the pipeline on a single bin. The real output is these metrics pooled "
+         "across every bin of every image."),
+        ("1 · Sample the image into bins",
+         "Each channel is tiled into small sampling regions: square boxes (standard), "
+         "vertical lines (kymograph), or boxes within rolling time windows. Every bin "
+         "is analyzed independently and produces one trace per channel.",
+         "boxes"),
+        ("2 · Period, from autocorrelation",
+         "The top half of the graph shows the raw mean-intensity trace for one bin. "
+         "A bin's mean intensity over time is the oscillatory signal. Correlating that "
+         "signal with a time-shifted copy of itself (autocorrelation) reveals its "
+         "dominant period, the first non-zero strong ACF peak (bottom).",
+         "indvACF"),
+        ("3 · Shift, from cross-correlation",
+         "For multi-channel data, cross-correlating two channels measures the temporal "
+         "shift (lead / lag) between them — the CCF Shift. It is also reported as a "
+         "percentage of the period (CCF % Phase Shift), which normalizes across bins "
+         "with different periods.",
+         "indvCCF"),
+        ("4 · Peak shape",
+         "Individual peaks in the (smoothed) trace give amplitude, width, area, "
+         "rise / fall durations and slopes. Savitzky–Golay smoothing suppresses "
+         "spurious peaks in noisy data before this step.",
+         "indvPeaks"),
+        ("5 · Summarize across bins",
+         "A single bin is just one sample. Pooling every bin of an image gives a "
+         "distribution for each metric, and the per-image mean becomes one data point "
+         "for group comparisons.",
+         "groupComparison"),
+        ("Which mode should I use?",
+         "Standard: boxes on an en-face movie; best for a few clean wave periods. (Follows the pipeline above.) "
+         "Kymograph: vertical lines on a kymograph image. A single medial slice gives "
+         "finer temporal resolution than z-stacked en-face capture. Rolling: "
+         "overlapping temporal sub-windows of a long movie; use when the recording "
+         "spans tens to thousands of periods that change over time."),
+        ("Kymograph sampling",
+         "Instead of boxes, entire columns of the kymograph are segmented and measured. "
+         "Produces the same metrics as the standard method, but uses a different bin creation workflow.",
+         "lines"),
+        ("Rolling analysis",
+         "The movie is split into short, overlapping sub-movies; each is analyzed like "
+         "a standard movie so you can track how wave properties drift over time.",
+         "rolling_analysis"),
+    ],
     "Controls": [
         ("Input folder / Browse",
          "The folder of .tif movies to analyze (all non-hidden .tif files are "
@@ -2585,11 +2670,13 @@ _HELP = {
          "that is analyzed independently."),
         ("Line width (px) — kymograph",
          "Width, in pixels, of each vertical sampling line across the kymograph. "
-         "Each line yields one trace per channel."),
+         " The width is the number of neighboring columns that are averaged together to produce "
+         " each line's mean-intensity trace. Each line yields one trace per channel."),
         ("Box / Line shift (px)",
          "Step between neighboring bins. Setting it equal to the box size / line "
          "width tiles without overlap; a smaller value produces overlapping, "
-         "denser bins."),
+         "denser bins. A larger value skips bins and may miss some wave events, but "
+         "reduces the number of bins and speeds up analysis."),
         ("Subframe size / roll — rolling",
          "Rolling analysis splits the movie into temporal sub-windows. 'Subframe "
          "size' is the number of frames per window; 'Subframe roll' is how many "
@@ -2604,9 +2691,17 @@ _HELP = {
          "Minimum prominence — as a fraction of the trace's intensity range — "
          "for a peak in the raw signal to be included in peak-shape analysis."),
         ("Small shifts correction",
-         "Resolves sign ambiguity for near-zero CCF shifts so a small lead/lag "
-         "isn't flipped to a near-period value. Only recommended for signals that are closely matched."
-         " Otherwise, leave this off to avoid biasing the shift measurement."),
+         "The inter-channel shift is read from the cross-correlation peak nearest "
+         "zero lag. Because the signals are periodic, a shift of, say, +0.9 period "
+         "is indistinguishable from a −0.1 period lead, and noise or phase aliasing "
+         "can push a genuinely small lead/lag out to a near-full-period value. When "
+         "enabled, any measured shift whose magnitude exceeds 60% of the average "
+         "period is wrapped back toward zero by ±1 period (subtract a period from a "
+         "positive shift, add one to a negative shift), collapsing these aliased "
+         "readings onto the small lead/lag they actually represent. "
+         "Only use this for signals you expect to be closely matched (small true "
+         "offset). If channels can genuinely be offset by more than half a period, "
+         "leave it off — it would wrap real large shifts and bias the measurement."),
         ("Smoothing (Ch1–Ch4, CCF)",
          "Savitzky–Golay smoothing applied to each channel's trace (and the CCF) "
          "before analysis. 'win' is the window length in frames (odd number); "
@@ -2620,11 +2715,14 @@ _HELP = {
          "The height — as a percentage of each peak's amplitude — at which the "
          "rising and falling 'landmarks' are placed. These landmarks define the "
          "rise/fall durations and edge-shift metrics. 50% ≈ full-width-half-max."
-         " 100% = peak apex; 0% = baseline. The landmarks are drawn on the plots."),
+         " 100% = peak apex; 0% = baseline. The landmarks are drawn on the plots."
+         # TODO: add a new image here showing the landmarks on a peak,
+        ),
         ("Plot Options",
          "Choose which figure sets to generate (see the Plots tab). 'Summary' plots "
          "aggregate across all bins of an image; 'Indv' plots are one-per-bin. "
-         "'Dark plots' renders figures on a dark background."),
+         "'Dark plots' renders figures on a dark background. See the Plots tab for a "
+         "glossary of each figure type."),
         ("Test File",
          "Run the full analysis on a single chosen .tif (no settings are saved). A "
          "fast way to check parameters before processing a whole folder."),
@@ -2635,62 +2733,130 @@ _HELP = {
          "Open an existing results folder (a 0_signalProcessing-… folder)"
          " to browse its plots and summary without re-running."),
         ("Rolling / Kymograph",
-         "Switch the analysis mode. Standard = boxes on a movie; Kymograph = lines "
-         "on a kymograph image; Rolling = temporal sub-windows of a movie."),
+         "Switch the analysis mode."),
     ],
-    "Plots": [
-        ("Summary ACFs",
-         "Per-channel mean autocorrelation across all bins of an image, used to "
-         "read out the dominant period."),
-        ("Summary CCFs",
-         "Mean cross-correlation between each channel pair, summarizing the typical "
-         "temporal shift between channels."),
-        ("Summary peaks",
-         "Distribution of peak-shape metrics (amplitude, width, etc.) pooled over "
-         "all bins of an image."),
-        ("Metric correlations (per image)",
-         "Spearman correlation heatmap between metrics computed across the bins of "
-         "a single image — which measurements correlate."),
-        ("Indv ACFs / CCFs / peaks",
-         "The same ACF, CCF, and peak analyses drawn separately for every "
-         "individual bin. Useful for QC but produces many figures and significantly "
-         "increases the time required for analysis."),
-        ("Heatmaps",
-         "Spatial overlay maps: each metric painted onto the image at the location "
-         "of its bin, plus a bin-ID reference map."),
-        ("Fourier transforms",
-         "FFT power spectrum of each bin's trace, annotated with the top three "
-         "spectral peaks and a reference line at the ACF-detected period (with the "
-         "nearest FFT peak highlighted)."),
-        ("Summary / Indv landmark",
-         "Rise- and fall-edge timing summaries (and per-bin versions), based on the "
-         "Landmark Edge Height setting."),
-        ("Group comparison (results viewer)",
-         "Box-and-swarm plot per group for each metric, with the sample size in the "
-         "axis label and a non-parametric significance test (Mann–Whitney for two "
-         "groups, Kruskal–Wallis for more)."),
-        ("Group correlations",
-         "Spearman cross-metric correlation heatmap computed separately for each "
-         "group, where each row is one image's per-image mean."),
-        ("Group scatter",
-         "Scatter of any two summary metrics with one point per image, groups "
-         "overlaid by color/marker, with an optional trend line and statistics."),
-        ("Quality: detection quality",
-         "Per group, the percentage of bins where no period/peak/shift could be "
-         "measured. High values mean the group's metrics rest on few usable bins; a "
-         "caution band marks >50%."),
-        ("Quality: coverage",
-         "Number of usable bins per image ('Num Bins'), per group. Flags "
-         "under-sampled images whose per-image means are statistically thin."),
-        ("Quality: effective N heatmap",
-         "Group × metric grid showing how many images carry a usable (non-NaN) "
-         "value for each metric — the 'can I even run stats here?' map. "
-         "Under-supported cells are outlined."),
-        ("Quality: per-image reliability",
-         "Caterpillar plot: each image's per-image mean ± within-image "
-         "variability, blocked by group. Long error bars flag images whose mean "
-         "rests on highly variable bins."),
-    ],
+    # Grouped into sub-tabs (dict value) rather than one long scroll. Each key
+    # becomes a sub-tab inside the Plots tab; see _build_section.
+    "Plots": {
+        "Summary": [
+            ("About summary plots",
+             "One figure per image, pooling every bin of that image into a "
+             "distribution or mean. These are the day-to-day outputs."),
+            ("Summary ACFs",
+             "Per-channel mean autocorrelation across all bins of an image, used to "
+             "read out the dominant period.",
+             "summaryACF"),
+            ("Summary CCFs",
+             "Mean cross-correlation between each channel pair, summarizing the "
+             "typical temporal shift between channels.",
+             "summaryCCF"),
+            ("Summary peaks",
+             "Distribution of peak-shape metrics (amplitude, width, area, etc.) "
+             "pooled over all bins of an image.",
+             "summaryPeaks"),
+            ("Summary slopes",
+             "Distribution of the rising/falling-edge slope metrics across an "
+             "image's bins — how steep and how symmetric the wave edges are.",
+             "summarySlopes"),
+            ("Summary edge times",
+             "Distribution of the rise- and fall-edge timing (rise/fall durations) "
+             "pooled over the bins of an image.",
+             "summaryEdgeTimes"),
+            ("Summary landmark shifts",
+             "Per-channel-pair inter-channel timing offsets measured from matched "
+             "peak landmarks (apex, rising edge, falling edge), pooled over the "
+             "image's bins. A landmark-based alternative to the CCF shift.",
+             "summaryLandmarkShifts"),
+            ("Lag profile",
+             "How the cross-correlation shift between two channels varies across the "
+             "image's bins — a profile of lead/lag rather than a single summary "
+             "value.",
+             "lagProfile"),
+            ("Metric correlations (per image)",
+             "Spearman correlation heatmap between metrics computed across the bins "
+             "of a single image — which measurements move together.",
+             "summaryMetricCorr"),
+        ],
+        "Individual": [
+            ("About individual-bin plots",
+             "One figure per bin — the same analyses as the summary plots, drawn "
+             "separately for each bin. Useful for QC but they produce many figures "
+             "and significantly increase analysis time, so sample sparsely (large "
+             "box / line shift) or leave them off for routine runs."),
+            ("Indv ACFs",
+             "The autocorrelation for a single bin, with the detected period marked.",
+             "indvACF"),
+            ("Indv CCFs",
+             "The cross-correlation between two channels for a single bin, with the "
+             "detected shift marked.",
+             "indvCCF"),
+            ("Indv peaks",
+             "Peak-shape analysis for a single bin's trace: detected peaks with "
+             "their amplitude, width, and baseline annotated.",
+             "indvPeaks"),
+            ("Indv landmark shift",
+             "Per-bin inter-channel timing from matched peak landmarks, showing the "
+             "apex / rising-edge / falling-edge offsets between two channels.",
+             "indvLandmarkShift"),
+            ("Fourier transforms",
+             "FFT power spectrum of each bin's trace, annotated with the top three "
+             "spectral peaks and a reference line at the ACF-detected period (with "
+             "the nearest FFT peak highlighted).",
+             "indvFFT"),
+        ],
+        "Spatial": [
+            ("About spatial maps",
+             "Values placed back onto the image at the location of each bin, so you "
+             "can see where in the field a metric is high or low."),
+            ("Heatmaps",
+             "Each metric painted onto the image at the location of its bin.",
+             "heatmap"),
+            ("Bin reference chart",
+             "A companion map that labels each bin with its ID, so heatmap features "
+             "can be traced back to specific bins.",
+             "heatmapBinRef"),
+        ],
+        "Group": [
+            ("About group plots",
+             "One point per image, compared across the folder using the group "
+             "labels. These are the between-condition comparisons."),
+            ("Group comparison",
+             "Box-and-swarm plot per group for each metric, with the sample size in "
+             "the axis label and an optional significance test. Use 'Group stats' to "
+             "show or hide the test, and choose the test family: non-parametric "
+             "(Mann–Whitney for two groups, Kruskal–Wallis for more — no "
+             "distribution assumption) or parametric (t-test / one-way ANOVA, which "
+             "assume roughly normal groups).",
+             "groupComparison"),
+            ("Group correlations",
+             "Spearman cross-metric correlation heatmap computed separately for each "
+             "group, where each row is one image's per-image mean.",
+             "groupCorr"),
+            ("Group scatter",
+             "Scatter of any two summary metrics with one point per image, groups "
+             "overlaid by color/marker, with an optional trend line and statistics.",
+             "groupScatter"),
+        ],
+        "Quality": [
+            ("About quality plots",
+             "Diagnostics for how much you should trust the numbers — how many bins "
+             "were usable and how variable they were."),
+            ("Detection quality",
+             "Per group, the percentage of bins where no period/peak/shift could be "
+             "measured. High values mean the group's metrics rest on few usable "
+             "bins; a caution band marks >50%.",
+             "qualityDetection"),
+            ("Coverage",
+             "Number of usable bins per image ('Num Bins'), per group. Flags "
+             "under-sampled images whose per-image means are statistically thin.",
+             "qualityCoverage"),
+            ("Per-image reliability",
+             "Caterpillar plot: each image's per-image mean ± within-image "
+             "variability, blocked by group. Long error bars flag images whose mean "
+             "rests on highly variable bins.",
+             "qualityReliability"),
+        ],
+    },
     "Metrics": [
         ("Units",
          "AU = arbitrary intensity units. s = seconds. Summary values are means "
@@ -2704,9 +2870,9 @@ _HELP = {
          "Peak amplitude relative to the baseline (dimensionless)."),
         ("Peak Width (s)",
          "Peak width at half maximum (FWHM)."),
-        ("Peak Max / Peak Min (AU)",
-         "Maximum (apex) and baseline/minimum intensity of the peak."),
-        ("Peak Offset (s)",
+        ("Peak Apex / Peak Baseline (AU)",
+         "Apex (maximum) and baseline (minimum) intensity of the peak."),
+        ("Peak Apex Offset (s)",
          "Offset of the peak apex from the midpoint between its rise and fall "
          "landmarks — a measure of asymmetry."),
         ("Peak Area (AU·s)",
@@ -2723,29 +2889,144 @@ _HELP = {
          "Steepest instantaneous slope on the rising / falling edge."),
         ("Rising/Falling Slope Ratio",
          "Ratio of rising to falling slope; 1 = symmetric edges."),
-        ("Shift (s)",
-         "Temporal shift between two channels from the cross-correlation peak. The "
-         "sign indicates which channel leads."),
-        ("% Phase Shift",
+        ("CCF Shift (s)",
+         "Temporal shift between two channels from the cross-correlation (CCF) peak. "
+         "The sign indicates which channel leads."),
+        ("CCF % Phase Shift",
          "CCF shift expressed as a percentage of the period (phase)."),
-        ("Peak Shift (s)",
-         "Shift between the channels' peak-apex times."),
-        ("Rise Shift / Fall Shift (s)",
-         "Shift between channels measured at the rising / falling edge landmarks."),
-        ("Rise-Peak Diff / Fall-Peak Diff (s)",
-         "Edge shift minus peak shift — whether the edges and apex shift by the "
-         "same amount."),
+        ("Peak-Apex Shift (s)",
+         "Inter-channel shift between the channels' peak-apex times (landmark-based, "
+         "not from the CCF)."),
+        ("Rising-Edge / Falling-Edge Shift (s)",
+         "Inter-channel shift measured at the rising / falling edge landmarks."),
+        ("Rise-Apex / Fall-Apex Shift Diff (s)",
+         "Edge-landmark shift minus the peak-apex shift — whether the edges and apex "
+         "shift between channels by the same amount."),
         ("Num Bins (quality)",
          "Number of usable bins contributing to an image's per-image means."),
         ("Pcnt No … (quality)",
          "Percentage of bins in an image where a given measurement (period, peak, "
          "or shift) could not be detected."),
     ],
+    "Preparing Data": [
+        ("Before you analyze",
+         "A few minutes of pre-processing makes the measurements far more "
+         "trustworthy. Wave Analysis measures the whole image exactly as given — it "
+         "does no drift, crop, or bleach correction for you."),
+        ("Correct drift first",
+         "Any significant 2-D drift smears the wave dynamics. Register / stabilize "
+         "the movie before analysis."),
+        ("Crop out black / background regions",
+         "Empty areas (from drift correction or true background) add meaningless "
+         "bins. Crop them out, or crop each region of interest into its own file."),
+        ("Bleaching & z-drift",
+         "Both bias amplitude and width measurements. It is best to avoid them at "
+         "acquisition, since bleach-correction algorithms can add their own "
+         "artifacts. Correct only if necessary."),
+        ("File format & metadata",
+         "Files should be TIFFs in tzcyx order. The tool reads ImageJ metadata to "
+         "identify the time, channel, and z axes and to get pixel size and frame "
+         "interval. If the frame interval or pixel size is missing it defaults to 1 "
+         "— so periods and shifts would come out in frames, not seconds."),
+        ("Z-stacks",
+         "Files with more than one z plane are max-projected along z before "
+         "analysis."),
+        ("One image = one region (for now)",
+         "The tool analyzes the entire image. To isolate a cell or exclude "
+         "background, crop it into a separate file. Mask-based sub-region analysis "
+         "is planned."),
+        ("Dataset character",
+         "Standard and kymograph modes want a few consistent periods; rolling wants "
+         "many periods that vary over time."),
+        ("Picking a box / line size",
+         "Bins should be large enough to average out noise but small enough not to "
+         "span multiple structures. A good empirical check: in FIJI draw a box, open "
+         "Image > Stacks > Plot Z-axis Profile, click Live, and resize until the "
+         "trace captures the dynamics you expect."),
+    ],
+    "Output": [
+        ("Results folder",
+         "Each run creates a 0_signalProcessing-<timestamp> folder inside your "
+         "source folder, so runs never overwrite each other."),
+        ("Pooled summary spreadsheet",
+         "!<timestamp>_summary.csv at the top of the results folder holds one row "
+         "per image (the per-image means) for every metric — the file you take to "
+         "statistics. The leading ! keeps it sorted to the top."),
+        ("Per-image folders",
+         "One subfolder per input file holds that image's summary plots, per-bin "
+         "measurement CSVs, and any heatmaps / FFT / individual-bin plots you "
+         "enabled."),
+        ("Group comparison graphs",
+         "If you set group names, group_comparison_graphs holds the box-and-swarm "
+         "comparison plots plus the group correlation and scatter figures."),
+        ("Quality assessment graphs",
+         "quality_assessment_graphs holds the detection-quality, coverage, "
+         "effective-N, and per-image reliability plots — check these before trusting "
+         "the comparisons."),
+        ("Mean parameter measurements",
+         "mean_parameter_measurements holds the per-metric mean CSVs behind the "
+         "group plots."),
+        ("Run log",
+         "!log-<timestamp>.txt records the exact parameters used, plus any files "
+         "that didn't match a group."),
+        ("Re-opening a run",
+         "Use Load Results in the GUI to browse an existing 0_signalProcessing-… "
+         "folder's plots and summary without re-running."),
+    ],
+    "Tips": [
+        ("Test before you batch",
+         "Run Test File on one movie (nothing is saved) and use Preview Bins to see "
+         "exactly where signals will be sampled before processing a whole folder."),
+        ("Most bins report nothing / low detection quality",
+         "Usually the bins are too small, the movie too short, or a threshold too "
+         "high. Enlarge the box / line, include more periods, or lower the ACF / "
+         "peak thresholds. The quality plots show which images are affected."),
+        ("A shift jumped to about one whole period",
+         "Near-zero shifts can wrap to a full period. Enable 'Small shifts "
+         "correction' — but only for closely matched signals (e.g. the same protein "
+         "in two fluorophores), since it biases genuinely large shifts."),
+        ("Peaks look spurious / over-counted",
+         "Increase per-channel smoothing (larger window) or raise the peak "
+         "prominence fraction so small wiggles are ignored."),
+        ("Comparing channel timing",
+         "Keep the smoothing window the same across channels, and smaller than the "
+         "shortest expected period — unequal smoothing shifts the apparent timing "
+         "between channels."),
+        ("Individual-bin plots are slow / flood the folder",
+         "They write one figure per bin. Sample sparsely (large box / line shift) "
+         "when you turn them on, or leave them off for routine runs."),
+        ("Period or shift is in frames, not seconds",
+         "The frame interval wasn't in the metadata, so it defaulted to 1. Fix the "
+         "TIFF metadata and re-run."),
+    ],
 }
 
 
+# Example figures embedded in the Info panel live inside the installed package
+# (see pyproject build include) so they ship with pip/uv installs, not just the
+# git checkout. Each entry may name a figure "stem"; the light/dark variant is
+# chosen to match the active theme.
+_HELP_ASSET_DIR = os.path.join(os.path.dirname(__file__), "help_assets")
+
+# Order of the Info panel tabs.
+_HELP_SECTIONS = ("Overview", "Controls", "Plots", "Metrics",
+                  "Preparing Data", "Output", "Tips")
+
+# Width (px) example figures are scaled to inside the panel.
+_HELP_IMAGE_WIDTH = 600
+
+
+def _help_image_path(stem, theme):
+    """Path to a bundled help figure for the given theme, or None if missing."""
+    for ext in ("png", "jpg"):
+        p = os.path.join(_HELP_ASSET_DIR, f"{stem}_{theme}.{ext}")
+        if os.path.exists(p):
+            return p
+    return None
+
+
 class _InfoPanel(tk.Toplevel):
-    """Tabbed help panel explaining the controls, plots, and metrics."""
+    """Tabbed help panel explaining the pipeline, controls, plots, and metrics."""
 
     def __init__(self, parent):
         super().__init__(parent)
@@ -2753,21 +3034,56 @@ class _InfoPanel(tk.Toplevel):
         self.geometry("840x640")
         self.transient(parent)
 
+        self._theme = getattr(parent, "_theme", "light")
+        if self._theme not in ("light", "dark"):
+            self._theme = "light"
+        self._photo_refs = []  # keep PhotoImages alive for the panel's lifetime
+
         _add_popup_header(self, parent, "Info & Glossary", "Reference")
-        ttk.Label(self, text="What each control, plot, and metric means.",
+        ttk.Label(self, text="How the pipeline works, plus every control, plot, and metric.",
                   foreground=_RETRO["header_sub"]).pack(anchor="w", padx=12, pady=(6, 6))
 
         nb = ttk.Notebook(self)
         nb.pack(fill=tk.BOTH, expand=True, padx=8, pady=(0, 6))
-        for section in ("Controls", "Plots", "Metrics"):
+        for section in _HELP_SECTIONS:
             frame = ttk.Frame(nb)
             nb.add(frame, text=section)
             self._build_section(frame, _HELP[section])
 
         ttk.Button(self, text="Close", command=self.destroy).pack(pady=(0, 10))
 
-    @staticmethod
-    def _build_section(parent, entries):
+    def _load_photo(self, stem):
+        """Return a theme-matched, panel-width PhotoImage for a figure, or None."""
+        path = _help_image_path(stem, self._theme)
+        if path is None:
+            return None
+        try:
+            from PIL import Image, ImageTk
+            image = Image.open(path)
+            if image.width > _HELP_IMAGE_WIDTH:
+                h = round(image.height * _HELP_IMAGE_WIDTH / image.width)
+                image = image.resize((_HELP_IMAGE_WIDTH, h), Image.LANCZOS)
+            photo = ImageTk.PhotoImage(image)
+        except Exception:
+            return None
+        self._photo_refs.append(photo)
+        return photo
+
+    def _build_section(self, parent, content):
+        # A section is either a flat list of entries, or a dict mapping
+        # sub-tab name -> entries (rendered as a nested notebook to avoid one
+        # very long scroll, e.g. the Plots tab).
+        if isinstance(content, dict):
+            sub_nb = ttk.Notebook(parent)
+            sub_nb.pack(fill=tk.BOTH, expand=True)
+            for name, entries in content.items():
+                frame = ttk.Frame(sub_nb)
+                sub_nb.add(frame, text=name)
+                self._build_entries(frame, entries)
+            return
+        self._build_entries(parent, content)
+
+    def _build_entries(self, parent, entries):
         txt = scrolledtext.ScrolledText(
             parent, wrap=tk.WORD, relief="sunken", borderwidth=2,
             highlightthickness=0, background=_RETRO["log_bg"], foreground=_RETRO["log_fg"],
@@ -2775,10 +3091,18 @@ class _InfoPanel(tk.Toplevel):
         )
         txt.pack(fill=tk.BOTH, expand=True)
         fam = tkfont.nametofont("TkDefaultFont").actual("family")
-        txt.tag_configure("h", font=(fam, 11, "bold"), foreground=_RETRO["select"],
+        txt.tag_configure("h", font=(fam, 14, "bold"), foreground=_RETRO["select"],
                           spacing1=10, spacing3=2)
-        txt.tag_configure("body", font=(fam, 10), spacing3=6, lmargin1=6, lmargin2=6)
-        for title, body in entries:
+        txt.tag_configure("body", font=(fam, 13), spacing3=6, lmargin1=6, lmargin2=6)
+        txt.tag_configure("img", spacing1=4, spacing3=8, lmargin1=6, lmargin2=6)
+        for entry in entries:
+            title, body = entry[0], entry[1]
+            stem = entry[2] if len(entry) > 2 else None
             txt.insert(tk.END, title + "\n", "h")
             txt.insert(tk.END, body + "\n", "body")
+            if stem:
+                photo = self._load_photo(stem)
+                if photo is not None:
+                    txt.image_create(tk.END, image=photo)
+                    txt.insert(tk.END, "\n", "img")
         txt.configure(state="disabled")
