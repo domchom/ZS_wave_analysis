@@ -4,6 +4,7 @@ import scipy.signal as sig
 import matplotlib.pyplot as plt
 from waveanalysis.signal_processing.correlation_functions import normalize_signal, _peak_landmarks
 from waveanalysis.housekeeping.housekeeping_functions import get_channel_name, get_channel_combo_name
+from waveanalysis.plotting.style import style_context, apply_dark
 
 def plot_indv_peak_workflow(
 	raw_bin_values: np.ndarray,
@@ -67,7 +68,7 @@ def _return_indv_peak_prop_figure(
     """
     # Extract peak properties from the dictionary
     signal = prop_dict['signal']
-    signal_ddx = prop_dict['derivative']
+    signal_derivative = prop_dict['derivative']
     avg_signal = prop_dict['average_signal']
     peaks = prop_dict['peaks']
     proms = prop_dict['proms']
@@ -78,23 +79,17 @@ def _return_indv_peak_prop_figure(
     left_bases = prop_dict['left_bases']
     right_bases = prop_dict['right_bases']
 
-    style = 'dark_background' if dark_plots else 'default'
-
-    with plt.style.context(style):
+    with style_context(dark_plots):
         # Create the figure and plot raw and smoothed signals
         fig, ax = plt.subplots()
-
-        # Force black backgrounds in dark mode for consistency
-        if dark_plots:
-            fig.patch.set_facecolor('black')
-            ax.set_facecolor('black')
+        apply_dark(fig, ax, dark_plots)
 
         x_axis = np.arange(0, num_frames) * frame_interval
         ax.plot(x_axis, bin_signal, color='gray', label='raw intensity')
         ax.plot(x_axis, signal, color='blue' if not dark_plots else 'lightblue', label='smoothed intensity')
 
         # Plot the derivative plot and the "zero line"
-        ax.plot(x_axis, signal_ddx, color = 'orange', label = 'derivative', alpha = 0.7)
+        ax.plot(x_axis, signal_derivative, color = 'orange', label = 'derivative', alpha = 0.7)
         ax.axhline(y=avg_signal, color='grey', linestyle = '--', alpha = 0.5)
     
         # Plot each peak width and amplitude
@@ -248,17 +243,10 @@ def _return_indv_acf_figure(
     """
     Space saving function to return individual ACF figures
     """
-    style = 'dark_background' if dark_plots else 'default'
-
-    with plt.style.context(style):
+    with style_context(dark_plots):
         # Create subplots for raw signal and autocorrelation curve
         fig, (ax1, ax2) = plt.subplots(2, 1)
-
-        # Force black backgrounds in dark mode
-        if dark_plots:
-            fig.patch.set_facecolor('black')
-            ax1.set_facecolor('black')
-            ax2.set_facecolor('black')
+        apply_dark(fig, (ax1, ax2), dark_plots)
 
         x_axis = np.arange(0, num_frames) * frame_interval
 
@@ -365,16 +353,9 @@ def _return_indv_ccf_figure(
     """
     Space saving function to return individual CCF figures
     """
-    style = 'dark_background' if dark_plots else 'default'
-
-    with plt.style.context(style):
+    with style_context(dark_plots):
         fig, (ax1, ax2) = plt.subplots(2, 1)
-
-        # Force black backgrounds for dark mode
-        if dark_plots:
-            fig.patch.set_facecolor('black')
-            ax1.set_facecolor('black')
-            ax2.set_facecolor('black')
+        apply_dark(fig, (ax1, ax2), dark_plots)
 
         x_axis = np.arange(0, num_frames) * frame_interval 
 
@@ -513,15 +494,11 @@ def _return_indv_landmark_shift_figure(
     '''
     Space saving function to return individual landmark-shift figures.
     '''
-    style = 'dark_background' if dark_plots else 'default'
     x_axis = np.arange(0, num_frames) * frame_interval
 
-    with plt.style.context(style):
+    with style_context(dark_plots):
         fig, ax = plt.subplots(figsize=(10, 4))
-
-        if dark_plots:
-            fig.patch.set_facecolor('black')
-            ax.set_facecolor('black')
+        apply_dark(fig, ax, dark_plots)
 
         c1 = 'lightblue' if dark_plots else 'blue'
         c2 = 'lightcoral' if dark_plots else 'orange'

@@ -52,8 +52,13 @@ class _GUIWriter:
 
             tqdm_match = _TQDM_RE.search(line)
             if tqdm_match:
-                label = line[:tqdm_match.start()].strip() or "progress"
-                self.gui.update_progress_line(label, line)
+                # Per-file sub-bars (ind acfs/peaks/ccfs/landmark, etc.) would
+                # flood the log with a line per update; show a compact live
+                # "task NN%" indicator next to the progress bar instead.
+                label = line[:tqdm_match.start()].strip(" :") or "working"
+                pct_match = re.search(r"(\d+)%\|", line)
+                pct = pct_match.group(1) if pct_match else "?"
+                self.gui.set_subprogress(f"{label} {pct}%")
                 continue
 
             if (line.startswith("Processing ")
@@ -101,9 +106,14 @@ def _build_log_params(params, analysis_type):
             "Box Size(px)": params["box_size"],
             "Box Shift(px)": params["bin_shift"],
             "Group Names": params["group_names"],
+            "Group Order": params.get("group_order"),
+            "Group Display Names": params.get("group_labels"),
             "Plot Summary ACFs": params["plot_flags"]["plot_summary_ACFs"],
             "Plot Summary CCFs": params["plot_flags"]["plot_summary_CCFs"],
             "Plot Summary Peaks": params["plot_flags"]["plot_summary_peaks"],
+            "Plot Metric Correlations": params["plot_flags"].get(
+                "plot_metric_correlations", params["plot_flags"].get("plot_summary_peaks", False)
+            ),
             "Plot Individual ACFs": params["plot_flags"]["plot_indv_ACFs"],
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
@@ -112,32 +122,41 @@ def _build_log_params(params, analysis_type):
             "Plot Individual Landmark Shifts": params["plot_flags"].get("plot_indv_landmark_shifts", False),
             "Plot FTs": params["plot_flags"].get("plot_fts", False),
             "Dark Plots": params["plot_flags"]["dark_plots"],
+            "Group Stats": params["plot_flags"].get("group_stats", True),
+            "Group Stats Test": params["plot_flags"].get("group_stats_test", "nonparametric"),
         })
     elif analysis_type == "rolling":
         log_params.update({
             "Box Size(px)": params["box_size"],
             "Box Shift(px)": params["bin_shift"],
-            "Plot sub-movie ACFs": params["plot_subframe_ACFs"],
-            "Plot movie CCFs": params["plot_subframe_CCFs"],
-            "Plot movie Peaks": params["plot_subframe_peaks"],
             "Submovies Used": [],
             "Plotting errors": [],
+            "Rise/Fall Landmark Height": params.get("edge_height_fraction", 0.5),
+            "Dark Plots": params["dark_plots"],
         })
     elif analysis_type == "kymograph":
         log_params.update({
             "Line width": params["line_width"],
             "Line Shift(px)": params["bin_shift"],
             "Group Names": params["group_names"],
+            "Group Order": params.get("group_order"),
+            "Group Display Names": params.get("group_labels"),
             "Plot Summary ACFs": params["plot_flags"]["plot_summary_ACFs"],
             "Plot Summary CCFs": params["plot_flags"]["plot_summary_CCFs"],
             "Plot Summary Peaks": params["plot_flags"]["plot_summary_peaks"],
+            "Plot Metric Correlations": params["plot_flags"].get(
+                "plot_metric_correlations", params["plot_flags"].get("plot_summary_peaks", False)
+            ),
             "Plot Individual ACFs": params["plot_flags"]["plot_indv_ACFs"],
             "Plot Individual CCFs": params["plot_flags"]["plot_indv_CCFs"],
             "Plot Individual Peaks": params["plot_flags"]["plot_indv_peaks"],
             "Plot Heatmaps": params["plot_flags"]["plot_heatmaps"],
             "Plot Landmark Shifts": params["plot_flags"].get("plot_landmark_shifts", False),
             "Plot Individual Landmark Shifts": params["plot_flags"].get("plot_indv_landmark_shifts", False),
+            "Plot FTs": params["plot_flags"].get("plot_fts", False),
             "Dark Plots": params["plot_flags"]["dark_plots"],
+            "Group Stats": params["plot_flags"].get("group_stats", True),
+            "Group Stats Test": params["plot_flags"].get("group_stats_test", "nonparametric"),
             "Calc Wave Speeds": params["calculate_wave_speeds"],
             "Plot Wave Speeds": True,
         })
@@ -203,6 +222,8 @@ def _run_analysis(gui):
                 smoothing=params["smoothing"],
                 channel_names=channel_names,
                 edge_height_fraction=params["edge_height_fraction"],
+                group_order=params.get("group_order"),
+                group_labels=params.get("group_labels"),
             )
 
         elif analysis_type == "rolling":
@@ -224,7 +245,10 @@ def _run_analysis(gui):
                 channel_names=channel_names,
                 injection_ch1=params.get("injection_ch1", False),
                 injection_ch2=params.get("injection_ch2", False),
+                injection_ch3=params.get("injection_ch3", False),
+                injection_ch4=params.get("injection_ch4", False),
                 injection_frame=params.get("injection_frame", None),
+                edge_height_fraction=params.get("edge_height_fraction", 0.5),
             )
 
         elif analysis_type == "kymograph":
@@ -248,6 +272,8 @@ def _run_analysis(gui):
                 smoothing=params["smoothing"],
                 channel_names=channel_names,
                 edge_height_fraction=params["edge_height_fraction"],
+                group_order=params.get("group_order"),
+                group_labels=params.get("group_labels"),
             )
 
         if log_params["Errors"]:

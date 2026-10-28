@@ -93,7 +93,7 @@ def test_summarize_image_nan_handling():
 
 def test_summarize_image_shift_row_present():
     df, _ = summarize_image(_make_img_metrics(), _make_img_props())
-    assert 'Ch1-Ch2 Shift' in df['Parameter'].values
+    assert 'Ch1-Ch2 CCF Shift' in df['Parameter'].values
 
 def test_summarize_image_returns_stats_dict():
     _, stats = summarize_image(_make_img_metrics(), _make_img_props())
@@ -132,7 +132,7 @@ def test_combine_stats_has_shift_keys():
     img_metrics = _make_img_metrics()
     _, stats = summarize_image(img_metrics, img_props)
     result = combine_stats_for_image_kymo_standard('f.tif', 'Group1', img_props, img_metrics, stats)
-    assert 'Ch1-Ch2 Mean Shift' in result
+    assert 'Ch1-Ch2 Mean CCF Shift' in result
 
 def test_combine_stats_mean_period_value():
     img_props = _make_img_props()

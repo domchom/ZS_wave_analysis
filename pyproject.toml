@@ -30,7 +30,11 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build]
 packages = ["waveanalysis"]
-include = ["waveanalysis/**/*.py"]
+include = [
+    "waveanalysis/**/*.py",
+    "waveanalysis/custom_gui/help_assets/*.png",
+    "waveanalysis/custom_gui/help_assets/*.jpg",
+]
 
 [tool.hatch.version]
 source = "vcs"

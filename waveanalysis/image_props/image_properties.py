@@ -1,5 +1,25 @@
 import tifffile
 
+
+def _normalize_unit(unit) -> str:
+    """Clean up the pixel-size unit read from ImageJ metadata.
+
+    Some TIFFs store the micron sign as a literal escape sequence (e.g. the
+    seven characters '\\u00B5m') instead of the character 'µm', which otherwise
+    renders as junk text on the scale bar. Decode any such escapes and fall back
+    to 'px' for missing/blank units.
+    """
+    if not unit:
+        return 'px'
+    u = str(unit)
+    if '\\u' in u or '\\x' in u:
+        try:
+            u = u.encode('utf-8').decode('unicode_escape')
+        except (UnicodeDecodeError, UnicodeEncodeError):
+            pass
+    return u
+
+
 def get_multi_frame_properties(image_path: str) -> dict:
     """
     Retrieves the properties of a multi-frame image.
@@ -28,7 +48,7 @@ def get_multi_frame_properties(image_path: str) -> dict:
         # Get the number of channels, frames, pixel unit, and the frame interval
         num_channels = metadata.get('channels', 1)
         frame_interval = metadata.get('finterval', 1)
-        pixel_unit = metadata.get('unit', 'px')
+        pixel_unit = _normalize_unit(metadata.get("unit", "px"))
         num_frames = metadata.get('frames', 1)
     
     img_props_dict = {
@@ -59,7 +79,7 @@ def get_single_frame_properties(image_path: str) -> dict:
         # Get the number of channels, frame interval, and pixel unit
         num_channels = metadata.get('channels', 1)
         frame_interval = metadata.get('finterval', 1)
-        pixel_unit = metadata.get('unit', 'px')
+        pixel_unit = _normalize_unit(metadata.get("unit", "px"))
 
     # Get the dimensions of the image
     num_frames = image.shape[-2]

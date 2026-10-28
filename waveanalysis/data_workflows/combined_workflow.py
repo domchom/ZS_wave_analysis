@@ -35,6 +35,8 @@ def combined_workflow(
     smoothing: bool = False,
     channel_names: list = None,
     edge_height_fraction: float = 0.5,
+    group_order: list = None,
+    group_labels: dict = None,
 ) -> pd.DataFrame:
     '''
     This is the combined workflow for kymographs and standard analysis. It processes the image files in the 
@@ -166,7 +168,7 @@ def combined_workflow(
                 indv_periods = sp.calc_indv_period_workflow(acf_curve=indv_acfs, img_props=img_props)
 
                 # Calculate the peak properties
-                indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas, indv_incr_rates, indv_dec_rates, indv_ddx_maxs, indv_ddx_mins = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props)
+                indv_peak_widths, indv_peak_maxs, indv_peak_mins, indv_peak_offsets, indv_peak_props, indv_peak_areas, indv_rising_slopes, indv_falling_slopes, indv_max_rising_slopes, indv_max_falling_slopes = sp.calc_indv_peak_props_workflow(bin_values=bin_values, img_props=img_props)
                 
                 # with open(f'/Users/domchom/Desktop/{file_name}_peak_props.pkl', 'wb') as f:
                 #    pickle.dump(indv_peak_props, f)
@@ -198,18 +200,20 @@ def combined_workflow(
                 indv_periods = indv_periods * img_props['frame_interval']
                 indv_peak_offsets = indv_peak_offsets * img_props['frame_interval']
                 indv_peak_widths = indv_peak_widths * img_props['frame_interval']
-                indv_rise_times = indv_edge_times['Rise Time'] * img_props['frame_interval']
-                indv_fall_times = indv_edge_times['Fall Time'] * img_props['frame_interval']
-                indv_rise_fall_times = indv_edge_times['Rise-Fall Time'] * img_props['frame_interval']
+                indv_rise_durations = indv_edge_times['Rise Duration'] * img_props['frame_interval']
+                indv_fall_durations = indv_edge_times['Fall Duration'] * img_props['frame_interval']
+                indv_rise_minus_fall_durations = indv_edge_times['Rise minus Fall Duration'] * img_props['frame_interval']
+                # peak area is integrated over the frame index (AU*frames), so scale to AU*s
+                indv_peak_areas = indv_peak_areas * img_props['frame_interval']
 
                 # same adjustment, use division since rates are in units/time
-                indv_incr_rates /= img_props['frame_interval']
-                indv_dec_rates /= img_props['frame_interval']
-                indv_ddx_maxs /= img_props['frame_interval']
-                indv_ddx_mins /= img_props['frame_interval']
+                indv_rising_slopes /= img_props['frame_interval']
+                indv_falling_slopes /= img_props['frame_interval']
+                indv_max_rising_slopes /= img_props['frame_interval']
+                indv_max_falling_slopes /= img_props['frame_interval']
 
                 # calculate ratio between the rate max and min
-                indv_ddx_ratios = -1 * (indv_ddx_maxs / indv_ddx_mins)
+                indv_max_slope_ratios = -1 * (indv_max_rising_slopes / indv_max_falling_slopes)
 
                 # create dictionary of image parameters and their values for later use
                 img_metrics = {
@@ -220,15 +224,15 @@ def combined_workflow(
                                 'Peak Max': indv_peak_maxs,
                                 'Peak Min': indv_peak_mins,
                                 'Peak Offset': indv_peak_offsets,
-                                'Rise Time': indv_rise_times,
-                                'Fall Time': indv_fall_times,
-                                'Rise-Fall Time': indv_rise_fall_times,
+                                'Rise Duration': indv_rise_durations,
+                                'Fall Duration': indv_fall_durations,
+                                'Rise minus Fall Duration': indv_rise_minus_fall_durations,
                                 'Peak Area': indv_peak_areas,
-                                'Increasing Rate (left side)':indv_incr_rates,
-                                'Decreasing Rate (right side)': indv_dec_rates,
-                                'Max Increasing Rate': indv_ddx_maxs,
-                                'Max Decreasing Rate': indv_ddx_mins,
-                                'Max Incr Rate / Dec Rate': indv_ddx_ratios
+                                'Rising Slope': indv_rising_slopes,
+                                'Falling Slope': indv_falling_slopes,
+                                'Max Rising Slope': indv_max_rising_slopes,
+                                'Max Falling Slope': indv_max_falling_slopes,
+                                'Rising/Falling Slope Ratio': indv_max_slope_ratios
                                 }
                 
                 # add shifts to the dictionary if there are multiple channels
@@ -273,25 +277,51 @@ def combined_workflow(
                     )
                     hf.save_plots(mean_peak_figs, im_save_path)
 
-                # plot spatial metric heatmaps (standard analysis only)
-                if plot_flags["plot_heatmaps"] and analysis_type == 'standard':
-                    heatmap_figs = pt.plot_metric_heatmaps_workflow(
+                    # plot the mean edge-slope (steepness) figures for the file
+                    mean_slope_figs = pt.plot_mean_slope_props_workflow(
                         img_metrics=img_metrics,
                         img_props=img_props,
-                        image_array=image_array,
-                        dark_plots=plot_flags["dark_plots"],
+                        dark_plots=plot_flags["dark_plots"]
                     )
+                    hf.save_plots(mean_slope_figs, im_save_path)
+
+                # plot the per-bin cross-metric correlation heatmaps
+                if plot_flags.get("plot_metric_correlations", plot_flags.get("plot_summary_peaks", False)):
+                    corr_figs = pt.plot_metric_correlation_workflow(
+                        img_metrics=img_metrics,
+                        img_props=img_props,
+                        dark_plots=plot_flags["dark_plots"]
+                    )
+                    hf.save_plots(corr_figs, im_save_path)
+
+                # plot spatial metric heatmaps
+                if plot_flags["plot_heatmaps"]:
+                    if analysis_type == 'standard':
+                        heatmap_figs = pt.plot_metric_heatmaps_workflow(
+                            img_metrics=img_metrics,
+                            img_props=img_props,
+                            image_array=image_array,
+                            dark_plots=plot_flags["dark_plots"],
+                        )
+                    else:
+                        heatmap_figs = pt.plot_metric_heatmaps_kymo_workflow(
+                            img_metrics=img_metrics,
+                            img_props=img_props,
+                            image_array=image_array,
+                            dark_plots=plot_flags["dark_plots"],
+                        )
                     heatmap_path = os.path.join(im_save_path, 'Metric_Heatmaps')
                     os.makedirs(heatmap_path, exist_ok=True)
                     hf.save_plots(heatmap_figs, heatmap_path)
 
                 # plot Fourier transforms
-                if plot_flags["plot_fts"] and analysis_type == 'standard':
+                if plot_flags.get("plot_fts", False):
                     fft_figs = pt.plot_fft_workflow(
                         bin_values=bin_values,
                         img_props=img_props,
                         indv_peak_props=indv_peak_props,
                         num_frames=img_props['num_frames'],
+                        indv_periods=indv_periods,
                         dark_plots=plot_flags["dark_plots"]
                     )
                     fft_path = os.path.join(im_save_path, 'FFT_plots')
@@ -454,10 +484,22 @@ def combined_workflow(
 
         # create dataframe from summary list, then sort and save the summary to a csv file
         summary_df = pd.DataFrame(summary_list, columns=col_headers)
+        if summary_df.empty:
+            # Every file failed or was skipped: nothing to summarize. Surface a
+            # clear message instead of a cryptic 'File Name' KeyError downstream.
+            print('****** ERROR ******\nNo files were successfully processed; '
+                  'see the log for per-file errors.\n****** ERROR ******')
+            log_params['Errors'].append('No files were successfully processed.')
+            return summary_df
         summary_df = summary_df.sort_values('File Name', ascending=True)
         summary_df.to_csv(f"{main_save_path}/!{now.strftime('%Y%m%d%H%M')}_summary.csv", index = False) if not test else None
 
         if group_names != ['']:
+            # Group-test options: whether to annotate a significance test at all,
+            # and which test family (rank-based non-parametric vs t-test/ANOVA).
+            group_stats = plot_flags.get("group_stats", True)
+            group_stats_test = plot_flags.get("group_stats_test", "nonparametric")
+
             # generate comparisons between each group
             mean_parameter_figs = pt.generate_group_comparison(
                 summary_df=summary_df,
@@ -465,17 +507,62 @@ def combined_workflow(
                 dark_plots=plot_flags["dark_plots"],
                 channel_names=channel_names,
                 edge_height_fraction=edge_height_fraction,
+                group_order=group_order,
+                group_labels=group_labels,
+                add_stats=group_stats,
+                stats_test=group_stats_test,
             )
             group_plots_save_path = os.path.join(main_save_path, "group_comparison_graphs")
             os.makedirs(group_plots_save_path, exist_ok=True) if not test else None
-            hf.save_plots(mean_parameter_figs, group_plots_save_path) if not test else None
+            hf.save_plots(mean_parameter_figs, group_plots_save_path, group_by_metric=True) if not test else None
 
-            # save the means each parameter for the attributes to make them easier to work with 
+            # dataset-quality plots: detection failure, coverage, effective N
+            quality_figs = {}
+            quality_figs.update(pt.generate_group_detection_quality(
+                summary_df=summary_df,
+                log_params=log_params,
+                dark_plots=plot_flags["dark_plots"],
+                channel_names=channel_names,
+                edge_height_fraction=edge_height_fraction,
+                group_order=group_order,
+                group_labels=group_labels,
+                add_stats=group_stats,
+                stats_test=group_stats_test,
+            ))
+            quality_figs.update(pt.generate_group_coverage(
+                summary_df=summary_df,
+                log_params=log_params,
+                dark_plots=plot_flags["dark_plots"],
+                group_order=group_order,
+                group_labels=group_labels,
+                add_stats=group_stats,
+                stats_test=group_stats_test,
+            ))
+            quality_figs.update(pt.generate_group_per_image_reliability(
+                summary_df=summary_df,
+                log_params=log_params,
+                dark_plots=plot_flags["dark_plots"],
+                channel_names=channel_names,
+                edge_height_fraction=edge_height_fraction,
+                group_order=group_order,
+                group_labels=group_labels,
+            ))
+            if not test and quality_figs:
+                quality_save_path = os.path.join(main_save_path, "quality_assessment_graphs")
+                os.makedirs(quality_save_path, exist_ok=True)
+                hf.save_plots(quality_figs, quality_save_path)
+
+            # save the means each parameter for the attributes to make them easier to work with
             parameter_tables_dict = save_parameter_means_to_csv(summary_df=summary_df,group_names=group_names)
             mean_measurements_save_path = os.path.join(main_save_path, "mean_parameter_measurements")
             os.makedirs(mean_measurements_save_path, exist_ok=True) if not test else None
             for filename, table in parameter_tables_dict.items():
-                table.to_csv(f"{mean_measurements_save_path}/{filename}", index = False) if not test else None
+                if not test:
+                    # group related metric tables into the same subfolders as the plots
+                    category = hf.categorize_metric(filename)
+                    category_dir = os.path.join(mean_measurements_save_path, category)
+                    os.makedirs(category_dir, exist_ok=True)
+                    table.to_csv(os.path.join(category_dir, filename), index=False)
 
         # performance tracker end
         end = timeit.default_timer()

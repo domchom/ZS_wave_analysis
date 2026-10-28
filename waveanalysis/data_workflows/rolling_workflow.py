@@ -11,7 +11,25 @@ import waveanalysis.housekeeping.housekeeping_functions as hf
 from waveanalysis.data_workflows._helpers import _setup_workflow, _load_image_props, _smooth_bin_values_inplace
 from waveanalysis.image_props.image_bin_calc import create_multi_frame_bin_array
 from waveanalysis.image_props.image_to_np_arrays import tiff_to_np_array_multi_frame
+from waveanalysis.signal_processing.correlation_functions import _peak_landmarks
 from waveanalysis.summarize_save.summarize_images import summarize_image, combine_stats_rolling
+
+
+def _build_injection_dict(flags: list, num_channels: int, injection_frame: int, subframe_roll: int) -> dict:
+    '''
+    Assemble the live-injection overlay spec for the rolling summary plots.
+
+    flags is [Ch1, Ch2, Ch3, Ch4] booleans; the returned 'injection_channels'
+    is the 1-indexed list of selected channels that actually exist in the image.
+    'injection_submovie' converts the injection frame to the rolling plots'
+    x-axis units (submovie index = frame / subframe_roll), or None when no
+    injection frame is set.
+    '''
+    injection_channels = [ch for ch, on in enumerate(flags, start=1)
+                          if on and ch <= num_channels]
+    injection_submovie = (injection_frame / subframe_roll) if injection_frame else None
+    return {"injection_channels": injection_channels, "injection_submovie": injection_submovie}
+
 
 def rolling_workflow(
     folder_path: str,
@@ -31,7 +49,10 @@ def rolling_workflow(
     channel_names: list = None,
     injection_ch1: bool = False,
     injection_ch2: bool = False,
-    injection_frame: int = None
+    injection_ch3: bool = False,
+    injection_ch4: bool = False,
+    injection_frame: int = None,
+    edge_height_fraction: float = 0.5,
 ) -> pd.DataFrame:
     '''
     This is the workflow for rolling analysis. It processes the image files in the specified folder 
@@ -102,6 +123,7 @@ def rolling_workflow(
                 img_props['num_x_bins'] = num_x_bins
                 img_props['num_y_bins'] = num_y_bins
                 img_props['channel_names'] = channel_names
+                img_props['edge_height_fraction'] = edge_height_fraction
 
                 file_stem = file_name.rsplit(".", 1)[0]
 
@@ -130,6 +152,10 @@ def rolling_workflow(
                 indv_peak_mins = np.zeros(shape=(num_submovies, num_channels, num_bins))
                 indv_peak_offsets = np.zeros(shape=(num_submovies, num_channels, num_bins))
                 indv_peak_areas = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_rising_slopes = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_falling_slopes = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_max_rising_slopes = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_max_falling_slopes = np.zeros(shape=(num_submovies, num_channels, num_bins))
 
                 its = num_submovies*num_channels*num_x_bins*num_y_bins
                 with tqdm(total = its, miniters=its/100) as pbar:
@@ -140,7 +166,9 @@ def rolling_workflow(
                                 pbar.update(1)
                                 signal = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, channel, bin]
 
-                                mean_width, mean_max, mean_min, mean_offset, mean_area = sp.calc_indv_peak_props_rolling(signal=signal, peak_prominence_fraction=img_props['peak_prominence_fraction'])
+                                (mean_width, mean_max, mean_min, mean_offset, mean_area,
+                                 mean_rising_slope, mean_falling_slope,
+                                 mean_max_rising_slope, mean_max_falling_slope) = sp.calc_indv_peak_props_rolling(signal=signal, peak_prominence_fraction=img_props['peak_prominence_fraction'])
 
                                 # Store peak measurements for each bin in each channel
                                 indv_peak_widths[submovie, channel, bin] = mean_width
@@ -148,6 +176,10 @@ def rolling_workflow(
                                 indv_peak_mins[submovie, channel, bin] = mean_min
                                 indv_peak_offsets[submovie, channel, bin] = mean_offset
                                 indv_peak_areas[submovie, channel, bin] = mean_area
+                                indv_rising_slopes[submovie, channel, bin] = mean_rising_slope
+                                indv_falling_slopes[submovie, channel, bin] = mean_falling_slope
+                                indv_max_rising_slopes[submovie, channel, bin] = mean_max_rising_slope
+                                indv_max_falling_slopes[submovie, channel, bin] = mean_max_falling_slope
 
                 indv_peak_amps = indv_peak_maxs - indv_peak_mins
                 indv_peak_rel_amps = indv_peak_amps / indv_peak_mins
@@ -180,6 +212,55 @@ def rolling_workflow(
                                         shift = sp.correct_small_shifts(delay_frames=shift, average_period=average_period)
                                     indv_shifts[submovie, combo_number, bin] = shift
 
+                # Per-channel within-peak edge durations (rise/fall halves of each peak)
+                indv_rise_durations = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_fall_durations = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                indv_rise_minus_fall_durations = np.zeros(shape=(num_submovies, num_channels, num_bins))
+                its = num_submovies * num_channels * num_bins
+                with tqdm(total=its, miniters=its/100) as pbar:
+                    pbar.set_description('Edge Times: ')
+                    for submovie in range(num_submovies):
+                        for channel in range(num_channels):
+                            for bin in range(num_bins):
+                                pbar.update(1)
+                                signal = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, channel, bin]
+                                apexes, rises, falls = _peak_landmarks(signal, img_props['peak_prominence_fraction'], edge_height_fraction)
+                                if len(apexes) == 0:
+                                    indv_rise_durations[submovie, channel, bin] = np.nan
+                                    indv_fall_durations[submovie, channel, bin] = np.nan
+                                    indv_rise_minus_fall_durations[submovie, channel, bin] = np.nan
+                                else:
+                                    peak_rise_durations = apexes - rises
+                                    peak_fall_durations = falls - apexes
+                                    indv_rise_durations[submovie, channel, bin] = np.nanmean(peak_rise_durations)
+                                    indv_fall_durations[submovie, channel, bin] = np.nanmean(peak_fall_durations)
+                                    indv_rise_minus_fall_durations[submovie, channel, bin] = np.nanmean(peak_rise_durations - peak_fall_durations)
+
+                # Landmark-based shifts (per channel combo, per submovie)
+                if num_channels > 1:
+                    indv_landmark_peak_shifts = np.zeros(shape=(num_submovies, num_combos, num_bins))
+                    indv_landmark_rise_shifts = np.zeros(shape=(num_submovies, num_combos, num_bins))
+                    indv_landmark_fall_shifts = np.zeros(shape=(num_submovies, num_combos, num_bins))
+                    its = num_submovies * num_combos * num_bins
+                    with tqdm(total=its, miniters=its/100) as pbar:
+                        pbar.set_description('Landmark Shifts: ')
+                        for submovie in range(num_submovies):
+                            for combo_number, combo in enumerate(channel_combos):
+                                for bin in range(num_bins):
+                                    pbar.update(1)
+                                    signal1 = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, combo[0], bin]
+                                    signal2 = bin_values[subframe_roll*submovie : subframe_size + subframe_roll*submovie, combo[1], bin]
+                                    combo_period = np.nanmean(indv_periods[submovie, [combo[0], combo[1]], bin])
+                                    peak_shift, rise_shift, fall_shift = sp.calc_indv_landmark_shifts(
+                                        signal1=signal1, signal2=signal2,
+                                        period=combo_period,
+                                        peak_prominence_fraction=img_props['peak_prominence_fraction'],
+                                        edge_height_fraction=edge_height_fraction,
+                                    )
+                                    indv_landmark_peak_shifts[submovie, combo_number, bin] = peak_shift
+                                    indv_landmark_rise_shifts[submovie, combo_number, bin] = rise_shift
+                                    indv_landmark_fall_shifts[submovie, combo_number, bin] = fall_shift
+
                 # create a subfolder within the main save path with the same name as the image file
                 im_save_path = os.path.join(main_save_path, file_stem)
                 os.makedirs(im_save_path, exist_ok=True) if not test else None
@@ -188,6 +269,18 @@ def rolling_workflow(
                 indv_periods = indv_periods * img_props['frame_interval']
                 indv_peak_offsets = indv_peak_offsets * img_props['frame_interval']
                 indv_peak_widths = indv_peak_widths * img_props['frame_interval']
+                indv_rise_durations = indv_rise_durations * img_props['frame_interval']
+                indv_fall_durations = indv_fall_durations * img_props['frame_interval']
+                indv_rise_minus_fall_durations = indv_rise_minus_fall_durations * img_props['frame_interval']
+                # peak area is integrated over the frame index (AU*frames), so scale to AU*s
+                indv_peak_areas = indv_peak_areas * img_props['frame_interval']
+                # slopes are AU per frame, so divide by the interval to get AU/s
+                indv_rising_slopes = indv_rising_slopes / img_props['frame_interval']
+                indv_falling_slopes = indv_falling_slopes / img_props['frame_interval']
+                indv_max_rising_slopes = indv_max_rising_slopes / img_props['frame_interval']
+                indv_max_falling_slopes = indv_max_falling_slopes / img_props['frame_interval']
+                # slope ratio is dimensionless (rise vs fall steepness; 1 = symmetric)
+                indv_max_slope_ratios = -1 * (indv_max_rising_slopes / indv_max_falling_slopes)
 
                 img_metrics = {
                                 'Period': indv_periods,
@@ -197,7 +290,15 @@ def rolling_workflow(
                                 'Peak Max': indv_peak_maxs,
                                 'Peak Min': indv_peak_mins,
                                 'Peak Offset': indv_peak_offsets,
-                                'Peak Area': indv_peak_areas
+                                'Peak Area': indv_peak_areas,
+                                'Rise Duration': indv_rise_durations,
+                                'Fall Duration': indv_fall_durations,
+                                'Rise minus Fall Duration': indv_rise_minus_fall_durations,
+                                'Rising Slope': indv_rising_slopes,
+                                'Falling Slope': indv_falling_slopes,
+                                'Max Rising Slope': indv_max_rising_slopes,
+                                'Max Falling Slope': indv_max_falling_slopes,
+                                'Rising/Falling Slope Ratio': indv_max_slope_ratios,
                 }
 
                 # add shifts to the dictionary if there are multiple channels
@@ -209,6 +310,16 @@ def rolling_workflow(
                         combo_period = np.nanmean(indv_periods[:, [ch1, ch2], :], axis=1)
                         indv_phase_shifts[:, combo_idx, :] = (indv_shifts[:, combo_idx, :] / combo_period) * 100
                     img_metrics['% Phase Shift'] = indv_phase_shifts
+
+                    # convert landmark shifts to time units and store them
+                    indv_landmark_peak_shifts *= img_props['frame_interval']
+                    indv_landmark_rise_shifts *= img_props['frame_interval']
+                    indv_landmark_fall_shifts *= img_props['frame_interval']
+                    img_metrics['Peak Shift'] = indv_landmark_peak_shifts
+                    img_metrics['Rise Shift'] = indv_landmark_rise_shifts
+                    img_metrics['Fall Shift'] = indv_landmark_fall_shifts
+                    img_metrics['Rise-Peak Diff'] = indv_landmark_rise_shifts - indv_landmark_peak_shifts
+                    img_metrics['Fall-Peak Diff'] = indv_landmark_fall_shifts - indv_landmark_peak_shifts
 
                 # calculate the number of subframes used
                 log_params['Submovies Used'].append(num_submovies)
@@ -244,11 +355,16 @@ def rolling_workflow(
                     channel_combos=channel_combos,
                     dark_plots=dark_plots,
                     channel_names=channel_names,
-                    live_injection_dict={"injection_ch1": injection_ch1, "injection_ch2": injection_ch2, "injection_frame": (injection_frame / img_props['frame_interval']) if injection_frame is not None else None}
+                    live_injection_dict=_build_injection_dict(
+                        flags=[injection_ch1, injection_ch2, injection_ch3, injection_ch4],
+                        num_channels=num_channels,
+                        injection_frame=injection_frame,
+                        subframe_roll=subframe_roll,
+                    )
                 )
                 plot_save_path = os.path.join(im_save_path, 'summary_plots')
                 os.makedirs(plot_save_path, exist_ok=True) if not test else None
-                hf.save_plots(summary_plots, plot_save_path) if not test else None
+                hf.save_plots(summary_plots, plot_save_path, group_by_metric=True) if not test else None
 
                 end = timeit.default_timer()
                 log_params["Time Elapsed"] = f"{end - start:.2f} seconds"

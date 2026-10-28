@@ -176,16 +176,16 @@ def test_edge_times_workflow_per_channel():
 
     result = calc_indv_edge_times_workflow(bin_values=bin_values, img_props=img_props)
 
-    assert set(result) == {'Rise Time', 'Fall Time', 'Rise-Fall Time'}
-    assert result['Rise Time'].shape == (num_channels, num_bins)
-    np.testing.assert_allclose(result['Rise Time'][0], 20.0, atol=1e-6)  # Ch1
-    np.testing.assert_allclose(result['Fall Time'][0], 5.0, atol=1e-6)
-    np.testing.assert_allclose(result['Rise-Fall Time'][0], 15.0, atol=1e-6)
-    np.testing.assert_allclose(result['Rise Time'][1], 10.0, atol=1e-6)  # Ch2
-    np.testing.assert_allclose(result['Fall Time'][1], 10.0, atol=1e-6)
-    np.testing.assert_allclose(result['Rise-Fall Time'][1], 0.0, atol=1e-6)
+    assert set(result) == {'Rise Duration', 'Fall Duration', 'Rise minus Fall Duration'}
+    assert result['Rise Duration'].shape == (num_channels, num_bins)
+    np.testing.assert_allclose(result['Rise Duration'][0], 20.0, atol=1e-6)  # Ch1
+    np.testing.assert_allclose(result['Fall Duration'][0], 5.0, atol=1e-6)
+    np.testing.assert_allclose(result['Rise minus Fall Duration'][0], 15.0, atol=1e-6)
+    np.testing.assert_allclose(result['Rise Duration'][1], 10.0, atol=1e-6)  # Ch2
+    np.testing.assert_allclose(result['Fall Duration'][1], 10.0, atol=1e-6)
+    np.testing.assert_allclose(result['Rise minus Fall Duration'][1], 0.0, atol=1e-6)
     # At the default 50% edge height, rise + fall equals the half-max width.
-    np.testing.assert_allclose(result['Rise Time'] + result['Fall Time'],
+    np.testing.assert_allclose(result['Rise Duration'] + result['Fall Duration'],
                                [[25.0, 25.0], [20.0, 20.0]], atol=1e-6)
 
 
@@ -210,12 +210,12 @@ def test_edge_times_workflow_uses_configured_edge_height():
 
     result = calc_indv_edge_times_workflow(bin_values=bin_values, img_props=img_props)
 
-    np.testing.assert_allclose(result['Rise Time'][0], 32.0, atol=1e-6)
-    np.testing.assert_allclose(result['Fall Time'][0], 8.0, atol=1e-6)
-    np.testing.assert_allclose(result['Rise-Fall Time'][0], 24.0, atol=1e-6)
-    np.testing.assert_allclose(result['Rise Time'][1], 16.0, atol=1e-6)
-    np.testing.assert_allclose(result['Fall Time'][1], 16.0, atol=1e-6)
-    np.testing.assert_allclose(result['Rise-Fall Time'][1], 0.0, atol=1e-6)
+    np.testing.assert_allclose(result['Rise Duration'][0], 32.0, atol=1e-6)
+    np.testing.assert_allclose(result['Fall Duration'][0], 8.0, atol=1e-6)
+    np.testing.assert_allclose(result['Rise minus Fall Duration'][0], 24.0, atol=1e-6)
+    np.testing.assert_allclose(result['Rise Duration'][1], 16.0, atol=1e-6)
+    np.testing.assert_allclose(result['Fall Duration'][1], 16.0, atol=1e-6)
+    np.testing.assert_allclose(result['Rise minus Fall Duration'][1], 0.0, atol=1e-6)
 
 
 def test_edge_times_no_peaks_is_nan():
@@ -225,6 +225,6 @@ def test_edge_times_no_peaks_is_nan():
     img_props = {'num_channels': 1, 'num_bins': 1, 'analysis_type': 'kymograph',
                  'peak_prominence_fraction': 0.1}
     result = calc_indv_edge_times_workflow(bin_values=bin_values, img_props=img_props)
-    assert np.isnan(result['Rise Time']).all()
-    assert np.isnan(result['Fall Time']).all()
-    assert np.isnan(result['Rise-Fall Time']).all()
+    assert np.isnan(result['Rise Duration']).all()
+    assert np.isnan(result['Fall Duration']).all()
+    assert np.isnan(result['Rise minus Fall Duration']).all()
